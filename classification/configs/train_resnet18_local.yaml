@@ -12,8 +12,8 @@ workload:
     run_training: True
     run_evaluate: False
     save_checkpoints: False
-    save_dir: mlworkloads/classification/models
-    log_dir: mlworkloads/classification/reports
+    save_dir: models
+    log_dir: reports
     seed: 1
     use_synthetic: False
     profile: True
