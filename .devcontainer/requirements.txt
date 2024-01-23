@@ -1,0 +1,13 @@
+torch
+torchvision
+lightning
+jsonargparse
+boto3
+grpcio
+grpcio-tools
+#nlp workload
+#tiktoken
+#datasets
+#wandb
+#transformers
+#export PYTHONPATH=/workspaces/super-dl

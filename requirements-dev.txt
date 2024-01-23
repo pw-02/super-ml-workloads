@@ -1,0 +1,10 @@
+torch
+torchvision
+lightning
+jsonargparse
+boto3
+pandas
+xlsxwriter
+redis
+grpcio-tools
+super-client
