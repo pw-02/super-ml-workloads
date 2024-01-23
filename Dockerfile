@@ -25,6 +25,7 @@ RUN apt update \
                    curl \
                    ca-certificates \
                    wget \
+                   vim \
                    #redis-server \ 
     && rm -rf /var/lib/apt/lists
 
