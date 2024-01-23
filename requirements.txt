@@ -7,6 +7,7 @@ grpcio-tools
 super-client
 redis
 pandas
+awscli
 #nlp workload
 #tiktoken
 #datasets
