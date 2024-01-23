@@ -16,7 +16,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV CONDA_AUTO_UPDATE_CONDA=false
 
 # Set the working directory
-WORKDIR /workspace
+WORKDIR /workspaces
 
 RUN apt update \
     && apt install -y bash \
@@ -51,7 +51,7 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt \
     && rm /tmp/requirements.txt
 
 # Set PYTHONPATH
-ENV PYTHONPATH=/workspace/super-ml-workloads
+ENV PYTHONPATH=/workspaces/super-ml-workloads
 
 # Copy the source code for the server into the container
 #COPY classification /superworkloads/classification
