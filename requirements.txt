@@ -3,9 +3,9 @@ torchvision
 lightning
 jsonargparse
 boto3
-grpcio
 grpcio-tools
 super-client
+redis
 #nlp workload
 #tiktoken
 #datasets

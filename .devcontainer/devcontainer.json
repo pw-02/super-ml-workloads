@@ -22,11 +22,12 @@
             "mutantdino.resourcemonitor",
             "redhat.vscode-yaml",
             "GrapeCity.gc-excelviewer",
-            "kangping.protobuf"
+            "kangping.protobuf",
+            "ms-azuretools.vscode-docker"
           ]
       }
-  }//,
-//   "features": {
-//     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
-// }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+}
 }

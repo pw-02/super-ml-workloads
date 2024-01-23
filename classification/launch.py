@@ -111,7 +111,7 @@ if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")
 
     defaults = {
-        "config_file": 'mlworkloads/classification/configs/train_resnet18_s3.yaml',
+        "config_file": 'classification/configs/train_resnet18_s3.yaml',
         'devices': 1,
         'precision': None,
     }
