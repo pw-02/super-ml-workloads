@@ -1,6 +1,6 @@
 pytorch:
     workers: 0
-    accelerator: 'gpu'
+    accelerator: 'cpu'
     devices: 1
 
 workload:
