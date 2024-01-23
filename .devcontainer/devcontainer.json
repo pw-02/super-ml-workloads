@@ -1,5 +1,5 @@
 {
-  "name": "super",
+  "name": "super-workloads",
   "context": "..",
   "dockerFile": "./Dockerfile",
   "runArgs": [

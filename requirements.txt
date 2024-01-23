@@ -6,6 +6,7 @@ boto3
 grpcio-tools
 super-client
 redis
+pandas
 #nlp workload
 #tiktoken
 #datasets
