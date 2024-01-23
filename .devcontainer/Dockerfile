@@ -43,6 +43,6 @@ RUN pip install --no-cache-dir -r /tmp/requirements-dev.txt \
     && rm /tmp/requirements-dev.txt
 
 # Set PYTHONPATH
-ENV PYTHONPATH=/workspaces/super-dl
+ENV PYTHONPATH=/workspaces/super-ml-workloads
 
 CMD ["/bin/bash"]
