@@ -22,7 +22,7 @@ class MyDataset:
     def __len__(self) -> int:
         return len(self.xs)
     
-class SuperBaseSampler(Sampler[int]):
+class BaseSampler(Sampler[int]):
     data_source: Sized
     def __init__(self, data_source: Sized, num_samples: Optional[int] = None, shuffle: bool = True, seed: int = 0) -> None:
         self.data_source = data_source
@@ -58,20 +58,22 @@ class SuperBaseSampler(Sampler[int]):
     def set_seed(self, seed: int) -> None:
         self.seed = seed
 
-class SuperBatchSampler():
-    def __init__(self, base_sampler: Union[Sampler[int], Iterable[int]], batch_size: int, drop_last: bool) -> None:
+class BaseBatchSampler(BaseSampler):
+
+    def __init__(self, data_source: Sized, batch_size: int, drop_last: bool, num_samples: Optional[int] = None, shuffle: bool = True, seed: int = 0) -> None:
+
         if not isinstance(batch_size, int) or batch_size <= 0:
             raise ValueError(f"batch_size should be a positive integer value, but got batch_size={batch_size}")
         if not isinstance(drop_last, bool):
             raise ValueError(f"drop_last should be a boolean value, but got drop_last={drop_last}")
-
-        self.sampler = base_sampler
+        
+        super(BaseBatchSampler, self).__init__(data_source, num_samples, shuffle, seed)
         self.batch_size = batch_size
         self.drop_last = drop_last
 
     def __iter__(self) -> Iterator[List[int]]:
         if self.drop_last:
-            sampler_iter = iter(self.sampler)
+            sampler_iter = iter(super().__iter__())
             while True:
                 try:
                     batch = [next(sampler_iter) for _ in range(self.batch_size)]
@@ -82,7 +84,7 @@ class SuperBatchSampler():
         else:
             batch = [0] * self.batch_size
             idx_in_batch = 0
-            for idx in self.sampler:
+            for idx in super().__iter__():
                 batch[idx_in_batch] = idx
                 idx_in_batch += 1
                 if idx_in_batch == self.batch_size:
@@ -97,36 +99,38 @@ class SuperBatchSampler():
 
     def __len__(self) -> int:
         if self.drop_last:
-            return len(self.sampler) // self.batch_size
+            return super().__len__() // self.batch_size
         else:
-            return (len(self.sampler) + self.batch_size - 1) // self.batch_size
+            return (super().__len__() + self.batch_size - 1) // self.batch_size
 
-    def set_seed(self, seed: int) -> None:
-        if isinstance(self.sampler, SuperBaseSampler):
-            self.sampler.set_seed(seed)
-        else:
-            raise ValueError("The underlying sampler must be an instance of SuperBaseSampler")
-        
+
+
+class PytorchVanilliaSampler(BaseSampler):
   
+  def __init__(self, data_source: Sized, num_samples: Optional[int] = None, shuffle: bool = True, seed: int = 0) -> None:
+        super(PytorchVanilliaSampler, self).__init__(data_source, num_samples, shuffle, seed)
 
-class SUPERSampler(SuperBatchSampler):
-    def __init__(self, dataset: Sized, job_id: int, super_client: SuperClient = None, shuffle: bool = True, seed: int = 0, 
-                 batch_size:int = 16, drop_last: bool = False, prefetch_lookahead = 10):
-        
-        base_sampler = SuperBaseSampler(data_source=dataset, shuffle=shuffle, seed=seed)
 
-        super(SUPERSampler, self).__init__(base_sampler, batch_size, drop_last)
+class PytorchBatchSampler(BaseBatchSampler):
+    def __init__(self, data_source: Sized, batch_size: int, drop_last: bool, num_samples: Optional[int] = None, shuffle: bool = True, seed: int = 0) -> None:
+        super(PytorchBatchSampler, self).__init__(data_source, batch_size, drop_last, num_samples, shuffle, seed)
+
+class SUPERSampler(BaseBatchSampler):
+
+    def __init__(self, data_source: Sized, batch_size: int, drop_last: bool, job_id:int, num_samples: Optional[int] = None, 
+                 shuffle: bool = True, seed: int = 0,super_client: SuperClient = None, super_prefetch_lookahead = 10) -> None:
+
+        super(SUPERSampler, self).__init__(data_source, batch_size, drop_last, num_samples,shuffle, seed )
+
         self.super_client = super_client
-        self.prefetch_lookahead = prefetch_lookahead
+        self.super_prefetch_lookahead = super_prefetch_lookahead
         self.job_id = job_id
-        self.dataset_id = dataset.dataset_id
-        
+        self.dataset_id = data_source.dataset_id
         
     def share_future_batch_accesses(self, batches: List[List[int]]) -> None:
         """
         Share future batch accesses with the CacheCoordinatorClient.
-        """
-        
+        """ 
         if batches and self.super_client is not None:
             self.super_client.share_batch_access_pattern(job_id=self.job_id, batches=batches, dataset_id = self.dataset_id)
 
@@ -139,7 +143,7 @@ class SUPERSampler(SuperBatchSampler):
         batch_iter = super().__iter__()
         batches_exhausted = False
 
-        for _ in range(self.prefetch_lookahead * 2):
+        for _ in range(self.super_prefetch_lookahead * 2):
             try:
                 batch_buffer.append(next(batch_iter))
             except StopIteration:
@@ -148,9 +152,9 @@ class SUPERSampler(SuperBatchSampler):
         self.share_future_batch_accesses(batch_buffer)
 
         while batch_buffer:
-            if len(batch_buffer) <= self.prefetch_lookahead and not batches_exhausted:
+            if len(batch_buffer) <= self.super_prefetch_lookahead and not batches_exhausted:
                 prefetch_buffer = []
-                for _ in range(self.prefetch_lookahead):
+                for _ in range(self.super_prefetch_lookahead):
                     try:
                         prefetch_buffer.append(next(batch_iter))
                     except StopIteration:

@@ -19,8 +19,8 @@ def run_training(fabric: Fabric, model:torch.nn.Module, optimizer:optim.Optimize
     
     for epoch in range(hparams.workload.epochs):
         if hparams.workload.run_evaluate:
-            
-            fabric.print("validating..")
+
+            fabric.print(f"Running validation loop for epoch {epoch}")
            
             total_batches = min(hparams.workload.max_minibatches_per_epoch, len(val_dataloader)) if hparams.workload.max_minibatches_per_epoch else len(val_dataloader)
 
@@ -37,7 +37,7 @@ def run_training(fabric: Fabric, model:torch.nn.Module, optimizer:optim.Optimize
                          total_batches=total_batches)
             
         if hparams.workload.run_training:
-            fabric.print("training..")
+            fabric.print(f"Running training loop for epoch {epoch}")
             total_batches = min(hparams.workload.max_minibatches_per_epoch, len(train_dataloader)) if hparams.workload.max_minibatches_per_epoch else len(train_dataloader)
 
             process_data(fabric=fabric,
@@ -65,14 +65,14 @@ def process_data(fabric: Fabric, dataloader: DataLoader,
     model.train(is_training)
     end = time.perf_counter()
     start_time = time.time()
-    for iteration, (input, target, batch_id, cache_hit) in enumerate(dataloader):
+    for iteration, (input, target, batch_id, cache_hit, data_fetch_time, data_transform_time) in enumerate(dataloader):
         num_sampels = input.size(0)
         data_time = time.perf_counter() - end
         
         # Accumulate gradient x batches at a time
         is_accumulating = hparams.model.grad_acc_steps is not None and iteration % hparams.model.grad_acc_steps != 0
 
-        if hparams.workload.profile:
+        if hparams.reporting.profile:
             torch.cuda.synchronize()
 
         # Forward pass and loss calculation
@@ -86,7 +86,7 @@ def process_data(fabric: Fabric, dataloader: DataLoader,
             optimizer.step()
             optimizer.zero_grad()
         
-        if hparams.workload.profile:
+        if hparams.reporting.profile:
             torch.cuda.synchronize()    
           
         iteration_time = time.perf_counter()-end
@@ -109,10 +109,12 @@ def process_data(fabric: Fabric, dataloader: DataLoader,
             top5=to_python_float(prec5),
             batch_id=batch_id,
             is_training=is_training,
-            cache_hit = cache_hit
+            cache_hit = cache_hit,
+            data_fetch_time=data_fetch_time,
+            data_transform_time=data_transform_time
             )
     
-        if super_client is not None:
+        if hparams.data.dataloader_backend == 'super' and super_client is not None:
             metrics_dict['access_time'] = start_time
             metrics_dict['training_speed'] = logger.iteration_aggregator.compute_time.avg
             metrics_dict['cache_hit'] = cache_hit

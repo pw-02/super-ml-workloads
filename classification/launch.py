@@ -12,31 +12,23 @@ def initialize_parser(config_file: str) -> ArgumentParser:
     
     from torchvision.models import list_models
 
-    data_backend_choices = ['super', 'vanilla-pytorch']
+    data_backend_choices = ['super', 'pytorch-vanillia','pytorch-batch']
 
     parser = ArgumentParser(prog="app", description="Description for my app", default_config_files=[config_file])
     
     #parser.add_argument('--config', action=ActionConfigFile)
 
     # PyTorch Configuration
-    parser.add_argument('--pytorch.workers', default=4, type=int, metavar='N', help='number of data loading workers (default: 4)')
-    parser.add_argument('--pytorch.accelerator', default='gpu', type=str, metavar='N', help='accelerator id to use')
-    parser.add_argument('--pytorch.devices', default=1, type=int, metavar='N', help='number of devices for distributed training')
-
-    #Workload Configuration
-    parser.add_argument('--workload.seed', type=int, default=None)
-    parser.add_argument('--workload.print_freq', type=int, default=1, help="how many steps to wait before flushing logs")
-    parser.add_argument('--workload.flush_logs_every_n_steps', type=int, default=10, help="how many steps to wait before flushing logs")
+    parser.add_argument('--workload.workers', default=4, type=int, metavar='N', help='number of data loading workers (default: 4)')
+    parser.add_argument('--workload.accelerator', default='gpu', type=str, metavar='N', help='accelerator id to use')
+    parser.add_argument('--workload.devices', default=1, type=int, metavar='N', help='number of devices for distributed training')
     parser.add_argument('--workload.epochs', type=int, default=3, help="number of epochs")
     parser.add_argument('--workload.max_minibatches_per_epoch', type=int, default=None)
     parser.add_argument('--workload.run_training', default=True, action="store_true")
     parser.add_argument('--workload.run_evaluate', default=False, action="store_true")
     parser.add_argument('--workload.save_checkpoints', default=False)
     parser.add_argument('--workload.save_dir', type=str, default=None)
-    parser.add_argument('--workload.log_dir', type=str, default=None, required=True)
-    parser.add_argument('--workload.use_synthetic', default=False, action="store_true")
-    parser.add_argument('--workload.exp_name', type=str, default=None)
-    parser.add_argument('--workload.profile', default=False, action="store_true")
+    parser.add_argument('--workload.training_seed', type=int, default=None)
 
     # Model Configuration
     parser.add_argument("--model.arch", type=str, default=None, required=True, choices=list_models(), help="model architecture: {}".format(", ".join(list_models())))
@@ -46,28 +38,31 @@ def initialize_parser(config_file: str) -> ArgumentParser:
     parser.add_argument('--model.optimizer', default="sgd", choices=['sgd','rmsprop'])
     parser.add_argument('--model.grad_acc_steps', type=int, default=None)
 
+
     # Data Configuration
     parser.add_argument('--data.dataloader_backend', default="super", choices=data_backend_choices, help="Choose data backend from {} (default: super-local)".format(", ".join(data_backend_choices)))
-    parser.add_argument('--data.dataset_name', type=str, default=None, required=True)
     parser.add_argument('--data.train_data_dir', type=str, default=None, required=False)
     parser.add_argument('--data.eval_data_dir', type=str, default=None, required=False)
-
     parser.add_argument('--data.batch_size', type=int, default=128, help="number of samples per batch")
-    parser.add_argument('--data.shuffle', default=False, action="store_true")
+    parser.add_argument('--data.shuffle', default=True, action="store_true")
     parser.add_argument('--data.drop_last', default=False, action="store_true")
-    parser.add_argument('--data.s3_bucket_name', type=str, default=None, required=True)
+    parser.add_argument('--data.cache_host', type=str, default='localhost') #only used when caching enabled
+    parser.add_argument('--data.cache_port', type=int, default=6379) #only used when caching enabled
+    parser.add_argument('--data.super_address', type=str, default='localhost:50051')
+    parser.add_argument('--data.super_prefetch_lookahead', type=int, default=32)
+    parser.add_argument('--data.use_cache', default=False, action="store_true")
+    parser.add_argument('--data.sampler_seed', type=int, default=None)
 
-    # Super DL Configuration
-    parser.add_argument('--super_dl.server_address', type=str, default='localhost:50051')
-    parser.add_argument('--super_dl.use_cache', default=False, action="store_true")
-    parser.add_argument('--super_dl.cache_host', type=str, default='localhost')
-    parser.add_argument('--super_dl.cache_port', type=int, default=6379)
-
-    parser.add_argument('--super_dl.prefetch_lookahead', type=int, default=32)
-    parser.add_argument('--super_dl.source_system', default="local", choices=['local','s3'])
+    # Reporting Configuration
+    parser.add_argument('--reporting.exp_name', type=str, default=None)
+    parser.add_argument('--reporting.profile', default=False, action="store_true")
+    parser.add_argument('--reporting.report_dir', type=str, default=None, required=True)
+    parser.add_argument('--reporting.flush_logs_every_n_steps', type=int, default=10, help="how many steps to wait before flushing logs")
+    parser.add_argument('--reporting.print_freq', type=int, default=1, help="how many steps to wait before flushing logs")
 
     parser.add_argument("--config", action=ActionConfigFile)  
     return parser
+
 
 def get_default_supported_precision(training: bool) -> str:
     """Return default precision that is supported by the hardware: either `bf16` or `16`.
@@ -95,7 +90,7 @@ def setup(config_file: str, devices: int, precision: Optional[str]) -> None:
 
     strategy = FSDPStrategy(state_dict_type="full", limit_all_gathers=True, cpu_offload=False) if devices > 1 else "auto"
 
-    fabric = Fabric(accelerator=hparams.pytorch.accelerator, devices=hparams.pytorch.devices, strategy=strategy, precision=precision)
+    fabric = Fabric(accelerator=hparams.workload.accelerator, devices=hparams.workload.devices, strategy=strategy, precision=precision)
     
     if hparams.workload.max_minibatches_per_epoch:
         hparams.workload.max_minibatches_per_epoch //= fabric.world_size
@@ -111,7 +106,7 @@ if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")
 
     defaults = {
-        "config_file": 'configs/train_resnet18_s3.yaml',
+        "config_file": 'configs/testing/cifar10_resnet18_torch_batched_s3.yaml',
         'devices': 1,
         'precision': None,
     }

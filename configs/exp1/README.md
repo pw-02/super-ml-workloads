@@ -1,0 +1,23 @@
+# Exp 1 - Training a single classification model on ResNet18
+
+## Description and Expected Outcomes:
+
+The goal for this experiment is to test how my solution performs when training a single model using a single GPU. The outcome of this experiment, should highlight any issues with my solution that need to be resolved as well as being able to answer the following questions:
+
+- Did the training fail or stop before completion, if so, what was the cause of this?
+-  What is the accuracy of the trained model?
+- What was the cost of training?
+- What was the training throughput?
+- What was the data loading time?
+  -  What was the data fetch time?
+  - What was the batch decoding time?
+- How much time was spent processing on GPU?
+- What was the GPU utilization?
+
+## What needs to be done before I can run this experiment?
+
+- Update the reporting of the training jobs to capture the required information.
+- Create a configuration file for the experiment.
+- Document the environment setup so that I replicate needed if I need to
+-  Develop a script that will track the GPU utilization.
+

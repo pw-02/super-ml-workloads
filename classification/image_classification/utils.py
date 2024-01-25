@@ -10,6 +10,24 @@ from lightning.fabric import Fabric
 from collections import OrderedDict
 import yaml
 from lightning.fabric.utilities.rank_zero import rank_zero_only
+import time
+
+
+def timer_decorator(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        execution_time = end_time - start_time
+        # Unpack result if it's a tuple
+        if isinstance(result, tuple):
+            return (*result, execution_time)
+        else:
+            return (result, execution_time)
+    return wrapper
+
+
+
 
 class AverageMeter(object):
     """Computes and stores the average and current value."""

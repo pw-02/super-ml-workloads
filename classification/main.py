@@ -6,10 +6,9 @@ from torchvision import models, transforms
 from torch.utils.data import DataLoader
 from jsonargparse._namespace import Namespace
 import sys
-
+from torch.utils.data.dataloader import default_collate
 from lightning.fabric import Fabric
 from super_client import SuperClient
-
 from image_classification.utils import *
 from image_classification.datasets import *
 from image_classification.samplers import *
@@ -40,15 +39,31 @@ def main(fabric: Fabric,hparams:Namespace) -> None:
 
     exp_duration = time.time() - exp_start_time
 
-    create_job_report(hparams.workload.exp_name,logger.log_dir)
+    create_job_report(hparams.reporting.exp_name,logger.log_dir)
 
     fabric.print(f"Experiment ended. Duration: {exp_duration}")
 
 
+def custom_collate(batch):
+    imgs, labels, indices, fetch_times, transform_times = zip(*batch)
+
+    # Convert images and labels to tensors using default_collate
+    img_tensor = default_collate(imgs)
+    label_tensor = default_collate(labels)
+    
+    total_fetch_time = sum(list(fetch_times))
+    total_transform_time = sum(list(transform_times))
+
+    # Convert other information to tensors if needed
+    batch_id = abs(hash(tuple(indices)))
+
+    return img_tensor, label_tensor, batch_id, False,  total_fetch_time, total_transform_time
+
+
 def prepare_for_training(fabric: Fabric,hparams:Namespace):
     # Set seed
-    if hparams.workload.seed is not None:
-        fabric.seed_everything(hparams.workload.seed, workers=True)
+    if hparams.workload.training_seed is not None:
+        fabric.seed_everything(hparams.workload.training_seed, workers=True)
     
     #Load model
     t0 = time.perf_counter()
@@ -65,8 +80,8 @@ def prepare_for_training(fabric: Fabric,hparams:Namespace):
     transformations = initialize_transformations()
 
     # Initialize cache and super
-    cache_client = redis.StrictRedis(host=hparams.super_dl.cache_host, port=hparams.super_dl.cache_port) if hparams.super_dl.use_cache else None    
-    super_client = SuperClient(hparams.super_dl.server_address) if hparams.data.dataloader_backend == 'super' else None
+    cache_client = redis.StrictRedis(host=hparams.data.cache_host, port=hparams.data.cache_port) if hparams.data.use_cache else None    
+    super_client = SuperClient(hparams.data.super_address) if hparams.data.dataloader_backend == 'super' else None
     
     # Initialize dataloaders
     eval_dataloader = None
@@ -102,10 +117,10 @@ def prepare_for_training(fabric: Fabric,hparams:Namespace):
 
 
     #Initialize logger
-    logger = SUPERLogger( fabric=fabric, root_dir=hparams.workload.log_dir,
-                          flush_logs_every_n_steps=hparams.workload.flush_logs_every_n_steps,
-                          print_freq= hparams.workload.print_freq,
-                          exp_name=hparams.workload.exp_name)
+    logger = SUPERLogger( fabric=fabric, root_dir=hparams.reporting.report_dir,
+                          flush_logs_every_n_steps=hparams.reporting.flush_logs_every_n_steps,
+                          print_freq= hparams.reporting.print_freq,
+                          exp_name=hparams.reporting.exp_name)
    
     
     return model, optimizer, scheduler, train_dataloader, eval_dataloader, logger, super_client
@@ -135,22 +150,26 @@ def initialize_dataloader(hparams:Namespace, transformations, is_training = Fals
         dataloader_backend=hparams.data.dataloader_backend,
         transformations=transformations,
         data_dir=hparams.data.train_data_dir if is_training else hparams.data.eval_data_dir,
-        source_system=hparams.super_dl.source_system,
-        s3_bucket_name=hparams.data.s3_bucket_name,
         cache_client=cache_client,
         super_client=super_client
         )
     
     sampler = initialize_sampler(
         dataset, 
+        hparams.data.dataloader_backend,
         hparams.job_id, 
         super_client,
         shuffle=hparams.data.shuffle,
         batch_size=hparams.data.batch_size,
         drop_last=hparams.data.drop_last,
-        prefetch_lookahead=hparams.super_dl.prefetch_lookahead)
+        prefetch_lookahead=hparams.data.super_prefetch_lookahead,
+        sampler_seed=hparams.data.sampler_seed)
         
-    return DataLoader(dataset, sampler=sampler, batch_size=None, num_workers=hparams.pytorch.workers)
+    if  hparams.data.dataloader_backend == "pytorch-vanillia":
+        return DataLoader(dataset=dataset, sampler=sampler, batch_size=hparams.data.batch_size, 
+                          num_workers=hparams.workload.workers, collate_fn=custom_collate)
+    else:
+        return DataLoader(dataset=dataset, sampler=sampler, batch_size=None, num_workers=hparams.workload.workers)
 
 
 def register_job_with_super(super_client: SuperClient, job_id, train_dataset:SUPERDataset, evaluation_dataset:SUPERDataset):
@@ -168,41 +187,47 @@ def register_job_with_super(super_client: SuperClient, job_id, train_dataset:SUP
     return super_client
     
 
-def initialize_sampler(dataset, job_id,super_client,shuffle, batch_size, drop_last,prefetch_lookahead):
+def initialize_sampler(dataset, dataloader_backend, job_id, super_client,shuffle,sampler_seed, batch_size, drop_last,prefetch_lookahead):
     
-    return SUPERSampler(
-        dataset=dataset,
-        job_id=job_id,
-        super_client=super_client,
-        shuffle=shuffle,
-        seed=1,
+    if dataloader_backend == "super":
+      
+      return SUPERSampler(
+        data_source=dataset,
         batch_size=batch_size,
         drop_last=drop_last,
-        prefetch_lookahead=prefetch_lookahead
-    )
-
-
-def initialize_dataset( 
-                        dataloader_backend:str, 
-                        transformations: transforms.Compose,
-                        data_dir:str,
-                        source_system:str,
-                        s3_bucket_name:str,
-                        cache_client=None,
-                        super_client=None,
-
-                        ):
+        job_id=job_id,
+        shuffle=shuffle,
+        seed=sampler_seed,
+        super_client=super_client,
+        prefetch_lookahead=prefetch_lookahead)
     
+    elif dataloader_backend == "pytorch-batch":
+        return PytorchBatchSampler(
+        data_source=dataset,
+        batch_size=batch_size,
+        drop_last=drop_last,
+        shuffle=shuffle,
+        seed=sampler_seed
+        )
+    
+    elif dataloader_backend == "pytorch-vanillia":
+        return PytorchVanilliaSampler(
+        data_source=dataset,
+        shuffle=shuffle,
+        seed=sampler_seed
+        )
 
+
+def initialize_dataset( dataloader_backend:str, transformations: transforms.Compose,data_dir:str,cache_client=None,super_client=None, ):
+    
     if dataloader_backend == "super":
-        return SUPERDataset(
-                data_dir=data_dir,
-                transform=transformations,
-                cache_client=cache_client,
-                source_system=source_system,
-                s3_bucket_name=s3_bucket_name,
-                super_client=super_client
-                )
+        return SUPERDataset(data_dir=data_dir,transform=transformations,cache_client=cache_client,super_client=super_client)
+    
+    elif dataloader_backend == "pytorch-batch":
+        return PytorchBatchDataset(data_dir=data_dir,transform=transformations)
+    
+    elif dataloader_backend == "pytorch-vanillia":
+        return PytorchVanilliaDataset(data_dir=data_dir,transform=transformations)
     
 
 def initialize_transformations() -> transforms.Compose:

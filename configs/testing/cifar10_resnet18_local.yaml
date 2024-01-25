@@ -1,0 +1,53 @@
+pytorch:
+    workers: 0
+    accelerator: 'cpu'
+    devices: 1
+
+workload:
+    exp_name: cifar10
+    print_freq: 1
+    flush_logs_every_n_steps: 1
+    epochs: 1
+    max_minibatches_per_epoch: 16
+    run_training: True
+    run_evaluate: False
+    save_checkpoints: False
+    save_dir: models
+    log_dir: reports
+    seed: 1
+    use_synthetic: False
+    profile: True
+
+
+model:
+    arch: resnet18
+    weight_decay: 1.0e-4
+    lr: 0.896
+    momentum: 0.875
+    optimizer: sgd
+    grad_acc_steps: null
+
+super_dl:
+    use_cache: True
+    server_address: localhost:50051
+    cache_host: localhost
+    cache_port: 6379
+    prefetch_lookahead: 5
+    source_system: local
+
+data:
+    dataloader_backend: super
+    dataset_name: cifar10
+    train_data_dir: /workspaces/super-dl/datasets/vision/cifar-10/train
+    eval_data_dir: /workspaces/super-dl/datasets/vision/cifar-10/val
+    batch_size: 16
+    shuffle: False
+    drop_last: False
+    s3_bucket_name: sdl-cifar10
+
+
+
+
+
+
+

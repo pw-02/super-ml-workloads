@@ -1,7 +1,7 @@
 from typing import Optional, List, Tuple, Callable, Dict
 from PIL import Image
 from torch.utils.data import Dataset
-from .utils import S3Url
+from .utils import S3Url, timer_decorator
 import torch
 import functools
 import base64
@@ -15,32 +15,22 @@ import time
 from super_client import SuperClient
 
 
-# Define constants
-REDIS_PORT = 6379
 
-class SUPERDataset(Dataset):
-    def __init__(self, 
-                 data_dir: str,
-                 transform: Optional[Callable],
-                 cache_client,
-                 source_system,
-                 s3_bucket_name = None,
-                 super_client = None):
-        
-        self.dataset_id =  f"{source_system}_{data_dir}"
-        self.cache_client = cache_client
-        self.transform = transform
+class BaseDataset(Dataset):
+    def __init__(self, data_dir: str, transform: Optional[Callable]):
         self.data_dir = data_dir
-        self.source_system = source_system
+        self.use_s3 = self.data_dir.startswith("s3://")
+        self.dataset_id = f"{self.data_dir}"
+        self.transform = transform
+        self.target_transform = None
         self.img_extensions = ['.jpg', '.JPG', '.jpeg', '.JPEG', '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP']
-        self.s3_bucket_name = s3_bucket_name
-        self.super_client:SuperClient = super_client
-        self.use_s3 = True if source_system == 's3' else False
+        self.s3_client = boto3.client('s3')
+
         if self.use_s3:
-            self.samples: Dict[str, List[str]] =  self._classify_samples_s3(S3Url(data_dir))
+            self.samples: Dict[str, List[str]] = self._classify_samples_s3(S3Url(data_dir))
+            self.bucket_name = S3Url(data_dir).bucket
         else:
-            self.samples: Dict[str, List[str]] =  self._classify_samples_local(data_dir)
-        pass
+            self.samples: Dict[str, List[str]] = self._classify_samples_local(data_dir)
 
     @functools.cached_property
     def _classed_items(self) -> List[Tuple[str, int]]:
@@ -55,88 +45,29 @@ class SUPERDataset(Dataset):
 
     def __getitem__(self, next_batch):
         batch_indices, batch_id = next_batch
-        cached_data = None
-        end = time.time()
-        if self.cache_client is not None:
-            cached_data = self.fetch_from_cache(batch_id)
-            
-        if cached_data:
-            print(f"data fetch from cache {time.time() - end}")
-            # Convert JSON batch to torch format
-            decode_end = time.time()
-            torch_imgs, torch_labels = self.deserialize_torch_batch(cached_data)
-            print(f"data decode from cache {time.time() - decode_end}")
-
-            return torch_imgs, torch_labels, batch_id, True
-        
-        print(f'cache miss: {batch_id}')
 
         if self.use_s3:
-            # Cache miss, load from primary storage
-            images, labels = self.fetch_batch_data_s3(batch_indices, batch_id)
+            images, labels, fetch_time = self.fetch_batch_data_s3(batch_indices, batch_id)
         else:
-            images, labels = self.fetch_batch_data_local(batch_indices, batch_id)
-            print(f"data fetch {time.time() - end}")
+            images, labels, fetch_time = self.fetch_batch_data_local(batch_indices, batch_id)
 
+        images, labels, transform_time = self.apply_transformations(images, labels)
 
-        return torch.stack(images), torch.tensor(labels), batch_id, False
-    
+        return torch.stack(images), torch.tensor(labels), batch_id, False, fetch_time, transform_time
 
-    def fetch_from_cache(self, batch_id, max_attempts = 10):
-        cached_data = None
-        attempts = 0
+    @timer_decorator
+    def apply_transformations(self, images, labels):
+        if self.transform is not None:
+            for i in range(len(images)):
+                images[i] = self.transform(images[i])
 
-        while attempts < max_attempts:
-            cached_data = self.try_fetch_from_cache(batch_id)
-            if cached_data is not None:
-                break  # Exit the loop if data is successfully fetched
+        if self.target_transform is not None:
+            for i in range(len(labels)):
+                labels[i] = self.target_transform(labels[i])
+        return images, labels
 
-            if attempts >= 0:
-                    # Additional functionality on the second iteration
-                    status = self.super_client.get_batch_status(batch_id, self.dataset_id)
-                    if status == False:  # not cached or in progress, return none and fetch locally
-                        break        
-        attempts += 1
-        return cached_data
-
-    def try_fetch_from_cache(self, batch_id):
-        try:
-            return self.cache_client.get(batch_id)
-        except:
-             return None
-    
-
-
-
-    def is_image_file(self, filename:str):
+    def is_image_file(self, filename: str):
         return any(filename.endswith(extension) for extension in self.img_extensions)
-
-    def deserialize_torch_batch(self, batch_data):
-        decoded_data = base64.b64decode(batch_data) # Decode base64
-        try:
-            decoded_data = zlib.decompress(decoded_data)
-        except:
-            pass
-      
-        buffer = io.BytesIO(decoded_data)
-        batch_samples, batch_labels = torch.load(buffer)
-        return  batch_samples, batch_labels 
-    
-    def convert_json_batch_to_torch_format(self, batch_data):
-        samples = json.loads(batch_data)
-        imgs = []
-        labels = []
-
-        for img, label in samples:
-            img = Image.open(io.BytesIO(base64.b64decode(img)))
-            if self.transform is not None:
-                img = self.transform(img)
-
-            imgs.append(img)
-            labels.append(label)
-        return torch.stack(imgs), torch.tensor(labels)
-    
-
 
     def _classify_samples_local(self, data_dir) -> Dict[str, List[str]]:
         data_dir = str(Path(data_dir))
@@ -150,7 +81,6 @@ class SUPERDataset(Dataset):
         else:
             for dirpath, dirnames, filenames in os.walk(data_dir):
                 for filename in filter(self.is_image_file, filenames):
-                    
                     img_class = os.path.basename(dirpath.removesuffix('/'))
                     img_path = os.path.join(dirpath, filename)
                     img_classes.setdefault(img_class, []).append(img_path)
@@ -160,7 +90,7 @@ class SUPERDataset(Dataset):
                 outfile.write(json_object)
 
         return img_classes
-    
+
     def _classify_samples_s3(self, s3url: S3Url) -> Dict[str, List[str]]:
         s3_client = boto3.client('s3')
         s3_resource = boto3.resource("s3")
@@ -183,9 +113,9 @@ class SUPERDataset(Dataset):
 
             return blob_classes
         except Exception as e:
-                # Handle exceptions, e.g., log them
-                print(f"Error in _classify_blobs_s3: {e}")
-                return None
+            # Handle exceptions, e.g., log them
+            print(f"Error in _classify_blobs_s3: {e}")
+            return None
 
     def _create_index_file_s3(self, s3url: S3Url) -> Dict[str, List[str]]:
         import json
@@ -218,7 +148,8 @@ class SUPERDataset(Dataset):
         index_object.put(Body=(bytes(json.dumps(blob_classes, indent=4).encode('UTF-8'))))
 
         return blob_classes
-    
+
+    @timer_decorator
     def fetch_batch_data_local(self, batch_indices, batch_id):
         images = []
         labels = []
@@ -237,27 +168,133 @@ class SUPERDataset(Dataset):
             labels.append(label)
 
         return images, labels
-    
+
+    @timer_decorator
     def fetch_batch_data_s3(self, batch_indices, batch_id):
-        s3_client = boto3.client('s3')
         images = []
         labels = []
-
         for idx in batch_indices:
             file_path, label = self._classed_items[idx]
             # Download file into memory
-            obj = s3_client.get_object(Bucket=self.s3_bucket_name, Key=file_path)
+            obj = self.s3_client.get_object(Bucket=self.bucket_name, Key=file_path)
             content = obj['Body'].read()
-
             img = Image.open(io.BytesIO(content))
-
-            if img.mode == "L":
-                img = img.convert("RGB")
-
-            if self.transform is not None:
-                img = self.transform(img)
-
             images.append(img)
             labels.append(label)
-
         return images, labels
+    
+
+class PytorchVanilliaDataset(BaseDataset):
+    
+    def __init__(self, data_dir: str, transform: Optional[Callable]):
+        super(PytorchVanilliaDataset, self).__init__(data_dir, transform)
+    
+    def __len__(self):
+        return super().__len__()
+   
+    def __getitem__(self, idx):    
+        
+        img_path, label = self._classed_items[idx]
+
+        if self.use_s3:
+            img, fetch_time = self.load_file_from_s3(img_path)
+        else:
+            img, fetch_time = self.fetch_batch_data_local(img_path)
+
+        if img.mode == "L":
+                img = img.convert("RGB")
+        
+        result, transform_time = self.transform_single_sample(img, label)
+        img, label = result[0],result[1]
+
+        return (img, label, idx, fetch_time, transform_time)
+    
+    @timer_decorator
+    def load_file_from_local(self,file_path):
+         return Image.open(file_path)
+    
+    @timer_decorator
+    def load_file_from_s3(self,file_path):
+        obj = self.s3_client.get_object(Bucket=self.bucket_name, Key=file_path)
+        content = obj['Body'].read()
+        img = Image.open(io.BytesIO(content))
+        return img
+    
+    @timer_decorator
+    def transform_single_sample(self, img, label):
+            
+        if self.transform is not None:
+            img = self.transform(img)
+
+        if self.target_transform is not None:
+            label = self.target_transform(label)
+        
+        return img, label
+
+class PytorchBatchDataset(BaseDataset):
+    
+      def __init__(self, data_dir: str, transform: Optional[Callable]):
+        super(PytorchBatchDataset, self).__init__(data_dir, transform)
+ 
+
+class SUPERDataset(BaseDataset):
+    def __init__(self, data_dir: str, transform: Optional[Callable], cache_client, super_client=None):
+        super(SUPERDataset, self).__init__(data_dir, transform)
+        self.cache_client = cache_client
+        self.super_client = super_client
+    
+    def __getitem__(self, next_batch):
+        batch_indices, batch_id = next_batch
+        cached_data = None  
+        
+        if self.cache_client is not None:
+            cached_data, fetch_time = self.fetch_from_cache(batch_id)
+            
+        if cached_data:
+            # Convert JSON batch to torch format
+            torch_imgs, torch_labels, transform_time = self.deserialize_torch_batch(cached_data)
+            return torch_imgs, torch_labels, batch_id, True, fetch_time, transform_time
+         
+        if self.use_s3:
+            images, labels, fetch_time = self.fetch_batch_data_s3(batch_indices, batch_id)
+        else:
+            images, labels, fetch_time = self.fetch_batch_data_local(batch_indices, batch_id)
+        
+        images, labels, transform_time = self.apply_transformations(images, labels)
+
+        return torch.stack(images), torch.tensor(labels), batch_id, False,  fetch_time, transform_time
+
+    def fetch_from_cache(self, batch_id, max_attempts = 10):
+        cached_data = None
+        attempts = 0
+
+        while attempts < max_attempts:
+            cached_data = self.try_fetch_from_cache(batch_id)
+            if cached_data is not None:
+                break  # Exit the loop if data is successfully fetched
+
+            if attempts >= 0:
+                    # Additional functionality on the second iteration
+                    status = self.super_client.get_batch_status(batch_id, self.dataset_id)
+                    if status == False:  # not cached or in progress, return none and fetch locally
+                        break        
+        attempts += 1
+        return cached_data
+
+    def try_fetch_from_cache(self, batch_id):
+        try:
+            return self.cache_client.get(batch_id)
+        except:
+             return None
+    
+    def deserialize_torch_batch(self, batch_data):
+        decoded_data = base64.b64decode(batch_data) # Decode base64
+        try:
+            decoded_data = zlib.decompress(decoded_data)
+        except:
+            pass
+      
+        buffer = io.BytesIO(decoded_data)
+        batch_samples, batch_labels = torch.load(buffer)
+        return  batch_samples, batch_labels 
+    
