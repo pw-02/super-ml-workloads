@@ -87,6 +87,7 @@ def prepare_for_training(fabric: Fabric,hparams:Namespace):
 
     if hparams.workload.run_training:
         train_dataloader = initialize_dataloader(
+            fabric=fabric,
             hparams=hparams,
             is_training=True,
             cache_client=cache_client,
@@ -96,6 +97,7 @@ def prepare_for_training(fabric: Fabric,hparams:Namespace):
     
     if hparams.workload.run_evaluate:
         eval_dataloader = initialize_dataloader(
+            fabric=fabric,
             hparams=hparams,
             is_training=False,
             cache_client=cache_client,
@@ -140,7 +142,7 @@ def initialize_optimizer(optimizer_type:str, model_parameters:Iterator[nn.Parame
     return optimizer
 
 
-def initialize_dataloader(hparams:Namespace, is_training = False, cache_client = None, super_client = None):
+def initialize_dataloader(fabric: Fabric, hparams:Namespace, is_training = False, cache_client = None, super_client = None):
 
     transformations = initialize_transformations(hparams.data.train_data_dir if is_training else hparams.data.eval_data_dir)
 
@@ -152,6 +154,8 @@ def initialize_dataloader(hparams:Namespace, is_training = False, cache_client =
         super_client=super_client
         )
     
+    fabric.print(f"Dataset initialized: {hparams.data.train_data_dir if is_training else hparams.data.eval_data_dir}, size: {len(dataset)} files")
+
     sampler = initialize_sampler(
         dataset, 
         hparams.data.dataloader_backend,

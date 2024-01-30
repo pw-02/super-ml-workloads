@@ -34,7 +34,7 @@ data:
 
 reporting:
     profile: True
-    exp_name: resnet_resnet18_pytorch_batch
+    exp_name: resnet_resnet18_super
     flush_logs_every_n_steps: 1
     report_dir: exps/exp1
     print_freq: 1

@@ -35,6 +35,7 @@ The goal for this experiment is to test how my solution performs when training a
 - EC2 Instance: G4dn
 - Pytorch Workers = 4
 - Shuffle dataset = True
+- Batch size: 256
 
 
 
