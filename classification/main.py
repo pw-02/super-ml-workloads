@@ -76,8 +76,6 @@ def prepare_for_training(fabric: Fabric,hparams:Namespace):
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 0.1 ** (epoch // 30)) #TODO: Add support for other scheduler
      # call `setup` to prepare for model / optimizer for distributed training. The model is moved automatically to the right device.
     model, optimizer = fabric.setup(model,optimizer, move_to_device=True) 
-    #Initialize data transformations
-    transformations = initialize_transformations()
 
     # Initialize cache and super
     cache_client = redis.StrictRedis(host=hparams.data.cache_host, port=hparams.data.cache_port) if hparams.data.use_cache else None    
@@ -90,7 +88,6 @@ def prepare_for_training(fabric: Fabric,hparams:Namespace):
     if hparams.workload.run_training:
         train_dataloader = initialize_dataloader(
             hparams=hparams,
-            transformations=transformations,
             is_training=True,
             cache_client=cache_client,
             super_client=super_client
@@ -100,7 +97,6 @@ def prepare_for_training(fabric: Fabric,hparams:Namespace):
     if hparams.workload.run_evaluate:
         eval_dataloader = initialize_dataloader(
             hparams=hparams,
-            transformations=transformations,
             is_training=False,
             cache_client=cache_client,
             super_client=super_client
@@ -144,8 +140,10 @@ def initialize_optimizer(optimizer_type:str, model_parameters:Iterator[nn.Parame
     return optimizer
 
 
-def initialize_dataloader(hparams:Namespace, transformations, is_training = False, cache_client = None, super_client = None):
-    
+def initialize_dataloader(hparams:Namespace, is_training = False, cache_client = None, super_client = None):
+
+    transformations = initialize_transformations(hparams.data.train_data_dir if is_training else hparams.data.eval_data_dir)
+
     dataset = initialize_dataset(
         dataloader_backend=hparams.data.dataloader_backend,
         transformations=transformations,
@@ -230,9 +228,21 @@ def initialize_dataset( dataloader_backend:str, transformations: transforms.Comp
         return PytorchVanilliaDataset(data_dir=data_dir,transform=transformations)
     
 
-def initialize_transformations() -> transforms.Compose:
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    transformations = transforms.Compose([transforms.ToTensor(), normalize])
+def initialize_transformations(data_dir) -> transforms.Compose:
+    
+    if 'resnet' in data_dir.lower():
+        #normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        transformations =  transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
+            ])
+    else:
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        transformations = transforms.Compose([transforms.ToTensor(), normalize])
+    
     return transformations
 
 if __name__ == "__main__":

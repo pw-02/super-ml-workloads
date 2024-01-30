@@ -148,6 +148,11 @@ class BaseDataset(Dataset):
         index_object.put(Body=(bytes(json.dumps(blob_classes, indent=4).encode('UTF-8'))))
 
         return blob_classes
+    
+    def _remove_prefix(self,s: str, prefix: str) -> str:
+        if not s.startswith(prefix):
+            return s
+        return s[len(prefix) :]
 
     @timer_decorator
     def fetch_batch_data_local(self, batch_indices, batch_id):
@@ -161,8 +166,8 @@ class BaseDataset(Dataset):
             if img.mode == "L":
                 img = img.convert("RGB")
 
-            if self.transform is not None:
-                img = self.transform(img)
+            # if self.transform is not None:
+            #     img = self.transform(img)
 
             images.append(img)
             labels.append(label)
@@ -179,6 +184,8 @@ class BaseDataset(Dataset):
             obj = self.s3_client.get_object(Bucket=self.bucket_name, Key=file_path)
             content = obj['Body'].read()
             img = Image.open(io.BytesIO(content))
+            if img.mode == "L":
+                img = img.convert("RGB")
             images.append(img)
             labels.append(label)
         return images, labels
