@@ -178,10 +178,10 @@ def register_job_with_super(super_client: SuperClient, job_id, train_dataset:SUP
     #dataset_id = hashlib.sha256(f"{data_source_system}_{data_dir}".encode()).hexdigest()
     job_dataset_ids = []
     if train_dataset is not None:
-        super_client.register_dataset(train_dataset.dataset_id, train_dataset.data_dir, train_dataset.source_system, None)
+        super_client.register_dataset(train_dataset.dataset_id, train_dataset.data_dir, 's3', None)
         job_dataset_ids.append(train_dataset.dataset_id)
     if evaluation_dataset is not None:
-        super_client.register_dataset(evaluation_dataset.dataset_id, evaluation_dataset.data_dir, evaluation_dataset.source_system, None)
+        super_client.register_dataset(evaluation_dataset.dataset_id, evaluation_dataset.data_dir, 's3', None)
         job_dataset_ids.append(evaluation_dataset.dataset_id)
 
     super_client.register_new_job(job_id=job_id,job_dataset_ids=job_dataset_ids)
