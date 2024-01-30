@@ -164,7 +164,7 @@ def initialize_dataloader(fabric: Fabric, hparams:Namespace, is_training = False
         shuffle=hparams.data.shuffle,
         batch_size=hparams.data.batch_size,
         drop_last=hparams.data.drop_last,
-        prefetch_lookahead=hparams.data.super_prefetch_lookahead,
+        super_prefetch_lookahead=hparams.data.super_prefetch_lookahead,
         sampler_seed=hparams.data.sampler_seed)
         
     if  hparams.data.dataloader_backend == "pytorch-vanillia":
@@ -189,7 +189,7 @@ def register_job_with_super(super_client: SuperClient, job_id, train_dataset:SUP
     return super_client
     
 
-def initialize_sampler(dataset, dataloader_backend, job_id, super_client,shuffle,sampler_seed, batch_size, drop_last,prefetch_lookahead):
+def initialize_sampler(dataset, dataloader_backend, job_id, super_client,shuffle,sampler_seed, batch_size, drop_last,super_prefetch_lookahead):
     
     if dataloader_backend == "super":
       
@@ -201,7 +201,7 @@ def initialize_sampler(dataset, dataloader_backend, job_id, super_client,shuffle
         shuffle=shuffle,
         seed=sampler_seed,
         super_client=super_client,
-        prefetch_lookahead=prefetch_lookahead)
+        super_prefetch_lookahead=super_prefetch_lookahead)
     
     elif dataloader_backend == "pytorch-batch":
         return PytorchBatchSampler(
