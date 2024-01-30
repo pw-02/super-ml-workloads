@@ -43,4 +43,12 @@ The goal for this experiment is to test how my solution performs when training a
 
 1. The first time the experiment was run with super it repeatedly tried to cache batches ''8406193351831191442" and "1615931262124447054". The logs for super were filled with 'INFO: Batch'{xxxx}' is cached or in actively being cached'. The training job did not make any progress while this was happening.
 
+   Cause:
+
+   The training job encountered a cache miss, so it contacted super to get a 'status' for the batch. The 'status' was that the batch was in progress, which is true, but it was taking a while because of the cold start penalty. The training job repeatedly called the function, it was only supposed to call it a max times of 10, but there was a error in the loop which caused it run until the data was returned with a cache hit.
+
+   Solution:
+
+   The Super Dataset code has been fixed. Specifically, the 'max_attempts' rule in the 'fetch_from_cache' function, which wasn't doing anything previously. 
+
    

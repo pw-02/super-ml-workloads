@@ -271,6 +271,7 @@ class SUPERDataset(BaseDataset):
 
         return torch.stack(images), torch.tensor(labels), batch_id, False,  fetch_time, transform_time
 
+    @timer_decorator
     def fetch_from_cache(self, batch_id, max_attempts = 10):
         cached_data = None
         attempts = 0
