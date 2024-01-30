@@ -27,11 +27,12 @@ data:
     shuffle: True
     sampler_seed: 1
     drop_last: False
-    use_cache: False
+    use_cache: True
     #the following are super cache specific
     cache_host: ip-10-0-31-114.us-west-2.compute.internal  #localhost
     cache_port: 6378 #6379
-
+    super_prefetch_lookahead: 50
+    super_address: ip-10-0-31-114.us-west-2.compute.internal:50051 #172.17.0.4:50051
 reporting:
     profile: True
     exp_name: resnet_resnet18_super
