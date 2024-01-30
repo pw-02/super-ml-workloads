@@ -39,3 +39,8 @@ The goal for this experiment is to test how my solution performs when training a
 
 
 
+## Issue Log:
+
+1. The first time the experiment was run with super it repeatedly tried to cache batches ''8406193351831191442" and "1615931262124447054". The logs for super were filled with 'INFO: Batch'{xxxx}' is cached or in actively being cached'. The training job did not make any progress while this was happening.
+
+   

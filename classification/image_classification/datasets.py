@@ -281,11 +281,12 @@ class SUPERDataset(BaseDataset):
                 break  # Exit the loop if data is successfully fetched
 
             if attempts >= 0:
+                    time.sleep(0.1)
                     # Additional functionality on the second iteration
                     status = self.super_client.get_batch_status(batch_id, self.dataset_id)
                     if status == False:  # not cached or in progress, return none and fetch locally
                         break        
-        attempts += 1
+            attempts += 1
         return cached_data
 
     def try_fetch_from_cache(self, batch_id):
