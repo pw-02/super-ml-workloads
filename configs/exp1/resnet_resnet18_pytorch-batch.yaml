@@ -21,8 +21,8 @@ model:
 
 data:
     dataloader_backend: pytorch-batch #'super', 'pytorch-vanillia','pytorch-batch'
-    train_data_dir: s3://sdl-tiny-imagenet-200/train/
-    eval_data_dir: s3://sdl-tiny-imagenet-200/test/
+    train_data_dir: datasets/vision/cifar-10/train  #s3://sdl-tiny-imagenet-200/train/
+    eval_data_dir: datasets/vision/cifar-10/val #s3://sdl-tiny-imagenet-200/test/
     batch_size: 256
     shuffle: True
     sampler_seed: 1

@@ -15,7 +15,7 @@ import time
 from super_client import SuperClient
 import redis
 import torchvision.transforms as transforms
-
+import threading
 
 
 class BaseDataset(Dataset):
@@ -66,7 +66,7 @@ class BaseDataset(Dataset):
 
     def __getitem__(self, next_batch):
         batch_indices, batch_id = next_batch
-
+       
         if self.use_s3:
             images, labels, fetch_time = self.fetch_batch_data_s3(batch_indices, batch_id)
         else:
@@ -286,47 +286,55 @@ class SUPERDataset(BaseDataset):
     def __init__(self, job_id, data_dir: str, transform: Optional[Callable], super_address, cache_host, cache_port):
         super(SUPERDataset, self).__init__(job_id, data_dir, transform)
         
-        self.super_client = SuperClient(super_address) if super_address is not None else None
+        # self.super_client = SuperClient(super_address) if super_address is not None else None
         self.cache_client = redis.StrictRedis(host=cache_host, port=cache_port) if cache_host is not None else None
 
     def __getitem__(self, next_batch):
-        batch_indices, batch_id = next_batch
-        cached_data = None  
+        batch_indices, batch_id, cache_status = next_batch
+        cached_data = None
         
+        # print(batch_id)
         if self.cache_client is not None:
-            cached_data, fetch_time = self.fetch_from_cache(batch_id)
+            cached_data, fetch_time = self.fetch_from_cache(batch_id, cache_status)
             
         if cached_data:
             # Convert JSON batch to torch format
             torch_imgs, torch_labels, transform_time = self.deserialize_torch_batch(cached_data)
+            # print('data returned') 
             return torch_imgs, torch_labels, batch_id, True, fetch_time, transform_time
-         
+        # print('cache miss') 
         if self.use_s3:
             images, labels, fetch_time = self.fetch_batch_data_s3(batch_indices, batch_id)
         else:
             images, labels, fetch_time = self.fetch_batch_data_local(batch_indices, batch_id)
         
         images, labels, transform_time = self.apply_transformations(images, labels)
-
+        # print('data returned') 
         return torch.stack(images), torch.tensor(labels), batch_id, False,  fetch_time, transform_time
 
     @timer_decorator
-    def fetch_from_cache(self, batch_id, max_attempts = 10):
+    def fetch_from_cache(self, batch_id, cache_status, max_attempts = 1):
         cached_data = None
         attempts = 0
+         # Try fetching from cache initially
+        cached_data = self.try_fetch_from_cache(batch_id)
+        if cached_data is not None:
+            return cached_data
+        # If not found in cache, check batch status with super_client
+        #status = self.super_client.get_batch_status(batch_id=batch_id, dataset_id=self.dataset_id)
 
-        while attempts < max_attempts:
-            cached_data = self.try_fetch_from_cache(batch_id)
-            if cached_data is not None:
-                break  # Exit the loop if data is successfully fetched
-
-            if attempts >= 0:
-                    time.sleep(0.1)
-                    # Additional functionality on the second iteration
-                    status = self.super_client.get_batch_status(batch_id, self.dataset_id)
-                    if status == False:  # not cached or in progress, return none and fetch locally
-                        break        
-            attempts += 1
+        if cache_status == False:  # If the status is False, not cached or in progress, return None and fetch locally
+            return cached_data
+        else:
+            # Retry fetching from cache for a specified number of attempts
+            while attempts < max_attempts:
+                cached_data = self.try_fetch_from_cache(batch_id)
+                if cached_data is not None:
+                    break
+                else:
+                    time.sleep(0.25)
+                attempts += 1
+        
         return cached_data
 
     def try_fetch_from_cache(self, batch_id):

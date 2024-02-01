@@ -107,6 +107,8 @@ if __name__ == "__main__":
 
     defaults = {
         "config_file": 'configs/exp1/resnet_resnet18_super.yaml',
+        # "config_file": 'configs/exp1/resnet_resnet18_super.yaml',
+
         'devices': 1,
         'precision': None,
     }

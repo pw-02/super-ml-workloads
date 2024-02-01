@@ -1,6 +1,6 @@
 
 workload:
-    workers: 0
+    workers: 4
     accelerator: 'gpu'
     devices: 1
     epochs: 3
@@ -31,12 +31,12 @@ data:
     #the following are super cache specific
     cache_host: ec2-35-89-150-133.us-west-2.compute.amazonaws.com #'ip-10-0-31-114.us-west-2.compute.internal','localhost'
     cache_port: 6378 #6379
-    super_prefetch_lookahead: 10
+    super_prefetch_lookahead: 15
     super_address: 172.17.0.3:50051 #172.17.0.4:50051, 'ip-10-0-31-114.us-west-2.compute.internal:50051'
 reporting:
     profile: True
     exp_name: resnet_resnet18_super
-    flush_logs_every_n_steps: 1
+    flush_logs_every_n_steps: 25
     report_dir: exps/exp1
     print_freq: 1
 

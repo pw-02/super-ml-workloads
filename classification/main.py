@@ -107,8 +107,8 @@ def prepare_for_training(fabric: Fabric,hparams:Namespace):
             sampler_seed=hparams.data.sampler_seed,
             batch_size=hparams.data.batch_size,
             drop_last=hparams.data.drop_last,
-            super_address= hparams.data.super_address if hparams.data.dataloader_backend == 'super' else None,
-            super_prefetch_lookahead= hparams.data.super_prefetch_lookahead if hparams.data.dataloader_backend == 'super' else None,
+            super_address= hparams.data.super_address,
+            super_prefetch_lookahead= hparams.data.super_prefetch_lookahead,
             cache_host=hparams.data.cache_host if hparams.data.use_cache else None,
             cache_port=hparams.data.cache_port if hparams.data.use_cache else None   
             )
@@ -164,7 +164,7 @@ def prepare_for_training(fabric: Fabric,hparams:Namespace):
 
 def confirm_dataloader_backend(fabric: Fabric, use_cache, cache_host, cache_port,dataloader_backend, super_address  ):
     if use_cache == True:
-        fabric.print(f"\tconfirming connection to cache at {cache_host}:{cache_port}..")
+        fabric.print(f"confirming connection to cache at {cache_host}:{cache_port}..")
         #test connection to the cache, if test fails, disables use of cache and SUPER
         cache_client = redis.StrictRedis(host=cache_host, port=cache_port)
         try:
@@ -173,15 +173,15 @@ def confirm_dataloader_backend(fabric: Fabric, use_cache, cache_host, cache_port
         except Exception as e:
             use_cache = False
             dataloader_backend = 'pytorch-batch'
-            fabric.print(f"\tFailed to connect with cache -'{str(e)}'. Exiting job.")
+            fabric.print(f"Failed to connect with cache -'{str(e)}'. Exiting job.")
             sys.exit()
 
     if dataloader_backend == 'super':
-        fabric.print(f"\tConfirming connection to super at '{super_address}'")
+        fabric.print(f"Confirming connection to super at '{super_address}'")
         super_client = SuperClient(server_address=super_address)
         connection_confirmed, message = super_client.ping_server()
         if not connection_confirmed:
-            fabric.print(f"\tsuper connection check failed with '{message}'. Exiting job.")
+            fabric.print(f"super connection check failed with '{message}'. Exiting job.")
             sys.exit()
 
 def initialize_model(fabric: Fabric, arch: str) -> nn.Module: 
@@ -252,19 +252,19 @@ def initialize_dataloader(
                           collate_fn=custom_collate_batch)
 
 
-def register_job_with_super(super_client: SuperClient, job_id, train_dataset:SUPERDataset, evaluation_dataset:SUPERDataset):
-    #dataset_id = hashlib.sha256(f"{data_source_system}_{data_dir}".encode()).hexdigest()
-    job_dataset_ids = []
-    if train_dataset is not None:
-        super_client.register_dataset(train_dataset.dataset_id, train_dataset.data_dir, None)
-        job_dataset_ids.append(train_dataset.dataset_id)
-    if evaluation_dataset is not None:
-        super_client.register_dataset(evaluation_dataset.dataset_id, evaluation_dataset.data_dir, None)
-        job_dataset_ids.append(evaluation_dataset.dataset_id)
+# def register_job_with_super(super_client: SuperClient, job_id, train_dataset:SUPERDataset, evaluation_dataset:SUPERDataset):
+#     #dataset_id = hashlib.sha256(f"{data_source_system}_{data_dir}".encode()).hexdigest()
+#     job_dataset_ids = []
+#     if train_dataset is not None:
+#         super_client.register_dataset(train_dataset.dataset_id, train_dataset.data_dir, train_dataset.samples)
+#         job_dataset_ids.append(train_dataset.dataset_id)
+#     if evaluation_dataset is not None:
+#         super_client.register_dataset(evaluation_dataset.dataset_id, evaluation_dataset.data_dir,  train_dataset.samples)
+#         job_dataset_ids.append(evaluation_dataset.dataset_id)
 
-    super_client.register_new_job(job_id=job_id,job_dataset_ids=job_dataset_ids)
+#     super_client.register_new_job(job_id=job_id,job_dataset_ids=job_dataset_ids)
     
-    return super_client
+#     return super_client
     
 
 def initialize_sampler(job_id, 
@@ -297,6 +297,7 @@ def initialize_sampler(job_id,
         shuffle=shuffle,
         seed=sampler_seed
         )
+         
     
     elif dataloader_backend == "pytorch-vanillia":
         return PytorchVanilliaSampler(

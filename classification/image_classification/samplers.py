@@ -121,7 +121,9 @@ class SUPERSampler(BaseBatchSampler):
                  shuffle: bool = True, seed: int = 0, super_prefetch_lookahead = 10, super_address = None) -> None:
 
         super(SUPERSampler, self).__init__(data_source, batch_size, drop_last, num_samples,shuffle, seed, )
-        self.super_client = SuperClient(super_address)
+        
+        if super_address is not None:
+            self.super_client = SuperClient(super_address)
         # self.super_client = SuperClient(super_address)
         self.super_prefetch_lookahead = super_prefetch_lookahead
         self.job_id = job_id
@@ -131,11 +133,8 @@ class SUPERSampler(BaseBatchSampler):
         """
         Share future batch accesses with the CacheCoordinatorClient.
         """ 
-        # if self.super_client is None:
-        #     self.super_client = SuperClient()
         if batches and self.super_client is not None:
             self.super_client.share_batch_access_pattern(job_id=self.job_id, batches=batches, dataset_id = self.dataset_id)
-
 
     def __iter__(self) -> Iterator[List[int]]:
         """
@@ -167,7 +166,11 @@ class SUPERSampler(BaseBatchSampler):
                 self.share_future_batch_accesses(prefetch_buffer)
                 batch_buffer.extend(prefetch_buffer)
             batch = batch_buffer.pop(0)
-            yield batch
+            batch_indices, batch_id = batch
+            status = self.super_client.get_batch_status(batch_id, self.dataset_id)
+            updated_batch = (batch_indices, batch_id, status)
+
+            yield updated_batch
 
 
 # def test_sampler(dataset, job_id, use_super = False, num_Epochs=1, batch_size=10):
