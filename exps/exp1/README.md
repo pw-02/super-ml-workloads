@@ -37,18 +37,81 @@ The goal for this experiment is to test how my solution performs when training a
 - Shuffle dataset = True
 - Batch size: 256
 
+# Issue Log:
+
+## Repletely Displaying  'Batch'{xxxx}' is cached or in actively being cached'
+
+#### Description:
+
+The first time the experiment was run with super it repeatedly tried to cache batches ''8406193351831191442" and "1615931262124447054". The logs for super were filled with 'INFO: Batch'{xxxx}' is cached or in actively being cached'. The training job did not make any progress while this was happening.
+
+#### Cause:
+
+The training job encountered a cache miss, so it contacted super to get a 'status' for the batch. The 'status' was that the batch was in progress, which is true, but it was taking a while because of the cold start penalty. The training job repeatedly called the function, it was only supposed to call it a max times of 10, but there was a error in the loop which caused it run until the data was returned with a cache hit.
+
+#### Solution:
+
+The Super Dataset code has been fixed. Specifically, the 'max_attempts' rule in the 'fetch_from_cache' function, which wasn't doing anything previously. 
+
+#### Resolved? 
+
+Yes
+
+------
+
+## The order of batches being cached is different than order that batches are being accessed
+
+#### Description:
+
+All of the jobs are experiencing a cache misses, even though the SUPER data loader says that the data has been added to the cache. 
+
+#### Cause:
+
+The 'bucket_name' is hard coded in SUPER, and is used to generate the 'batch_id'. In this experiment the S3 bucket used is different to the one that is hard coded within SUPER.
+
+#### Solution:
+
+Modify SUPER so that it can handle batches from any S3 bucket and therefore there is no need to hardcode a bucket name.
+
+#### Resolved? 
+
+Yes
+
+------
+
+## Training Not Working with Super when Pytorch Workers > 4
+
+#### Description:
+
+When the number of pytorch workers is > 0, the training loop just stalls and doesn't process any batches. It does not crash, and I can see information being sent to the SUPER service from the sampler. 
+
+#### Cause:
+
+When number workers > 0 multi-processing is used. This means each dataset object will require its own SUPER client and cache, meaning I cannot use the same client for all datasets. 
+
+#### Solution:
+
+Change code so that every super dataset object creates its own instance of a super client and a cache_client. 
+
+#### Resolved? 
+
+Yes - also added some functionality to the training script that confirms access to SUPER and the Cache before starting training.
+
+------
+
+## SUPER incorrectly assigning batches as 'cached'
+
+#### Description:
+
+During the processing of batches, SUPER is calling lambda to preload the batch into the cache, however the lambda always returns 'batch cached' even when the caching has failed for some reason. This has a knock on effect as SUPER assumes the batch has been cached.
+
+#### Cause:
+
+Lambda function always returns 'batch cached', even when the caching of the batch failed.
+
+#### Solution:
 
 
-## Issue Log:
 
-1. The first time the experiment was run with super it repeatedly tried to cache batches ''8406193351831191442" and "1615931262124447054". The logs for super were filled with 'INFO: Batch'{xxxx}' is cached or in actively being cached'. The training job did not make any progress while this was happening.
+#### Resolved? 
 
-   Cause:
-
-   The training job encountered a cache miss, so it contacted super to get a 'status' for the batch. The 'status' was that the batch was in progress, which is true, but it was taking a while because of the cold start penalty. The training job repeatedly called the function, it was only supposed to call it a max times of 10, but there was a error in the loop which caused it run until the data was returned with a cache hit.
-
-   Solution:
-
-   The Super Dataset code has been fixed. Specifically, the 'max_attempts' rule in the 'fetch_from_cache' function, which wasn't doing anything previously. 
-
-   

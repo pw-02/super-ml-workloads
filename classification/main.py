@@ -1,14 +1,14 @@
 import time
 from typing import Iterator
-import redis
 from torch import nn, optim
 from torchvision import models, transforms
-from torch.utils.data import DataLoader
+# from torch.utils.data import DataLoader
 from jsonargparse._namespace import Namespace
 import sys
 from torch.utils.data.dataloader import default_collate
 from lightning.fabric import Fabric
 from super_client import SuperClient
+from image_classification.dataloader import DataLoader
 from image_classification.utils import *
 from image_classification.datasets import *
 from image_classification.samplers import *
@@ -59,6 +59,10 @@ def custom_collate(batch):
 
     return img_tensor, label_tensor, batch_id, False,  total_fetch_time, total_transform_time
 
+def custom_collate_batch(data):
+   
+    return data
+
 
 def prepare_for_training(fabric: Fabric,hparams:Namespace):
     # Set seed
@@ -75,44 +79,78 @@ def prepare_for_training(fabric: Fabric,hparams:Namespace):
     optimizer =  initialize_optimizer(optimizer_type = hparams.model.optimizer,  model_parameters=model.parameters(),learning_rate=hparams.model.lr, momentum=hparams.model.momentum, weight_decay=hparams.model.weight_decay)
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 0.1 ** (epoch // 30)) #TODO: Add support for other scheduler
      # call `setup` to prepare for model / optimizer for distributed training. The model is moved automatically to the right device.
-    model, optimizer = fabric.setup(model,optimizer, move_to_device=True) 
+    model, optimizer = fabric.setup(model,optimizer, move_to_device=True)
 
-    # Initialize cache and super
-    cache_client = redis.StrictRedis(host=hparams.data.cache_host, port=hparams.data.cache_port) if hparams.data.use_cache else None    
-    super_client = SuperClient(hparams.data.super_address) if hparams.data.dataloader_backend == 'super' else None
+    #confirm the dataloader backend
+    fabric.print(f"Attempting to use '{hparams.data.dataloader_backend}' as the data laoder backend")
+   
+    confirm_dataloader_backend(fabric=fabric,use_cache=hparams.data.use_cache,
+                               cache_host=hparams.data.cache_host if hparams.data.use_cache else None,
+                               cache_port=hparams.data.cache_port if hparams.data.use_cache else None,   
+                               dataloader_backend=hparams.data.dataloader_backend,
+                               super_address=hparams.data.super_address if hparams.data.dataloader_backend == 'super' else None)
     
+    fabric.print(f"Confirmed '{hparams.data.dataloader_backend}' as the data laoder backend")
+
     # Initialize dataloaders
     eval_dataloader = None
     train_dataloader = None
 
     if hparams.workload.run_training:
         train_dataloader = initialize_dataloader(
+            job_id=hparams.job_id,
             fabric=fabric,
-            hparams=hparams,
-            is_training=True,
-            cache_client=cache_client,
-            super_client=super_client
-        )
-        train_dataloader = fabric.setup_dataloaders(train_dataloader)
+            num_workers=hparams.workload.workers,
+            dataloader_backend=hparams.data.dataloader_backend,
+            data_dir=hparams.data.train_data_dir,
+            shuffle=hparams.data.shuffle,
+            sampler_seed=hparams.data.sampler_seed,
+            batch_size=hparams.data.batch_size,
+            drop_last=hparams.data.drop_last,
+            super_address= hparams.data.super_address if hparams.data.dataloader_backend == 'super' else None,
+            super_prefetch_lookahead= hparams.data.super_prefetch_lookahead if hparams.data.dataloader_backend == 'super' else None,
+            cache_host=hparams.data.cache_host if hparams.data.use_cache else None,
+            cache_port=hparams.data.cache_port if hparams.data.use_cache else None   
+            )
+        train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)   
     
     if hparams.workload.run_evaluate:
-        eval_dataloader = initialize_dataloader(
+            train_dataloader = initialize_dataloader(
+            job_id=hparams.job_id,
             fabric=fabric,
-            hparams=hparams,
-            is_training=False,
-            cache_client=cache_client,
-            super_client=super_client
-        )
-        eval_dataloader = fabric.setup_dataloaders(eval_dataloader)
+            num_workers=hparams.workload.workers,
+            dataloader_backend=hparams.data.dataloader_backend,
+            data_dir=hparams.data.eval_data_dir,
+            shuffle=False,
+            sampler_seed=hparams.data.sampler_seed,
+            batch_size=hparams.data.batch_size,
+            drop_last=hparams.data.drop_last,
+            super_address= hparams.data.super_address if hparams.data.dataloader_backend == 'super' else None,
+            super_prefetch_lookahead= hparams.data.super_prefetch_lookahead if hparams.data.dataloader_backend == 'super' else None,
+            cache_host=hparams.data.cache_host if hparams.data.use_cache else None,
+            cache_port=hparams.data.cache_port if hparams.data.use_cache else None   
+            )
+            eval_dataloader = fabric.setup_dataloaders(eval_dataloader, move_to_device=True)
 
-    #register job with super
-    if hparams.data.dataloader_backend == 'super' and super_client is not None:
-        register_job_with_super(
-            super_client=super_client,
-            job_id=   hparams.job_id,
-            train_dataset= None if train_dataloader is None else train_dataloader.dataset,
-            evaluation_dataset= None if eval_dataloader is None else eval_dataloader.dataset)
+    #register job and datasets with super if its the dataloader_backend
+    if hparams.data.dataloader_backend == 'super':
+        super_client = SuperClient(server_address=hparams.data.super_address)
+        job_dataset_ids = []
 
+        if train_dataloader is not None:
+            train_dataset:SUPERDataset = train_dataloader.dataset
+            super_client.register_dataset(train_dataset.dataset_id, train_dataset.data_dir, json.dumps(train_dataset.transform_to_dict()), None)
+            job_dataset_ids.append(train_dataset.dataset_id)
+        
+        if eval_dataloader is not None:
+            eval_dataset:SUPERDataset = eval_dataloader.dataset
+            super_client.register_dataset(eval_dataset.dataset_id, eval_dataset.data_dir, json.dumps(eval_dataset.transform_to_dict()), None)
+            job_dataset_ids.append(eval_dataset.dataset_id)
+
+        super_client.register_new_job(job_id=hparams.job_id,job_dataset_ids=job_dataset_ids)
+
+    else:
+        super_client = None
 
     #Initialize logger
     logger = SUPERLogger( fabric=fabric, root_dir=hparams.reporting.report_dir,
@@ -122,6 +160,29 @@ def prepare_for_training(fabric: Fabric,hparams:Namespace):
    
     
     return model, optimizer, scheduler, train_dataloader, eval_dataloader, logger, super_client
+
+
+def confirm_dataloader_backend(fabric: Fabric, use_cache, cache_host, cache_port,dataloader_backend, super_address  ):
+    if use_cache == True:
+        fabric.print(f"\tconfirming connection to cache at {cache_host}:{cache_port}..")
+        #test connection to the cache, if test fails, disables use of cache and SUPER
+        cache_client = redis.StrictRedis(host=cache_host, port=cache_port)
+        try:
+            cache_client.set('foo', 123456)
+            cache_client.get('foo')
+        except Exception as e:
+            use_cache = False
+            dataloader_backend = 'pytorch-batch'
+            fabric.print(f"\tFailed to connect with cache -'{str(e)}'. Exiting job.")
+            sys.exit()
+
+    if dataloader_backend == 'super':
+        fabric.print(f"\tConfirming connection to super at '{super_address}'")
+        super_client = SuperClient(server_address=super_address)
+        connection_confirmed, message = super_client.ping_server()
+        if not connection_confirmed:
+            fabric.print(f"\tsuper connection check failed with '{message}'. Exiting job.")
+            sys.exit()
 
 def initialize_model(fabric: Fabric, arch: str) -> nn.Module: 
     with fabric.init_module(empty_init=True): #model is instantiated with randomly initialized weights by default.
@@ -142,46 +203,63 @@ def initialize_optimizer(optimizer_type:str, model_parameters:Iterator[nn.Parame
     return optimizer
 
 
-def initialize_dataloader(fabric: Fabric, hparams:Namespace, is_training = False, cache_client = None, super_client = None):
-
-    transformations = initialize_transformations(hparams.data.train_data_dir if is_training else hparams.data.eval_data_dir)
+def initialize_dataloader(
+                        job_id,
+                        fabric: Fabric,
+                        num_workers,
+                        #is_training: bool, 
+                        dataloader_backend, 
+                        data_dir,
+                        shuffle,
+                        sampler_seed,
+                        batch_size,
+                        drop_last,
+                        super_address,
+                        super_prefetch_lookahead,
+                        cache_host,
+                        cache_port        ):
 
     dataset = initialize_dataset(
-        dataloader_backend=hparams.data.dataloader_backend,
-        transformations=transformations,
-        data_dir=hparams.data.train_data_dir if is_training else hparams.data.eval_data_dir,
-        cache_client=cache_client,
-        super_client=super_client
+        job_id=job_id,
+        dataloader_backend=dataloader_backend,
+        transformations=initialize_transformations(),
+        data_dir=data_dir,
+        super_address= super_address,
+        cache_host=cache_host,
+        cache_port=cache_port 
         )
     
-    fabric.print(f"Dataset initialized: {hparams.data.train_data_dir if is_training else hparams.data.eval_data_dir}, size: {len(dataset)} files")
+    fabric.print(f"Dataset initialized: {data_dir}, size: {len(dataset)} files")
 
     sampler = initialize_sampler(
-        dataset, 
-        hparams.data.dataloader_backend,
-        hparams.job_id, 
-        super_client,
-        shuffle=hparams.data.shuffle,
-        batch_size=hparams.data.batch_size,
-        drop_last=hparams.data.drop_last,
-        super_prefetch_lookahead=hparams.data.super_prefetch_lookahead,
-        sampler_seed=hparams.data.sampler_seed)
+        job_id=job_id,
+        dataset=dataset,
+        dataloader_backend=dataloader_backend,
+        shuffle=shuffle,
+        batch_size=batch_size,
+        drop_last=drop_last,
+        super_prefetch_lookahead=super_prefetch_lookahead,
+        sampler_seed=sampler_seed,
+        super_address=super_address)
         
-    if  hparams.data.dataloader_backend == "pytorch-vanillia":
-        return DataLoader(dataset=dataset, sampler=sampler, batch_size=hparams.data.batch_size, 
-                          num_workers=hparams.workload.workers, collate_fn=custom_collate)
+    if  dataloader_backend == "pytorch-vanillia":
+        return DataLoader(dataset=dataset, sampler=sampler, batch_size=batch_size, 
+                          num_workers=num_workers, collate_fn=custom_collate)
     else:
-        return DataLoader(dataset=dataset, sampler=sampler, batch_size=None, num_workers=hparams.workload.workers)
+        return DataLoader(dataset=dataset, sampler=sampler, 
+                          batch_size=None, #disables automated batching
+                          num_workers=num_workers, 
+                          collate_fn=custom_collate_batch)
 
 
 def register_job_with_super(super_client: SuperClient, job_id, train_dataset:SUPERDataset, evaluation_dataset:SUPERDataset):
     #dataset_id = hashlib.sha256(f"{data_source_system}_{data_dir}".encode()).hexdigest()
     job_dataset_ids = []
     if train_dataset is not None:
-        super_client.register_dataset(train_dataset.dataset_id, train_dataset.data_dir, 's3', None)
+        super_client.register_dataset(train_dataset.dataset_id, train_dataset.data_dir, None)
         job_dataset_ids.append(train_dataset.dataset_id)
     if evaluation_dataset is not None:
-        super_client.register_dataset(evaluation_dataset.dataset_id, evaluation_dataset.data_dir, 's3', None)
+        super_client.register_dataset(evaluation_dataset.dataset_id, evaluation_dataset.data_dir, None)
         job_dataset_ids.append(evaluation_dataset.dataset_id)
 
     super_client.register_new_job(job_id=job_id,job_dataset_ids=job_dataset_ids)
@@ -189,19 +267,27 @@ def register_job_with_super(super_client: SuperClient, job_id, train_dataset:SUP
     return super_client
     
 
-def initialize_sampler(dataset, dataloader_backend, job_id, super_client,shuffle,sampler_seed, batch_size, drop_last,super_prefetch_lookahead):
+def initialize_sampler(job_id, 
+                       dataset, 
+                       dataloader_backend,  
+                       shuffle,
+                       sampler_seed, 
+                       batch_size, 
+                       drop_last,
+                       super_prefetch_lookahead =None, 
+                       super_address=None):
     
-    if dataloader_backend == "super":
-      
+    if dataloader_backend == "super":   
       return SUPERSampler(
+        job_id=job_id,
         data_source=dataset,
         batch_size=batch_size,
         drop_last=drop_last,
-        job_id=job_id,
         shuffle=shuffle,
         seed=sampler_seed,
-        super_client=super_client,
-        super_prefetch_lookahead=super_prefetch_lookahead)
+        super_prefetch_lookahead=super_prefetch_lookahead,
+        super_address = super_address
+        )
     
     elif dataloader_backend == "pytorch-batch":
         return PytorchBatchSampler(
@@ -220,34 +306,49 @@ def initialize_sampler(dataset, dataloader_backend, job_id, super_client,shuffle
         )
 
 
-def initialize_dataset( dataloader_backend:str, transformations: transforms.Compose,data_dir:str,cache_client=None,super_client=None, ):
+def initialize_dataset(job_id, 
+                       dataloader_backend:str, 
+                       transformations: transforms.Compose,
+                       data_dir:str,
+                       super_address=None,
+                       cache_host=None,
+                       cache_port = None):
     
+# Initialize cache and super
     if dataloader_backend == "super":
-        return SUPERDataset(data_dir=data_dir,transform=transformations,cache_client=cache_client,super_client=super_client)
+        return SUPERDataset(job_id = job_id,
+                            data_dir=data_dir,
+                            transform=transformations,
+                            super_address=super_address,
+                            cache_host=cache_host,
+                            cache_port=cache_port)
     
     elif dataloader_backend == "pytorch-batch":
-        return PytorchBatchDataset(data_dir=data_dir,transform=transformations)
+        return PytorchBatchDataset(job_id = job_id, data_dir=data_dir,transform=transformations)
     
     elif dataloader_backend == "pytorch-vanillia":
-        return PytorchVanilliaDataset(data_dir=data_dir,transform=transformations)
+        return PytorchVanilliaDataset(job_id = job_id, data_dir=data_dir,transform=transformations)
     
 
-def initialize_transformations(data_dir) -> transforms.Compose:
+def initialize_transformations() -> transforms.Compose:
     
-    if 'resnet' in data_dir.lower():
-        #normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        transformations =  transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize,
-            ])
-    else:
-        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        transformations = transforms.Compose([transforms.ToTensor(), normalize])
+    # if 'resnet' in data_dir.lower():
+    #     #normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    #     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    #     transformations =  transforms.Compose([
+    #         transforms.RandomResizedCrop(224),
+    #         transforms.RandomHorizontalFlip(),
+    #         transforms.ToTensor(),
+    #         normalize,
+    #         ])
+    # else:
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    transformations = transforms.Compose([transforms.ToTensor(), normalize])
     
     return transformations
+
+
+
 
 if __name__ == "__main__":
     pass

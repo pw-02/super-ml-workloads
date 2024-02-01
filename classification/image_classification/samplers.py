@@ -117,12 +117,12 @@ class PytorchBatchSampler(BaseBatchSampler):
 
 class SUPERSampler(BaseBatchSampler):
 
-    def __init__(self, data_source: Sized, batch_size: int, drop_last: bool, job_id:int, num_samples: Optional[int] = None, 
-                 shuffle: bool = True, seed: int = 0,super_client: SuperClient = None, super_prefetch_lookahead = 10) -> None:
+    def __init__(self, job_id:int, data_source: Sized, batch_size: int, drop_last: bool,  num_samples: Optional[int] = None, 
+                 shuffle: bool = True, seed: int = 0, super_prefetch_lookahead = 10, super_address = None) -> None:
 
-        super(SUPERSampler, self).__init__(data_source, batch_size, drop_last, num_samples,shuffle, seed )
-
-        self.super_client = super_client
+        super(SUPERSampler, self).__init__(data_source, batch_size, drop_last, num_samples,shuffle, seed, )
+        self.super_client = SuperClient(super_address)
+        # self.super_client = SuperClient(super_address)
         self.super_prefetch_lookahead = super_prefetch_lookahead
         self.job_id = job_id
         self.dataset_id = data_source.dataset_id
@@ -131,6 +131,8 @@ class SUPERSampler(BaseBatchSampler):
         """
         Share future batch accesses with the CacheCoordinatorClient.
         """ 
+        # if self.super_client is None:
+        #     self.super_client = SuperClient()
         if batches and self.super_client is not None:
             self.super_client.share_batch_access_pattern(job_id=self.job_id, batches=batches, dataset_id = self.dataset_id)
 
@@ -139,6 +141,7 @@ class SUPERSampler(BaseBatchSampler):
         """
         Iterator to yield batches with prefetching and sharing access patterns.
         """
+    
         batch_buffer = []
         batch_iter = super().__iter__()
         batches_exhausted = False

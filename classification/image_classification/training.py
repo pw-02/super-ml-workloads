@@ -119,7 +119,7 @@ def process_data(fabric: Fabric, dataloader: DataLoader,
             metrics_dict['access_time'] = start_time
             metrics_dict['training_speed'] = logger.iteration_aggregator.compute_time.avg
             metrics_dict['cache_hit'] = cache_hit
-           # super_client.share_job_metrics(dataset_id=dataloader.dataset.dataset_id, metrics=metrics_dict)
+            super_client.share_job_metrics(hparams.job_id, dataset_id=dataloader.dataset.dataset_id, metrics=metrics_dict)
 
         global_step+=1
 

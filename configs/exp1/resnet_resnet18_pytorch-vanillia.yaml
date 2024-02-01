@@ -1,6 +1,6 @@
 
 workload:
-    workers: 4
+    workers: 1
     accelerator: 'gpu'
     devices: 1
     epochs: 3
@@ -20,22 +20,21 @@ model:
     grad_acc_steps: null
 
 data:
-    dataloader_backend: super #'super', 'pytorch-vanillia','pytorch-batch'
+    dataloader_backend: pytorch-vanillia #'super', 'pytorch-vanillia','pytorch-batch'
     train_data_dir: s3://sdl-tiny-imagenet-200/train/
     eval_data_dir: s3://sdl-tiny-imagenet-200/test/
     batch_size: 256
-    shuffle: False
+    shuffle: True
     sampler_seed: 1
     drop_last: False
-    use_cache: True
+    use_cache: False
     #the following are super cache specific
     cache_host: ip-10-0-31-114.us-west-2.compute.internal  #localhost
     cache_port: 6378 #6379
-    super_prefetch_lookahead: 25
-    super_address: ip-10-0-31-114.us-west-2.compute.internal:50051 #172.17.0.4:50051
+
 reporting:
     profile: True
-    exp_name: resnet_resnet18_super
+    exp_name: resnet_resnet18_pytorch_batch
     flush_logs_every_n_steps: 1
     report_dir: exps/exp1
     print_freq: 1

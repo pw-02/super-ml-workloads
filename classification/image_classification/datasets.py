@@ -13,15 +13,18 @@ import boto3
 import zlib
 import time
 from super_client import SuperClient
+import redis
+import torchvision.transforms as transforms
 
 
 
 class BaseDataset(Dataset):
-    def __init__(self, data_dir: str, transform: Optional[Callable]):
+    def __init__(self, job_id, data_dir: str, transform: Optional[Callable]):
+        self.job_id = job_id
         self.data_dir = data_dir
         self.use_s3 = self.data_dir.startswith("s3://")
-        self.dataset_id = f"{self.data_dir}"
         self.transform = transform
+        self.dataset_id = self.generate_id()
         self.target_transform = None
         self.img_extensions = ['.jpg', '.JPG', '.jpeg', '.JPEG', '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP']
         self.s3_client = boto3.client('s3')
@@ -39,6 +42,24 @@ class BaseDataset(Dataset):
             for class_index, blob_class in enumerate(self.samples)
             for blob in self.samples[blob_class]
         ]
+    
+    def generate_id(self):
+        import hashlib
+        dataset_info = {
+            "data_dir": self.data_dir,
+            "transformations": self.transform_to_dict(),
+        }
+        # Serialize the dictionary to a JSON string
+        serialized_info = json.dumps(dataset_info, sort_keys=True)
+        # Hash the JSON string using SHA-256
+        sha256_hash = hashlib.sha256(serialized_info.encode()).digest()
+
+        # Take only a portion of the hash (e.g., first 8 bytes)
+        truncated_hash = sha256_hash[:8]
+        # Encode the truncated hash in Base64 for a shorter representation
+        dataset_id = base64.urlsafe_b64encode(truncated_hash).decode()
+        return dataset_id
+
 
     def __len__(self):
         return sum(len(class_items) for class_items in self.samples.values())
@@ -116,6 +137,23 @@ class BaseDataset(Dataset):
             # Handle exceptions, e.g., log them
             print(f"Error in _classify_blobs_s3: {e}")
             return None
+        
+    def transform_to_dict(self):
+        transform_dict = {}
+
+        for tf in self.transform.transforms:
+            transform_name = tf.__class__.__name__
+
+            if transform_name == 'Resize':
+                transform_dict[transform_name] = tf.size
+            elif transform_name == 'Normalize':
+                transform_dict[transform_name] = {'mean': tf.mean, 'std': tf.std}
+            else:
+                transform_dict[transform_name] = None
+
+        return transform_dict
+
+
 
     def _create_index_file_s3(self, s3url: S3Url) -> Dict[str, List[str]]:
         import json
@@ -193,8 +231,8 @@ class BaseDataset(Dataset):
 
 class PytorchVanilliaDataset(BaseDataset):
     
-    def __init__(self, data_dir: str, transform: Optional[Callable]):
-        super(PytorchVanilliaDataset, self).__init__(data_dir, transform)
+    def __init__(self, job_id, data_dir: str, transform: Optional[Callable]):
+        super(PytorchVanilliaDataset, self).__init__(job_id, data_dir, transform)
     
     def __len__(self):
         return super().__len__()
@@ -240,16 +278,17 @@ class PytorchVanilliaDataset(BaseDataset):
 
 class PytorchBatchDataset(BaseDataset):
     
-      def __init__(self, data_dir: str, transform: Optional[Callable]):
-        super(PytorchBatchDataset, self).__init__(data_dir, transform)
+      def __init__(self, job_id, data_dir: str, transform: Optional[Callable]):
+        super(PytorchBatchDataset, self).__init__(job_id, data_dir, transform)
  
 
 class SUPERDataset(BaseDataset):
-    def __init__(self, data_dir: str, transform: Optional[Callable], cache_client, super_client=None):
-        super(SUPERDataset, self).__init__(data_dir, transform)
-        self.cache_client = cache_client
-        self.super_client = super_client
-    
+    def __init__(self, job_id, data_dir: str, transform: Optional[Callable], super_address, cache_host, cache_port):
+        super(SUPERDataset, self).__init__(job_id, data_dir, transform)
+        
+        self.super_client = SuperClient(super_address) if super_address is not None else None
+        self.cache_client = redis.StrictRedis(host=cache_host, port=cache_port) if cache_host is not None else None
+
     def __getitem__(self, next_batch):
         batch_indices, batch_id = next_batch
         cached_data = None  
@@ -295,7 +334,7 @@ class SUPERDataset(BaseDataset):
             return self.cache_client.get(batch_id)
         except:
              return None
-    
+    @timer_decorator
     def deserialize_torch_batch(self, batch_data):
         decoded_data = base64.b64decode(batch_data) # Decode base64
         try:
