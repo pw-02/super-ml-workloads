@@ -1,6 +1,6 @@
 
 workload:
-    workers: 4
+    workers: 1
     accelerator: 'gpu'
     devices: 1
     epochs: 3
