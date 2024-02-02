@@ -11,6 +11,8 @@ from image_classification.dataloader import DataLoader
 from image_classification.utils import *
 from image_classification.datasets import *
 from image_classification.samplers import *
+from image_classification.samplers_dist import *
+
 from image_classification.training import *
 
 
@@ -113,7 +115,7 @@ def prepare_for_training(fabric: Fabric, hparams: Namespace):
             cache_host=hparams.data.cache_host if hparams.data.use_cache else None,
             cache_port=hparams.data.cache_port if hparams.data.use_cache else None
         )
-        train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
+        train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True, use_distributed_sampler=False)
 
     if hparams.workload.run_evaluate:
         eval_dataloader = initialize_dataloader(
@@ -131,7 +133,7 @@ def prepare_for_training(fabric: Fabric, hparams: Namespace):
             cache_host=hparams.data.cache_host if hparams.data.use_cache else None,
             cache_port=hparams.data.cache_port if hparams.data.use_cache else None
         )
-        eval_dataloader = fabric.setup_dataloaders(eval_dataloader, move_to_device=True)
+        eval_dataloader = fabric.setup_dataloaders(eval_dataloader, move_to_device=True, use_distributed_sampler=False)
 
     # Register job and datasets with super if it's the dataloader_backend
     if hparams.data.dataloader_backend == 'super':
@@ -218,7 +220,7 @@ def initialize_dataloader(job_id, fabric: Fabric, num_workers, dataloader_backen
 
     fabric.print(f"Dataset initialized: {data_dir}, size: {len(dataset)} files")
 
-    sampler = initialize_sampler(job_id=job_id, dataset=dataset, dataloader_backend=dataloader_backend,
+    sampler = initialize_sampler(fabric=fabric,job_id=job_id, dataset=dataset, dataloader_backend=dataloader_backend,
                                   shuffle=shuffle, batch_size=batch_size, drop_last=drop_last,
                                   super_prefetch_lookahead=super_prefetch_lookahead,
                                   sampler_seed=sampler_seed, super_address=super_address)
@@ -230,8 +232,27 @@ def initialize_dataloader(job_id, fabric: Fabric, num_workers, dataloader_backen
         return DataLoader(dataset=dataset, sampler=sampler, batch_size=None, num_workers=num_workers)
 
 
-def initialize_sampler(job_id, dataset, dataloader_backend, shuffle, sampler_seed, batch_size, drop_last,
+def initialize_sampler(fabric:Fabric, job_id, dataset, dataloader_backend, shuffle, sampler_seed, batch_size, drop_last,
                         super_prefetch_lookahead=None, super_address=None):
+    
+    if fabric.world_size > 1:
+        return SUPERDistributedSampler(
+            job_id=job_id, data_source=dataset, batch_size=batch_size, drop_last=drop_last,
+            num_replcias=fabric.world_size,
+            rank=fabric.node_rank,
+            shuffle=shuffle, seed=sampler_seed,
+            super_prefetch_lookahead=super_prefetch_lookahead,
+            super_address=super_address)
+
+
+    
+    
+    
+    
+    
+    
+    
+    
     if dataloader_backend == "super":
         return SUPERSampler(job_id=job_id, data_source=dataset, batch_size=batch_size, drop_last=drop_last,
                             shuffle=shuffle, seed=sampler_seed,

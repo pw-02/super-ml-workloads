@@ -3,6 +3,7 @@ from typing import Iterator, Optional, List, TypeVar, Sized, Union, Iterable
 from torch.utils.data import Sampler
 import sys
 from torch.utils.data  import DataLoader
+import math
 #sys.path.append('/workspaces/super-dl/superdl')
 # Specify the path to your module
 #print(sys.path)
@@ -217,13 +218,14 @@ class SUPERSampler(BaseBatchSampler):
                 batch_buffer.extend(prefetch_buffer)
             batch = batch_buffer.pop(0)
             batch_indices, batch_id = batch
-            if self.super_client is not None:
-                status = self.super_client.get_batch_status(batch_id, self.dataset_id)
-            else:
-                status = False
-            updated_batch = (batch_indices, batch_id, status)
+            # if self.super_client is not None:
+            #     status = self.super_client.get_batch_status(batch_id, self.dataset_id)
+            # else:
+            #     status = False
+            updated_batch = (batch_indices, batch_id, False)
 
             yield updated_batch
+    
 
 
 def test_sampler(dataset, job_id, shuffle, seed , num_Epochs, batch_size):

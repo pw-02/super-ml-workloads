@@ -130,8 +130,8 @@ class SUPERLogger(Logger):
 
 
     def display_progress(self,display_info:dict[str,float]):
-        self._fabric.print(", ".join(f"{key}: {round(float(value), 4)}" if isinstance(value, float) else f"{key}: {value}" for key, value in display_info.items()))
-        #print(", ".join(f"{key}: {value}" for key, value in display_info.items()))
+        #self._fabric.print(", ".join(f"{key}: {round(float(value), 4)}" if isinstance(value, float) else f"{key}: {value}" for key, value in display_info.items()))
+        print(", ".join(f"{key}: {value}" for key, value in display_info.items()))
         # reset traing metrics
 
     def epoch_start(self, epoch_length:int, is_training:bool):
@@ -197,19 +197,19 @@ class SUPERLogger(Logger):
         
         self.log_metrics(metrics=epoch_metrics, prefix='train.epoch' if is_training else 'val.epoch', force_save = True)
         
-        if (self._fabric.is_global_zero and self.log_rank_zero_only) or (not self.log_rank_zero_only):
-                print_seperator_line()
-                print(f"EPOCH {epoch} SUMMARY ({dataset_type}):")
-                # Filter keys to include only specific keys in the sub-dictionary
-                sub_dict_keys = ["device", "num_batches","total_time","data_time", "data_fetch", "data_transform", "compute_time" ,"total_bps"]
-                sub_dict = {key: epoch_metrics[key] for key in sub_dict_keys if key in epoch_metrics}
+        #if (self._fabric.is_global_zero and self.log_rank_zero_only) or (not self.log_rank_zero_only):
+        print_seperator_line()
+        print(f"EPOCH {epoch} SUMMARY ({dataset_type}):")
+        # Filter keys to include only specific keys in the sub-dictionary
+        sub_dict_keys = ["device", "num_batches","total_time","data_time", "data_fetch", "data_transform", "compute_time" ,"total_bps"]
+        sub_dict = {key: epoch_metrics[key] for key in sub_dict_keys if key in epoch_metrics}
 
-                total_cache_accesses = cache_hits + cache_misses
+        total_cache_accesses = cache_hits + cache_misses
 
-                sub_dict["cache_hit_rate:"] = (cache_hits / total_cache_accesses) * 100
+        sub_dict["cache_hit_rate:"] = (cache_hits / total_cache_accesses) * 100
 
-                self.display_progress(sub_dict)
-                print_seperator_line()
+        self.display_progress(sub_dict)
+        print_seperator_line()
         
         self.iteration_aggregator = IterationMetrics()
     
@@ -263,7 +263,7 @@ class SUPERLogger(Logger):
                             prefix='train.job' if dataset_type == 'train' else 'val.job',
                             force_save = True)
             
-            if (self._fabric.is_global_zero and self.log_rank_zero_only) or (not self.log_rank_zero_only):
+                # if (self._fabric.is_global_zero and self.log_rank_zero_only) or (not self.log_rank_zero_only):
                 print_seperator_line()
                 print(f"JOB SUMMARY ({dataset_type}):")
                 # Filter keys to include only specific keys in the sub-dictionary

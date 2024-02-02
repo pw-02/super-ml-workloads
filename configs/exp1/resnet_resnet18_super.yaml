@@ -1,12 +1,12 @@
 
 workload:
     workers: 4
-    accelerator: 'gpu'
-    devices: 1
-    epochs: 3
+    accelerator: 'cpu'
+    devices: 2
+    epochs: 1
     max_minibatches_per_epoch: null
-    run_training: True
-    run_evaluate: False
+    run_training: False
+    run_evaluate: True
     save_checkpoints: False
     save_dir: models
     training_seed: 1
@@ -29,14 +29,14 @@ data:
     drop_last: False
     use_cache: True
     #the following are super cache specific
-    cache_host: ec2-18-236-198-141.us-west-2.compute.amazonaws.com  #ip-10-0-31-114.us-west-2.compute.internal #'localhost'
+    cache_host: ec2-34-221-108-52.us-west-2.compute.amazonaws.com  #ip-10-0-31-114.us-west-2.compute.internal #'localhost'
     cache_port: 6378 #6379
-    super_prefetch_lookahead: 25
+    super_prefetch_lookahead: 2
     super_address: 172.17.0.3:50051 #172.17.0.3:50051 #172.17.0.4:50051, 'ip-10-0-31-114.us-west-2.compute.internal:50051'
 reporting:
     profile: True
     exp_name: resnet_resnet18_super
-    flush_logs_every_n_steps: 25
+    flush_logs_every_n_steps: 10
     report_dir: exps/exp1
     print_freq: 1
 
