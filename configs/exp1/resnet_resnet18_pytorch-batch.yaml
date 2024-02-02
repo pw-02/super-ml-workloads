@@ -1,12 +1,12 @@
 
 workload:
     workers: 0
-    accelerator: 'gpu'
-    devices: 1
+    accelerator: 'cpu'
+    devices: 2
     epochs: 3
     max_minibatches_per_epoch: null
-    run_training: True
-    run_evaluate: False
+    run_training: False
+    run_evaluate: True
     save_checkpoints: False
     save_dir: models
     training_seed: 1
@@ -24,7 +24,7 @@ data:
     train_data_dir: datasets/vision/cifar-10/train  #s3://sdl-tiny-imagenet-200/train/
     eval_data_dir: datasets/vision/cifar-10/val #s3://sdl-tiny-imagenet-200/test/
     batch_size: 256
-    shuffle: False
+    shuffle: True
     sampler_seed: 1 #only does anything when shuffle is enabled
     drop_last: False
     use_cache: False

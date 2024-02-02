@@ -66,7 +66,7 @@ class BaseDataset(Dataset):
 
     def __getitem__(self, next_batch):
         batch_indices, batch_id = next_batch
-       
+        print(batch_indices)
         if self.use_s3:
             images, labels, fetch_time = self.fetch_batch_data_s3(batch_indices, batch_id)
         else:

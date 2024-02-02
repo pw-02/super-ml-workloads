@@ -116,13 +116,13 @@ def prepare_for_training(fabric: Fabric, hparams: Namespace):
         train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
 
     if hparams.workload.run_evaluate:
-        train_dataloader = initialize_dataloader(
+        eval_dataloader = initialize_dataloader(
             job_id=hparams.job_id,
             fabric=fabric,
             num_workers=hparams.workload.workers,
             dataloader_backend=hparams.data.dataloader_backend,
             data_dir=hparams.data.eval_data_dir,
-            shuffle=False,
+            shuffle=hparams.data.shuffle,
             sampler_seed=hparams.data.sampler_seed,
             batch_size=hparams.data.batch_size,
             drop_last=hparams.data.drop_last,
