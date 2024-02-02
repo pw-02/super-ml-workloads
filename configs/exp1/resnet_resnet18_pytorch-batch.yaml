@@ -1,6 +1,6 @@
 
 workload:
-    workers: 4
+    workers: 0
     accelerator: 'gpu'
     devices: 1
     epochs: 3
@@ -20,12 +20,12 @@ model:
     grad_acc_steps: null
 
 data:
-    dataloader_backend: pytorch-batch #'super', 'pytorch-vanillia','pytorch-batch'
+    dataloader_backend: pytorch-batch #'super', 'pytorch-vanilla','pytorch-batch'
     train_data_dir: datasets/vision/cifar-10/train  #s3://sdl-tiny-imagenet-200/train/
     eval_data_dir: datasets/vision/cifar-10/val #s3://sdl-tiny-imagenet-200/test/
     batch_size: 256
-    shuffle: True
-    sampler_seed: 1
+    shuffle: False
+    sampler_seed: 1 #only does anything when shuffle is enabled
     drop_last: False
     use_cache: False
     #the following are super cache specific

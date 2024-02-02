@@ -243,7 +243,7 @@ def initialize_sampler(job_id, dataset, dataloader_backend, shuffle, sampler_see
                                    seed=sampler_seed)
 
     elif dataloader_backend == "pytorch-vanilla":
-        return PytorchVanilliaSampler(data_source=dataset, shuffle=shuffle, seed=sampler_seed)
+        return PytorchVanillaSampler(data_source=dataset, shuffle=shuffle, seed=sampler_seed)
 
 
 def initialize_dataset(job_id, dataloader_backend: str, transformations: transforms.Compose, data_dir: str,
@@ -254,7 +254,7 @@ def initialize_dataset(job_id, dataloader_backend: str, transformations: transfo
     elif dataloader_backend == "pytorch-batch":
         return PytorchBatchDataset(job_id=job_id, data_dir=data_dir, transform=transformations)
     elif dataloader_backend == "pytorch-vanilla":
-        return PytorchVanilliaDataset(job_id=job_id, data_dir=data_dir, transform=transformations)
+        return PytorchVanillaDataset(job_id=job_id, data_dir=data_dir, transform=transformations)
 
 
 def initialize_transformations() -> transforms.Compose:

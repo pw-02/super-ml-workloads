@@ -229,10 +229,10 @@ class BaseDataset(Dataset):
         return images, labels
     
 
-class PytorchVanilliaDataset(BaseDataset):
+class PytorchVanillaDataset(BaseDataset):
     
     def __init__(self, job_id, data_dir: str, transform: Optional[Callable]):
-        super(PytorchVanilliaDataset, self).__init__(job_id, data_dir, transform)
+        super(PytorchVanillaDataset, self).__init__(job_id, data_dir, transform)
     
     def __len__(self):
         return super().__len__()
@@ -244,13 +244,12 @@ class PytorchVanilliaDataset(BaseDataset):
         if self.use_s3:
             img, fetch_time = self.load_file_from_s3(img_path)
         else:
-            img, fetch_time = self.fetch_batch_data_local(img_path)
+            img, fetch_time = self.load_file_from_local(img_path)
 
         if img.mode == "L":
                 img = img.convert("RGB")
         
-        result, transform_time = self.transform_single_sample(img, label)
-        img, label = result[0],result[1]
+        img,label, transform_time = self.transform_single_sample(img, label)
 
         return (img, label, idx, fetch_time, transform_time)
     

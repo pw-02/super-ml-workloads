@@ -12,7 +12,7 @@ def initialize_parser(config_file: str) -> ArgumentParser:
     
     from torchvision.models import list_models
 
-    data_backend_choices = ['super', 'pytorch-vanillia','pytorch-batch']
+    data_backend_choices = ['super', 'pytorch-vanilla','pytorch-batch']
 
     parser = ArgumentParser(prog="app", description="Description for my app", default_config_files=[config_file])
     
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")
 
     defaults = {
-        "config_file": 'configs/exp1/resnet_resnet18_super.yaml',
+        "config_file": 'configs/exp1/resnet_resnet18_pytorch-batch.yaml',
         # "config_file": 'configs/exp1/resnet_resnet18_super.yaml',
 
         'devices': 1,

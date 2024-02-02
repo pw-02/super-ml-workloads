@@ -18,8 +18,8 @@ class MyDataset:
         self.dataset_id = 'foo'
 
     def __getitem__(self, idx: int) -> int:
-       indicies, batch_id, status = idx
-       return batch_id, indicies
+       #indicies, batch_id, status = idx
+       return idx
 
     def __len__(self) -> int:
         return len(self.xs)
@@ -88,8 +88,8 @@ class BaseSampler(Sampler[int]):
                 yield from torch.randperm(n, generator=generator).tolist()[:self.num_samples % n]
 
         else:
-            return iter(range(len(self.data_source)))
-
+            for idx in range(len(self.data_source)):
+                yield idx
     def __len__(self) -> int:
         return self.num_samples
     
@@ -147,22 +147,22 @@ class BaseBatchSampler(BaseSampler):
 
 
 
-class PytorchVanilliaSampler(BaseSampler):
+class PytorchVanillaSampler(BaseSampler):
   
   def __init__(self, data_source: Sized, num_samples: Optional[int] = None, shuffle: bool = True, seed: int = 0) -> None:
-        super(PytorchVanilliaSampler, self).__init__(data_source, num_samples, shuffle, seed)
+        super(PytorchVanillaSampler, self).__init__(data_source=data_source, shuffle=shuffle, num_samples=num_samples, seed=seed)
 
 
 class PytorchBatchSampler(BaseBatchSampler):
     def __init__(self, data_source: Sized, batch_size: int, drop_last: bool, num_samples: Optional[int] = None, shuffle: bool = True, seed: int = 0) -> None:
-        super(PytorchBatchSampler, self).__init__(data_source, batch_size, drop_last, num_samples, shuffle, seed)
+        super(PytorchBatchSampler, self).__init__(data_source=data_source, batch_size=batch_size, drop_last=drop_last,num_samples=num_samples, shuffle=shuffle, seed=seed)
 
 class SUPERSampler(BaseBatchSampler):
 
     def __init__(self, job_id:int, data_source: Sized, batch_size: int, drop_last: bool,  num_samples: Optional[int] = None, 
                  shuffle: bool = True, seed: int = 0,  super_prefetch_lookahead = 10, super_address = None) -> None:
 
-        super(SUPERSampler, self).__init__(data_source, batch_size, drop_last, num_samples,shuffle, seed, )
+        super(SUPERSampler, self).__init__(data_source=data_source, batch_size=batch_size, drop_last=drop_last, num_samples=num_samples,shuffle=shuffle, seed=seed)
         self.super_client = None
         self.super_address = super_address
        
@@ -226,20 +226,22 @@ class SUPERSampler(BaseBatchSampler):
             yield updated_batch
 
 
-def test_sampler(dataset, job_id, shuffle = False, seed = 0, num_Epochs=1, batch_size=10):
+def test_sampler(dataset, job_id, shuffle, seed , num_Epochs, batch_size):
     
         
     super_grpc_batch_sampler = SUPERSampler(job_id= job_id, data_source=dataset,batch_size=batch_size,  drop_last=False,
                                             shuffle=shuffle, seed=seed, super_prefetch_lookahead=10, super_address= None)
                                             
-
-    train_loader = DataLoader(dataset, num_workers=0, batch_size=None, sampler=super_grpc_batch_sampler)
+    vanilla = PytorchVanillaSampler(data_source=dataset,shuffle=shuffle, seed=seed)
+    
+    # train_loader = DataLoader(dataset, num_workers=0, batch_size=None, sampler=super_grpc_batch_sampler)
+    train_loader = DataLoader(dataset, num_workers=0, batch_size=batch_size, sampler=vanilla)
 
     for epoch in range(num_Epochs):
-        train_loader.sampler.set_seed(epoch)
+        #train_loader.sampler.set_seed(epoch)
         print(f'Epoch: {epoch}:')
-        for batch_id,batch_indices in train_loader:
-            print(f'Batch ID: {batch_id}, Batch Indices: {batch_indices}')
+        for idx in train_loader:
+            print(f'Batch ID: {idx}, Batch Indices: {idx}')
 
 # Usage example
 if __name__ == "__main__":
@@ -248,4 +250,4 @@ if __name__ == "__main__":
     ys = list(range(100, 1000))
     dataset = MyDataset(xs, ys)
     job_id = os.getpid()
-    test_sampler(dataset=dataset, job_id=job_id, shuffle=True,num_Epochs=4, batch_size=10, seed=None)
+    test_sampler(dataset=dataset, job_id=job_id, shuffle=False,num_Epochs=4, batch_size=10, seed=None)

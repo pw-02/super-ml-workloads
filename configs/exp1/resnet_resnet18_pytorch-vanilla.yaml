@@ -3,8 +3,8 @@ workload:
     workers: 0
     accelerator: 'gpu'
     devices: 1
-    epochs: 1
-    max_minibatches_per_epoch: 50
+    epochs: 3
+    max_minibatches_per_epoch: null
     run_training: True
     run_evaluate: False
     save_checkpoints: False
@@ -20,11 +20,11 @@ model:
     grad_acc_steps: null
 
 data:
-    dataloader_backend: pytorch-batch #'super', 'pytorch-vanillia','pytorch-batched'
-    train_data_dir: s3://sdl-cifar10/train/
-    eval_data_dir: s3://sdl-cifar10/test/
-    batch_size: 128
-    shuffle: False
+    dataloader_backend: pytorch-vanilla #'super', 'pytorch-vanilla','pytorch-batch'
+    train_data_dir: datasets/vision/cifar-10/train  #s3://sdl-tiny-imagenet-200/train/
+    eval_data_dir: datasets/vision/cifar-10/val #s3://sdl-tiny-imagenet-200/test/
+    batch_size: 256
+    shuffle: True
     sampler_seed: 1
     drop_last: False
     use_cache: False
@@ -34,11 +34,10 @@ data:
 
 reporting:
     profile: True
-    exp_name: cifar10
+    exp_name: resnet_resnet18_pytorch_batch
     flush_logs_every_n_steps: 1
-    report_dir: reports
+    report_dir: exps/exp1
     print_freq: 1
-
 
 
 

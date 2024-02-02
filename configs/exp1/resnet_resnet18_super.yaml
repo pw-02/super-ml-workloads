@@ -20,7 +20,7 @@ model:
     grad_acc_steps: null
 
 data:
-    dataloader_backend: super #'super', 'pytorch-vanillia','pytorch-batch'
+    dataloader_backend: super #'super', 'pytorch-vanilla','pytorch-batch'
     train_data_dir: s3://sdl-cifar10/train/
     eval_data_dir: s3://sdl-cifar10/test/
     batch_size: 128
