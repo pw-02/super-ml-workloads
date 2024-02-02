@@ -283,12 +283,14 @@ class PytorchBatchDataset(BaseDataset):
  
 
 class SUPERDataset(BaseDataset):
-    def __init__(self, job_id, data_dir: str, transform: Optional[Callable], super_address, cache_host, cache_port):
+    def __init__(self, job_id, data_dir: str, transform: Optional[Callable], cache_host, cache_port):
         super(SUPERDataset, self).__init__(job_id, data_dir, transform)
         
         # self.super_client = SuperClient(super_address) if super_address is not None else None
         self.cache_client = redis.StrictRedis(host=cache_host, port=cache_port) if cache_host is not None else None
 
+    #possinly put try catch around this fucntion
+        
     def __getitem__(self, next_batch):
         batch_indices, batch_id, cache_status = next_batch
         cached_data = None
@@ -313,7 +315,7 @@ class SUPERDataset(BaseDataset):
         return torch.stack(images), torch.tensor(labels), batch_id, False,  fetch_time, transform_time
 
     @timer_decorator
-    def fetch_from_cache(self, batch_id, cache_status, max_attempts = 1):
+    def fetch_from_cache(self, batch_id, cache_status, max_attempts = 5):
         cached_data = None
         attempts = 0
          # Try fetching from cache initially
@@ -321,8 +323,8 @@ class SUPERDataset(BaseDataset):
         if cached_data is not None:
             return cached_data
         # If not found in cache, check batch status with super_client
-        #status = self.super_client.get_batch_status(batch_id=batch_id, dataset_id=self.dataset_id)
-
+        # cache_status = self.super_client.get_batch_status(batch_id=batch_id, dataset_id=self.dataset_id)
+        # cache_status = False
         if cache_status == False:  # If the status is False, not cached or in progress, return None and fetch locally
             return cached_data
         else:
@@ -332,7 +334,7 @@ class SUPERDataset(BaseDataset):
                 if cached_data is not None:
                     break
                 else:
-                    time.sleep(0.25)
+                    time.sleep(0.01)
                 attempts += 1
         
         return cached_data
