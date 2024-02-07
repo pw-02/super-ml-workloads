@@ -1,0 +1,43 @@
+
+workload:
+    workers: 0
+    accelerator: 'gpu'
+    devices: 1
+    epochs: 3
+    max_minibatches_per_epoch: null
+    run_training: False
+    run_evaluate: True
+    save_checkpoints: False
+    save_dir: models
+    training_seed: 1
+
+model:
+    arch: resnet18
+    weight_decay: 1.0e-4
+    lr: 0.896
+    momentum: 0.875
+    optimizer: sgd
+    grad_acc_steps: null
+
+data:
+    dataloader_backend: pytorch-batch #'super', 'pytorch-vanilla','pytorch-batch'
+    train_data_dir: datasets/vision/cifar-10/train  #s3://sdl-tiny-imagenet-200/train/
+    eval_data_dir: datasets/vision/cifar-10/val #s3://sdl-tiny-imagenet-200/test/
+    batch_size: 128
+    shuffle: True
+    sampler_seed: 1 #only does anything when shuffle is enabled
+    drop_last: False
+    use_cache: False
+    #the following are super cache specific
+    cache_host: ip-10-0-31-114.us-west-2.compute.internal  #localhost
+    cache_port: 6378 #6379
+
+reporting:
+    profile: True
+    exp_name: resnet_resnet18_pytorch_batch
+    flush_logs_every_n_steps: 1
+    report_dir: exps/exp1
+    print_freq: 1
+
+
+

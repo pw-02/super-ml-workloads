@@ -1,9 +1,9 @@
 
 workload:
     workers: 0
-    accelerator: 'cpu'
-    devices: 2
-    epochs: 3
+    accelerator: 'gpu'
+    devices: 1
+    epochs: 1
     max_minibatches_per_epoch: null
     run_training: False
     run_evaluate: True
@@ -12,18 +12,19 @@ workload:
     training_seed: 1
 
 model:
-    arch: resnet18
-    weight_decay: 1.0e-4
-    lr: 0.896
+    arch: pythia-70m
+    weight_decay: 0.1
+    lr: 0.0006
     momentum: 0.875
     optimizer: sgd
     grad_acc_steps: null
+    
 
 data:
     dataloader_backend: pytorch-batch #'super', 'pytorch-vanilla','pytorch-batch'
-    train_data_dir: datasets/vision/cifar-10/train  #s3://sdl-tiny-imagenet-200/train/
-    eval_data_dir: datasets/vision/cifar-10/val #s3://sdl-tiny-imagenet-200/test/
-    batch_size: 256
+    train_data_dir: language/datasets/openwebtext/data/train  #s3://sdl-tiny-imagenet-200/train/
+    eval_data_dir: language/datasets/openwebtext/data/val #s3://sdl-tiny-imagenet-200/test/
+    batch_size: 5
     shuffle: True
     sampler_seed: 1 #only does anything when shuffle is enabled
     drop_last: False

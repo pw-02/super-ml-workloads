@@ -8,3 +8,5 @@ xlsxwriter
 redis
 grpcio-tools
 super-client
+datasets
+tiktoken

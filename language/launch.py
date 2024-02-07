@@ -13,6 +13,7 @@ def initialize_parser(config_file: str) -> ArgumentParser:
     from torchvision.models import list_models
 
     data_backend_choices = ['super', 'pytorch-vanilla','pytorch-batch']
+    llm_model_choices = ['pythia-70m']
 
     parser = ArgumentParser(prog="app", description="Description for my app", default_config_files=[config_file])
     
@@ -31,7 +32,7 @@ def initialize_parser(config_file: str) -> ArgumentParser:
     parser.add_argument('--workload.training_seed', type=int, default=None)
 
     # Model Configuration
-    parser.add_argument("--model.arch", type=str, default=None, required=True, choices=list_models(), help="model architecture: {}".format(", ".join(list_models())))
+    parser.add_argument("--model.arch", type=str, default=None, required=True, choices=llm_model_choices, help="model architecture: {}".format(", ".join(list_models())))
     parser.add_argument("--model.weight_decay", default=1e-4, type=float, help="weight decay factor (default: 1e-4)")
     parser.add_argument("--model.lr", type=float, default=0.1, help="initial learning rate (default: 0.1)")
     parser.add_argument("--model.momentum", default=0.9, type=float, help='momentum (default: 0.9)')
@@ -106,7 +107,7 @@ if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")
 
     defaults = {
-        "config_file": 'configs/exp1/resnet_resnet18_pytorch-batch.yaml',
+        "config_file": 'language/configs/example-config.yaml',
         # "config_file": 'configs/exp1/resnet_resnet18_super.yaml',
 
         'devices': 1,
