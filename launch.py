@@ -23,9 +23,10 @@ def initialize_parser(config_file: str) -> ArgumentParser:
     parser.add_argument('--accelerator', default='gpu', type=str, metavar='N', help='accelerator id to use')
     parser.add_argument('--devices', default=1, type=int, metavar='N', help='number of devices for distributed training')
     parser.add_argument('--training_seed', type=int, default=None)
+    parser.add_argument('--workload_type', type=str, default='vision', required=True)
 
     # Model Configuration
-    parser.add_argument("--arch", type=str, default=None, required=True, choices=list_models(), help="model architecture: {}".format(", ".join(list_models())))
+    parser.add_argument("--arch", type=str, default=None, required=True, choices=[list_models(),'pythia-70m'], help="model architecture: {}".format(", ".join(list_models())))
     parser.add_argument("--weight_decay", default=1e-4, type=float, help="weight decay factor (default: 1e-4)")
     parser.add_argument("--lr", type=float, default=0.1, help="initial learning rate (default: 0.1)")
     parser.add_argument("--momentum", default=0.9, type=float, help='momentum (default: 0.9)')
@@ -38,6 +39,7 @@ def initialize_parser(config_file: str) -> ArgumentParser:
     parser.add_argument('--train_data_dir', type=str, default=None, required=False)
     parser.add_argument('--eval_data_dir', type=str, default=None, required=False)
     parser.add_argument('--epochs', type=int, default=3, help="number of epochs")
+    parser.add_argument('--max_seq_length', type=int, default=1024, help="number of blocks per batch")
     parser.add_argument('--batch_size', type=int, default=128, help="number of samples per batch")
     parser.add_argument('--max_minibatches_per_epoch', type=int, default=None)
     parser.add_argument('--shuffle', default=True, action="store_true")
@@ -106,7 +108,7 @@ if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")
 
     defaults = {
-        "config_file": 'classification/configs/examples/cifar10_resnet18_s3.yaml',
+        "config_file": 'language/configs/example-config.yaml',
         # "config_file": 'configs/exp1/resnet_resnet18_super.yaml',
 
         'devices': 1,

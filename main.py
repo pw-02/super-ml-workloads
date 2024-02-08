@@ -8,20 +8,30 @@ from torch.utils.data.dataloader import default_collate
 from lightning.fabric import Fabric
 from super_client import SuperClient
 from torch.utils.data import DataLoader
-from super_dl.datasets import *
-from super_dl.sampler import *
+from super_dl.datasets.super_vision_dataset import SUPERVisionDataset
+from super_dl.datasets.supet_text_dataset import SUPERTextDataset
+import redis
+from super_dl.samplers import *
 from super_dl.utils import *
 from super_dl.logger import *
-from classification.train_image_classification import run_training
+from classification.train_image_classification import run_vision_training
+from language.gpt.train_llm import run_llm_training
+import tiktoken
+from language.gpt.model import GPT, Config
 
 def main(fabric: Fabric, hparams: Namespace) -> None:
-    
+
     exp_start_time = time.time()
     # Prepare for training
     model, optimizer, scheduler, train_dataloader, val_dataloader, logger = prepare_for_training(fabric=fabric, hparams=hparams)
     logger.log_hyperparams(hparams)
-    # Run training
-    run_training(fabric,model,optimizer,scheduler,train_dataloader,val_dataloader,hparams=hparams,logger=logger,)
+
+    if hparams.workload_type =='vision':
+        # Run training
+        run_vision_training(fabric,model,optimizer,scheduler,train_dataloader,val_dataloader,hparams=hparams,logger=logger,)
+    elif hparams.workload_type =='language':
+        run_llm_training(fabric,model,optimizer,scheduler,train_dataloader,val_dataloader,hparams=hparams,logger=logger,)
+
     exp_duration = time.time() - exp_start_time
     create_job_report(hparams.exp_name, logger.log_dir)
     fabric.print(f"Experiment ended. Duration: {exp_duration}")
@@ -34,7 +44,7 @@ def prepare_for_training(fabric: Fabric, hparams: Namespace):
 
     # Load model
     t0 = time.perf_counter()
-    model = initialize_model(fabric, hparams.arch)
+    model = initialize_model(fabric, hparams.arch,hparams.workload_type  )
     fabric.print(f"Time to instantiate {hparams.arch} model: {time.perf_counter() - t0:.02f} seconds")
     fabric.print(f"Total parameters in {hparams.arch} model: {num_model_parameters(model):,}")
 
@@ -53,19 +63,30 @@ def prepare_for_training(fabric: Fabric, hparams: Namespace):
     train_dataloader = None
 
     if hparams.run_training:
-        train_dataset = initialize_dataset(fabric,hparams.job_id, hparams.dataloader_backend, hparams.train_data_dir, hparams.cache_adress)
-        train_sampler = initialize_sampler(hparams.job_id, hparams.dataloader_backend, train_dataset, fabric.world_size, fabric.global_rank,
+        train_dataset = initialize_dataset(fabric,hparams.job_id, hparams.workload_type, hparams.dataloader_backend, 
+                                           hparams.train_data_dir, hparams.max_seq_length, hparams.cache_adress)
+        train_sampler = initialize_sampler(hparams.job_id, hparams.dataloader_backend,hparams.workload_type, train_dataset, fabric.world_size, fabric.global_rank,
                                             hparams.shuffle, hparams.batch_size,hparams.drop_last,
                                             hparams.superdl_address,hparams.superdl_prefetch_lookahead)
-        train_dataloader = DataLoader(dataset=train_dataset, sampler=train_sampler, batch_size=None, num_workers=hparams.num_workers)
+        
+        if hparams.workload_type == 'vision':
+            train_dataloader = DataLoader(dataset=train_dataset, sampler=train_sampler, batch_size=None, num_workers=hparams.num_workers)
+        elif hparams.workload_type == 'language':
+            train_dataloader = DataLoader(dataset=train_dataset, batch_size=hparams.batch_size, num_workers=hparams.num_workers)
+
         train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True, use_distributed_sampler=False)
 
+
     if hparams.run_evaluate:
-        eval_dataset = initialize_dataset(fabric,job_id, hparams.dataloader_backend, hparams.eval_data_dir, hparams.cache_adress)
-        eval_sampler = initialize_sampler(hparams.job_id, hparams.dataloader_backend, eval_dataset, fabric.world_size, fabric.global_rank,
+        eval_dataset = initialize_dataset(fabric,job_id, hparams.workload_type, hparams.dataloader_backend, 
+                                          hparams.eval_data_dir, hparams.max_seq_length, hparams.cache_adress)
+        eval_sampler = initialize_sampler(hparams.job_id, hparams.dataloader_backend,hparams.workload_type, eval_dataset, fabric.world_size, fabric.global_rank,
                                             hparams.shuffle, hparams.batch_size,hparams.drop_last,
                                             hparams.superdl_address,hparams.superdl_prefetch_lookahead)
-        eval_dataloader = DataLoader(dataset=eval_dataset, sampler=eval_sampler, batch_size=None, num_workers=hparams.num_workers)
+        if hparams.workload_type == 'vision':
+            eval_dataloader = DataLoader(dataset=eval_dataset, sampler=eval_sampler, batch_size=None, num_workers=hparams.num_workers)
+        elif hparams.workload_type == 'language':
+            eval_dataloader = DataLoader(dataset=eval_dataset, batch_size=hparams.batch_size, num_workers=hparams.num_workers)
         eval_dataloader = fabric.setup_dataloaders(eval_dataloader, move_to_device=True, use_distributed_sampler=False)
 
     # Register job and datasets with super if dataloader_backend is 'super-dl
@@ -119,9 +140,17 @@ def verify_dataloader_backend_is_ok(fabric: Fabric, dataloader_backend:str, cach
 
 
 
-def initialize_model(fabric: Fabric, arch: str) -> nn.Module:
-    with fabric.init_module(empty_init=True):  # model is instantiated with randomly initialized weights by default.
-        model: nn.Module = models.get_model(arch)
+def initialize_model(fabric: Fabric, arch: str, workload_type) -> nn.Module:
+    
+    if workload_type == 'vision':
+        with fabric.init_module(empty_init=True):  # model is instantiated with randomly initialized weights by default.
+            model: nn.Module = models.get_model(arch)
+    elif workload_type == 'language':
+
+        config = Config.from_name(arch)
+        with fabric.init_module(empty_init=True):  # model is instantiated with randomly initialized weights by default.
+            model = GPT(config)
+            model.apply(model._init_weights)
     return model
 
 
@@ -133,22 +162,32 @@ def initialize_optimizer(optimizer_type: str, model_parameters: Iterator[nn.Para
     return optimizer
 
 
-def initialize_sampler(job_id, dataloader_backend, dataset,world_size,global_rank, shuffle, batch_size, drop_last, super_address, superdl_prefetch_lookahead):
-    if dataloader_backend == "superdl":
+def initialize_sampler(job_id, dataloader_backend,workload_type, dataset,world_size,global_rank, shuffle, batch_size, drop_last, super_address, superdl_prefetch_lookahead):
+    if dataloader_backend == "super" and workload_type == 'vision':
         sampler = SuperBatchSampler(dataset, job_id, world_size, global_rank,batch_size, drop_last, shuffle, super_address, superdl_prefetch_lookahead)
 
-    elif dataloader_backend == "classic_pytorch" or 'classic-pytorch':
+    elif dataloader_backend == "classic_pytorch"  and workload_type == 'vision':
         sampler = SuperBatchSampler(dataset, job_id, world_size, global_rank,batch_size, drop_last, shuffle)
+    
+    elif dataloader_backend == "super" and workload_type == 'language':
+        sampler = SUPERSequentialSample(dataset, job_id, world_size, global_rank,super_address, superdl_prefetch_lookahead)
+    
+    elif dataloader_backend == "classic_pytorch"  and workload_type == 'language':
+        sampler = SUPERSequentialSample(dataset, job_id, world_size, global_rank)
 
     return sampler
 
 
-def initialize_dataset(fabric:Fabric,job_id, dataloader_backend: str, data_dir: str, cache_address:str):
-    if dataloader_backend == "super":
+def initialize_dataset(fabric:Fabric,job_id, workload_type, dataloader_backend: str, data_dir: str, max_sequence_length, cache_address:str):
+    if dataloader_backend == "super" and workload_type == 'vision':
         dataset = SUPERVisionDataset(job_id, data_dir,initialize_transformations(),None, cache_address)  
-    elif dataloader_backend == "classic_pytorch" or 'classic-pytorch':
+    elif dataloader_backend == ("classic_pytorch" ) and workload_type == 'vision':
         dataset = SUPERVisionDataset(job_id, data_dir,initialize_transformations(),None, None)
-    
+    elif dataloader_backend == "super" and workload_type == 'language':
+        dataset = SUPERTextDataset(job_id, data_dir,initialize_tokenizer(),max_sequence_length, cache_address)
+    elif dataloader_backend == ("classic_pytorch" ) and workload_type == 'language':
+        dataset = SUPERTextDataset(job_id, data_dir,initialize_tokenizer(),max_sequence_length, None)
+
     fabric.print(f"Dataset initialized: {data_dir}, size: {len(dataset)} files")
     return dataset
 
@@ -157,7 +196,8 @@ def initialize_transformations() -> transforms.Compose:
     transformations = transforms.Compose([transforms.ToTensor(), normalize])
     return transformations
 
-
+def initialize_tokenizer():
+    return tiktoken.get_encoding("gpt2")
 
 # def custom_collate(batch):
 

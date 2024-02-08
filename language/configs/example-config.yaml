@@ -1,44 +1,41 @@
+#env
+num_workers: 0
+devices: 1
+accelerator: 'gpu'
+training_seed: 1
+workload_type: 'language'
 
-workload:
-    workers: 0
-    accelerator: 'gpu'
-    devices: 1
-    epochs: 1
-    max_minibatches_per_epoch: null
-    run_training: False
-    run_evaluate: True
-    save_checkpoints: False
-    save_dir: models
-    training_seed: 1
+#model
+arch: pythia-70m
+weight_decay: 0.1
+lr: 0.0006
+momentum: 0.875
+optimizer: sgd
+grad_acc_steps: null
 
-model:
-    arch: pythia-70m
-    weight_decay: 0.1
-    lr: 0.0006
-    momentum: 0.875
-    optimizer: sgd
-    grad_acc_steps: null
-    
+#data
+dataloader_backend: classic_pytorch
+train_data_dir: s3://openwebtxt/owt/train/  #s3://sdl-tiny-imagenet-200/train/
+eval_data_dir: s3://openwebtxt/owt/val/ #s3://sdl-tiny-imagenet-200/test/
+epochs: 3
+batch_size: 5
+max_seq_length: 2048
+max_minibatches_per_epoch: 16
+shuffle: False
+drop_last: False
 
-data:
-    dataloader_backend: pytorch-batch #'super', 'pytorch-vanilla','pytorch-batch'
-    train_data_dir: language/datasets/openwebtext/data/train  #s3://sdl-tiny-imagenet-200/train/
-    eval_data_dir: language/datasets/openwebtext/data/val #s3://sdl-tiny-imagenet-200/test/
-    batch_size: 5
-    shuffle: True
-    sampler_seed: 1 #only does anything when shuffle is enabled
-    drop_last: False
-    use_cache: False
-    #the following are super cache specific
-    cache_host: ip-10-0-31-114.us-west-2.compute.internal  #localhost
-    cache_port: 6378 #6379
+#expiement/logging
+exp_name: pythia-70m
+print_freq: 1
+flush_logs_every_n_steps: 1
+run_training: True
+run_evaluate: False
+save_checkpoints: False
+save_checkpoint_dir: models
+report_dir: language/reports
+profile: True
 
-reporting:
-    profile: True
-    exp_name: resnet_resnet18_pytorch_batch
-    flush_logs_every_n_steps: 1
-    report_dir: exps/exp1
-    print_freq: 1
-
-
-
+#only used when super is thed datalaoder backend or caching is enabled for some other data loader that supports it
+cache_adress: null #localhost:6379
+superdl_address: localhost:50051
+superdl_prefetch_lookahead: 5

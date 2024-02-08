@@ -3,6 +3,7 @@ num_workers: 0
 devices: 2
 accelerator: 'cpu'
 training_seed: 1
+workload_type: 'vision'
 
 #model
 arch: resnet18

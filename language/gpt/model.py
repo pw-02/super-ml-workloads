@@ -23,11 +23,11 @@ from typing import Any, Literal, Optional, Type, Union
 
 import torch
 from typing_extensions import Self
-
+from super_dl.utils import find_multiple
 import language.gpt.model as model
 
 # import model
-from utils import find_multiple
+#from language.gpt.utils import find_multiple
 
 
 @dataclass

@@ -6,6 +6,88 @@ from super_client import SuperClient
 import torch
 
 
+
+class SUPERSequentialSample(SequentialSampler):
+    def __init__(self,
+        data_source: Sized,       
+        job_id: Any,
+        num_replicas: int,
+        global_rank: int,
+        super_address = None,
+        super_prefetch_lookahead = None):
+        
+        self._dataset_id = data_source.dataset_id
+        self._job_id = job_id
+        self._super_address = super_address
+        if super_prefetch_lookahead is None:
+            self._super_prefetch_lookahead = 1
+        else:
+            self._super_prefetch_lookahead = super_prefetch_lookahead
+        self._super_client:SuperClient = None
+    
+        if  num_replicas <= 1:
+            super(SUPERSequentialSample, self).__init__(SequentialSampler(data_source)) 
+    
+    def __gen_batch_id__(self, idx: List[int]) -> None:
+        batch_id = idx
+        return batch_id
+
+    def __share_future_accesses__(self, batches: List[List[int]]) -> None:
+        """
+        Share future batch accesses with the CacheCoordinatorClient.
+        """   
+        if self._super_client is not None:
+            batches_with_ids= []
+            for batch in batches:
+                batches_with_ids.append(batch,self.__gen_batch_id__(batch) )
+            self._super_client.share_batch_access_pattern(job_id=self._job_id, batches=batches_with_ids, dataset_id = self._dataset_id)
+    
+    def __iter__(self) ->Iterator[List[int]]:
+
+        if self._super_client is not None:
+            del self._super_client
+        if self._super_address is not None:
+            self.super_client = SuperClient(server_address=self._super_address)
+
+        buffer = []
+        iter = super().__iter__()
+        batches_exhausted = False
+
+
+        for _ in range(self._super_prefetch_lookahead * 2):
+            try:
+                buffer.append(next(iter))
+            except StopIteration:
+                break   
+
+        self.__share_future_accesses__(buffer)
+
+        while buffer:
+            if len(buffer) <= self._super_prefetch_lookahead and not batches_exhausted:
+                prefetch_buffer = []
+                for _ in range(self._super_prefetch_lookahead):
+                    try:
+                        prefetch_buffer.append(next(iter))
+                    except StopIteration:
+                        batches_exhausted = True
+                        break
+                
+                self.__share_future_accesses__(prefetch_buffer)
+                buffer.extend(prefetch_buffer)
+            next_idx = buffer.pop(0)
+            # if self.super_client is not None:
+            #     status = self.super_client.get_batch_status(batch_id, self.dataset_id)
+            # else:
+            #     status = False
+            next_idx = (next_idx, self.__gen_batch_id__(next_idx), False)
+            yield next_idx
+    
+    def set_seed(self, epoch: int) -> None:
+        self._seed = epoch
+
+
+
+
 class SuperBatchSampler(BatchSampler):
     def __init__(self,
         data_source: Sized,       

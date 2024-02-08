@@ -13,20 +13,41 @@ from lightning.fabric.utilities.rank_zero import rank_zero_only
 import time
 
 
-def timer_decorator(func):
-    def wrapper(*args, **kwargs):
-        start_time = time.perf_counter()
-        result = func(*args, **kwargs)
-        end_time = time.perf_counter()
-        execution_time = end_time - start_time
-        # Unpack result if it's a tuple
-        if isinstance(result, tuple):
-            return (*result, execution_time)
-        else:
-            return (result, execution_time)
-    return wrapper
+def chunked_cross_entropy(
+    logits: Union[torch.Tensor, List[torch.Tensor]],
+    targets: torch.Tensor,
+    chunk_size: int = 128,
+    ignore_index: int = -1,
+) -> torch.Tensor:
+    # with large max_sequence_lengths, the beginning of `backward` allocates a large memory chunk which can dominate
+    # the memory usage in fine-tuning settings with low number of parameters.
+    # as a workaround hack, the cross entropy computation is chunked to force it to deallocate on the go, reducing
+    # the memory spike's magnitude
 
+    # lm_head was chunked (we are fine-tuning)
+    #if isinstance(logits, list):
+        # don't want to chunk cross entropy
+        if chunk_size == 0:
+            logits = torch.cat(logits, dim=1)
+            logits = logits.reshape(-1, logits.size(-1))
+            targets = targets.reshape(-1)
+            return torch.nn.functional.cross_entropy(logits, targets, ignore_index=ignore_index)
 
+        # chunk cross entropy
+        logit_chunks = [logit_chunk.reshape(-1, logit_chunk.size(-1)) for logit_chunk in logits]
+        target_chunks = [target_chunk.reshape(-1) for target_chunk in targets.split(logits[0].size(1), dim=1)]
+        loss_chunks = [
+            torch.nn.functional.cross_entropy(logit_chunk, target_chunk, ignore_index=ignore_index, reduction="none")
+            for logit_chunk, target_chunk in zip(logit_chunks, target_chunks)
+        ]
+        non_masked_elems = (targets != ignore_index).sum()
+        return torch.cat(loss_chunks).sum() / max(1, non_masked_elems)
+
+def find_multiple(n: int, k: int) -> int:
+    assert k > 0
+    if n % k == 0:
+        return n
+    return n + k - (n % k)
 
 
 class AverageMeter(object):

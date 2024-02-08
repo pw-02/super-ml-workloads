@@ -4,13 +4,13 @@ from argparse import Namespace
 import torch.optim as optim
 from super_client import SuperClient
 from super_dl.logger import SUPERLogger
-from torch.utils.data import DataLoader
 from super_dl.utils import *
 import torch.optim as optim
 import torch.nn
+from torch.utils.data import DataLoader
+from  super_dl.utils import chunked_cross_entropy
 
-
-def run_vision_training(fabric: Fabric, model:torch.nn.Module, optimizer:optim.Optimizer, scheduler:optim.lr_scheduler.LRScheduler,
+def run_llm_training(fabric: Fabric, model:torch.nn.Module, optimizer:optim.Optimizer, scheduler:optim.lr_scheduler.LRScheduler,
                 train_dataloader: DataLoader, val_dataloader: DataLoader, hparams:Namespace,
                  logger:SUPERLogger, super_client:SuperClient = None) -> None:
     
@@ -28,6 +28,7 @@ def run_vision_training(fabric: Fabric, model:torch.nn.Module, optimizer:optim.O
                          dataloader=val_dataloader,
                          global_step=epoch * total_batches,
                          model=model,
+                         block_size=hparams.block_Size,
                          optimizer=optimizer,
                          logger=logger,
                          epoch=epoch,
@@ -60,7 +61,7 @@ def run_vision_training(fabric: Fabric, model:torch.nn.Module, optimizer:optim.O
   
 
 
-def process_data(fabric: Fabric, dataloader: DataLoader, 
+def process_data(fabric: Fabric, dataloader: DataLoader,
                  global_step:int, model:torch.nn.Module, 
                  optimizer:optim.SGD, logger:SUPERLogger, epoch, hparams:Namespace,
                  total_batches:int, is_training, super_client:SuperClient): 
@@ -69,11 +70,15 @@ def process_data(fabric: Fabric, dataloader: DataLoader,
     model.train(is_training)
     end = time.perf_counter()
     start_time = time.time()
-    for iteration, (input, target, batch_id, cache_hit, data_fetch_time, data_transform_time) in enumerate(dataloader):
-        num_sampels = input.size(0)
+    for iteration, (inputs, targets,) in enumerate(dataloader):
+        cache_hit = False
+        batch_id = iteration
+        data_transform_time = 0
+        num_sampels = inputs.size(0)
         data_time = time.perf_counter() - end
-        
+        data_fetch_time = data_time/inputs.shape[0]
         # Accumulate gradient x batches at a time
+            
         is_accumulating = hparams.grad_acc_steps is not None and iteration % hparams.grad_acc_steps != 0
 
         if hparams.profile:
@@ -81,10 +86,11 @@ def process_data(fabric: Fabric, dataloader: DataLoader,
 
         # Forward pass and loss calculation
         with fabric.no_backward_sync(model, enabled=is_accumulating):
-            output:torch.Tensor = model(input)
-            loss = torch.nn.functional.cross_entropy(output, target)
+            logits:torch.Tensor = model(inputs)
+            loss = chunked_cross_entropy(logits, targets, chunk_size=0)
+            #loss = chunked_cross_entropy(logits[..., :-1, :], targets[..., 1:])
             if is_training:
-                fabric.backward(loss) # .backward() accumulates when .zero_grad() wasn't called
+                fabric.backward(loss/1) # .backward() accumulates when .zero_grad() wasn't called
         if not is_accumulating and is_training:
             # Step the optimizer after accumulation phase is over
             optimizer.step()
@@ -96,7 +102,7 @@ def process_data(fabric: Fabric, dataloader: DataLoader,
         iteration_time = time.perf_counter()-end
         compute_time = iteration_time - data_time
         # measure accuracy and record loss
-        prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
+        # prec1, prec5 = accuracy(logits.data, targets, topk=(1, 5))
   
         metrics_dict = logger.record_iteration_metrics(
             epoch=epoch,
@@ -109,8 +115,8 @@ def process_data(fabric: Fabric, dataloader: DataLoader,
             compute_ips=  calc_throughput_per_second(num_sampels,compute_time),
             total_ips=calc_throughput_per_second(num_sampels,iteration_time),
             loss = to_python_float(loss.detach()),
-            top1=to_python_float(prec1),
-            top5=to_python_float(prec5),
+            top1=0,
+            top5=0,
             batch_id=batch_id,
             is_training=is_training,
             cache_hit = cache_hit,
@@ -118,16 +124,7 @@ def process_data(fabric: Fabric, dataloader: DataLoader,
             data_transform_time=data_transform_time
             )
     
-        if hparams.dataloader_backend == 'superdl' and super_client is not None:
-            metrics_dict['access_time'] = start_time
-            metrics_dict['training_speed'] = logger.iteration_aggregator.compute_time.avg
-            metrics_dict['cache_hit'] = cache_hit
-            #super_client.share_job_metrics(hparams.job_id, dataset_id=dataloader.dataset.dataset_id, metrics=metrics_dict)
-
         global_step+=1
-
-        #if (iteration + 1) % hparams.log_interval == 0:
-        #    progress.display(iteration)
 
         if hparams.max_minibatches_per_epoch and iteration >= hparams.max_minibatches_per_epoch - 1:
             # end epoch early based on num_minibatches that have been processed 
@@ -141,7 +138,25 @@ def process_data(fabric: Fabric, dataloader: DataLoader,
     
     logger.epoch_end(epoch, is_training=is_training)
 
-
+def cross_entropy(output, labels, _fp16=False):
+    """From pretrain_gpt2:forward_step()"""
+    """
+    if self.fp16_lm_cross_entropy:
+        assert output.dtype == torch.half
+        loss = mpu.vocab_parallel_cross_entropy(output, labels)
+    else:
+        loss = mpu.vocab_parallel_cross_entropy(output.float(), labels)
+        return loss
+    """
+    labels, loss_mask = labels[0], labels[1]
+    if _fp16:
+        assert output.dtype == torch.half and loss_mask.dtype == torch.half
+        losses = mpu.vocab_parallel_cross_entropy(output.contiguous(), labels)
+    else:
+        losses = mpu.vocab_parallel_cross_entropy(output.float().contiguous(), labels)
+    loss_mask = loss_mask.view(-1)
+    loss = torch.sum(losses.view(-1) * loss_mask) / loss_mask.sum()
+    return loss
 
 def accuracy(output: torch.Tensor, target:torch.Tensor, topk=(1,))-> List[torch.Tensor]:
     """Computes the accuracy over the k top predictions for the specified
