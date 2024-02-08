@@ -10,3 +10,4 @@ grpcio-tools
 super-client
 datasets
 tiktoken
+transformers

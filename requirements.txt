@@ -9,6 +9,8 @@ redis
 pandas
 awscli
 xlsxwriter
+tiktoken
+transformers
 #nlp workload
 #tiktoken
 #datasets
