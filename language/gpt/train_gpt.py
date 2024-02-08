@@ -10,7 +10,7 @@ import torch.nn
 from torch.utils.data import DataLoader
 from  super_dl.utils import chunked_cross_entropy
 
-def run_llm_training(fabric: Fabric, model:torch.nn.Module, optimizer:optim.Optimizer, scheduler:optim.lr_scheduler.LRScheduler,
+def run_gpt_training(fabric: Fabric, model:torch.nn.Module, optimizer:optim.Optimizer, scheduler:optim.lr_scheduler.LRScheduler,
                 train_dataloader: DataLoader, val_dataloader: DataLoader, hparams:Namespace,
                  logger:SUPERLogger, super_client:SuperClient = None) -> None:
     
@@ -86,11 +86,13 @@ def process_data(fabric: Fabric, dataloader: DataLoader,
 
         # Forward pass and loss calculation
         with fabric.no_backward_sync(model, enabled=is_accumulating):
-            logits:torch.Tensor = model(inputs)
-            loss = chunked_cross_entropy(logits, targets, chunk_size=0)
-            #loss = chunked_cross_entropy(logits[..., :-1, :], targets[..., 1:])
+            logits, loss = model(inputs, targets)
+            if hparams.grad_acc_steps is not None:
+                loss = loss / hparams.grad_acc_steps
+
             if is_training:
-                fabric.backward(loss/1) # .backward() accumulates when .zero_grad() wasn't called
+                fabric.backward(loss) # .backward() accumulates when .zero_grad() wasn't called
+        
         if not is_accumulating and is_training:
             # Step the optimizer after accumulation phase is over
             optimizer.step()
@@ -102,8 +104,9 @@ def process_data(fabric: Fabric, dataloader: DataLoader,
         iteration_time = time.perf_counter()-end
         compute_time = iteration_time - data_time
         # measure accuracy and record loss
-        # prec1, prec5 = accuracy(logits.data, targets, topk=(1, 5))
-  
+        #prec1, prec5 = accuracy(logits.data, targets, topk=(1, 5))
+        prec1, prec5 = 0,0
+
         metrics_dict = logger.record_iteration_metrics(
             epoch=epoch,
             step=iteration,
@@ -138,25 +141,7 @@ def process_data(fabric: Fabric, dataloader: DataLoader,
     
     logger.epoch_end(epoch, is_training=is_training)
 
-def cross_entropy(output, labels, _fp16=False):
-    """From pretrain_gpt2:forward_step()"""
-    """
-    if self.fp16_lm_cross_entropy:
-        assert output.dtype == torch.half
-        loss = mpu.vocab_parallel_cross_entropy(output, labels)
-    else:
-        loss = mpu.vocab_parallel_cross_entropy(output.float(), labels)
-        return loss
-    """
-    labels, loss_mask = labels[0], labels[1]
-    if _fp16:
-        assert output.dtype == torch.half and loss_mask.dtype == torch.half
-        losses = mpu.vocab_parallel_cross_entropy(output.contiguous(), labels)
-    else:
-        losses = mpu.vocab_parallel_cross_entropy(output.float().contiguous(), labels)
-    loss_mask = loss_mask.view(-1)
-    loss = torch.sum(losses.view(-1) * loss_mask) / loss_mask.sum()
-    return loss
+
 
 def accuracy(output: torch.Tensor, target:torch.Tensor, topk=(1,))-> List[torch.Tensor]:
     """Computes the accuracy over the k top predictions for the specified

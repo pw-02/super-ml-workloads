@@ -15,10 +15,10 @@ from super_dl.samplers import *
 from super_dl.utils import *
 from super_dl.logger import *
 from classification.train_image_classification import run_vision_training
-from language.gpt.train_llm import run_llm_training
-import tiktoken
-from language.gpt.model import GPT, Config
+from language.gpt.train_gpt import run_gpt_training
 
+import tiktoken
+from language.gpt.model import GPT, GPTConfig
 def main(fabric: Fabric, hparams: Namespace) -> None:
 
     exp_start_time = time.time()
@@ -30,7 +30,7 @@ def main(fabric: Fabric, hparams: Namespace) -> None:
         # Run training
         run_vision_training(fabric,model,optimizer,scheduler,train_dataloader,val_dataloader,hparams=hparams,logger=logger,)
     elif hparams.workload_type =='language':
-        run_llm_training(fabric,model,optimizer,scheduler,train_dataloader,val_dataloader,hparams=hparams,logger=logger,)
+        run_gpt_training(fabric,model,optimizer,scheduler,train_dataloader,val_dataloader,hparams=hparams,logger=logger,)
 
     exp_duration = time.time() - exp_start_time
     create_job_report(hparams.exp_name, logger.log_dir)
@@ -44,7 +44,7 @@ def prepare_for_training(fabric: Fabric, hparams: Namespace):
 
     # Load model
     t0 = time.perf_counter()
-    model = initialize_model(fabric, hparams.arch,hparams.workload_type  )
+    model = initialize_model(fabric, hparams.arch,hparams.workload_type,hparams.block_size)
     fabric.print(f"Time to instantiate {hparams.arch} model: {time.perf_counter() - t0:.02f} seconds")
     fabric.print(f"Total parameters in {hparams.arch} model: {num_model_parameters(model):,}")
 
@@ -64,7 +64,7 @@ def prepare_for_training(fabric: Fabric, hparams: Namespace):
 
     if hparams.run_training:
         train_dataset = initialize_dataset(fabric,hparams.job_id, hparams.workload_type, hparams.dataloader_backend, 
-                                           hparams.train_data_dir, hparams.max_seq_length, hparams.cache_adress)
+                                           hparams.train_data_dir, hparams.block_size, hparams.cache_adress)
         train_sampler = initialize_sampler(hparams.job_id, hparams.dataloader_backend,hparams.workload_type, train_dataset, fabric.world_size, fabric.global_rank,
                                             hparams.shuffle, hparams.batch_size,hparams.drop_last,
                                             hparams.superdl_address,hparams.superdl_prefetch_lookahead)
@@ -79,7 +79,7 @@ def prepare_for_training(fabric: Fabric, hparams: Namespace):
 
     if hparams.run_evaluate:
         eval_dataset = initialize_dataset(fabric,job_id, hparams.workload_type, hparams.dataloader_backend, 
-                                          hparams.eval_data_dir, hparams.max_seq_length, hparams.cache_adress)
+                                          hparams.eval_data_dir, hparams.block_size, hparams.cache_adress)
         eval_sampler = initialize_sampler(hparams.job_id, hparams.dataloader_backend,hparams.workload_type, eval_dataset, fabric.world_size, fabric.global_rank,
                                             hparams.shuffle, hparams.batch_size,hparams.drop_last,
                                             hparams.superdl_address,hparams.superdl_prefetch_lookahead)
@@ -140,17 +140,26 @@ def verify_dataloader_backend_is_ok(fabric: Fabric, dataloader_backend:str, cach
 
 
 
-def initialize_model(fabric: Fabric, arch: str, workload_type) -> nn.Module:
+def initialize_model(fabric: Fabric, arch: str, workload_type, block_size) -> nn.Module:
     
     if workload_type == 'vision':
         with fabric.init_module(empty_init=True):  # model is instantiated with randomly initialized weights by default.
             model: nn.Module = models.get_model(arch)
+    
     elif workload_type == 'language':
-
-        config = Config.from_name(arch)
-        with fabric.init_module(empty_init=True):  # model is instantiated with randomly initialized weights by default.
-            model = GPT(config)
-            model.apply(model._init_weights)
+        with fabric.init_module(empty_init=True):
+            gptconf = GPTConfig()    
+            # n_layer, n_head and n_embd are determined from model_type
+            config_args = {
+                'gpt2':         dict(n_layer=12, n_head=12, n_embd=768),  # 124M params
+                'gpt2-medium':  dict(n_layer=24, n_head=16, n_embd=1024), # 350M params
+                'gpt2-large':   dict(n_layer=36, n_head=20, n_embd=1280), # 774M params
+                'gpt2-xl':      dict(n_layer=48, n_head=25, n_embd=1600), # 1558M params
+            }
+            gptconf = GPTConfig(**config_args[arch])
+            model = GPT(gptconf)
+            if block_size < model.config.block_size:
+                 model.crop_block_size(block_size)
     return model
 
 

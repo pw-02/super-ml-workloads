@@ -13,7 +13,7 @@ def initialize_parser(config_file: str) -> ArgumentParser:
     from torchvision.models import list_models
 
     data_backend_choices = ['superdl', 'classic_pytorch']
-
+    gpt_model_choices = ['gpt2','gpt2-medium','gpt2-large','gpt2-xl']
     parser = ArgumentParser(prog="app", description="Description for my app", default_config_files=[config_file])
     
     #parser.add_argument('--config', action=ActionConfigFile)
@@ -25,8 +25,8 @@ def initialize_parser(config_file: str) -> ArgumentParser:
     parser.add_argument('--training_seed', type=int, default=None)
     parser.add_argument('--workload_type', type=str, default='vision', required=True)
 
-    # Model Configuration
-    parser.add_argument("--arch", type=str, default=None, required=True, choices=[list_models(),'pythia-70m'], help="model architecture: {}".format(", ".join(list_models())))
+   
+    parser.add_argument("--arch", type=str, default=None, required=True, choices=list_models() + gpt_model_choices, help="model architecture: {}".format(", ".join(list_models())))
     parser.add_argument("--weight_decay", default=1e-4, type=float, help="weight decay factor (default: 1e-4)")
     parser.add_argument("--lr", type=float, default=0.1, help="initial learning rate (default: 0.1)")
     parser.add_argument("--momentum", default=0.9, type=float, help='momentum (default: 0.9)')
@@ -39,7 +39,7 @@ def initialize_parser(config_file: str) -> ArgumentParser:
     parser.add_argument('--train_data_dir', type=str, default=None, required=False)
     parser.add_argument('--eval_data_dir', type=str, default=None, required=False)
     parser.add_argument('--epochs', type=int, default=3, help="number of epochs")
-    parser.add_argument('--max_seq_length', type=int, default=1024, help="number of blocks per batch")
+    parser.add_argument('--block_size', type=int, default=1024, help="number of blocks per batch")
     parser.add_argument('--batch_size', type=int, default=128, help="number of samples per batch")
     parser.add_argument('--max_minibatches_per_epoch', type=int, default=None)
     parser.add_argument('--shuffle', default=True, action="store_true")
