@@ -16,6 +16,7 @@ from super_client import SuperClient
 import redis
 import torchvision.transforms as transforms
 import threading
+from torch.utils.data import IterableDataset
 
 
 class BaseDataset(Dataset):

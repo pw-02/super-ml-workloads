@@ -225,7 +225,7 @@ class SUPERSampler(BaseBatchSampler):
             updated_batch = (batch_indices, batch_id, False)
 
             yield updated_batch
-    
+
 
 
 def test_sampler(dataset, job_id, shuffle, seed , num_Epochs, batch_size):
