@@ -1,0 +1,39 @@
+#env
+num_workers: 0
+devices: 1
+accelerator: 'gpu'
+training_seed: 1
+
+#model
+arch: resnet18
+weight_decay: 1.0e-4
+lr: 0.896
+momentum: 0.875
+optimizer: sgd
+grad_acc_steps: null
+
+#data
+dataloader_backend: classic_pytorch
+train_data_dir: s3://sdl-cifar10/train/
+eval_data_dir: s3://sdl-cifar10/test/
+epochs: 3
+batch_size: 16
+max_minibatches_per_epoch: 16
+shuffle: False
+drop_last: False
+
+#expiement/logging
+exp_name: cifar10
+print_freq: 1
+flush_logs_every_n_steps: 1
+run_training: True
+run_evaluate: False
+save_checkpoints: False
+save_checkpoint_dir: models
+report_dir: classification/reports
+profile: True
+
+#only used when super is thed datalaoder backend or caching is enabled for some other data loader that supports it
+cache_adress: null #localhost:6379
+superdl_address: localhost:50051
+superdl_prefetch_lookahead: 5

@@ -106,7 +106,7 @@ if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")
 
     defaults = {
-        "config_file": 'classification/configs/examples/cifar10_resnet18_local.yaml',
+        "config_file": 'classification/configs/examples/cifar10_resnet18_s3.yaml',
         # "config_file": 'configs/exp1/resnet_resnet18_super.yaml',
 
         'devices': 1,
