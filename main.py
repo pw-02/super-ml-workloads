@@ -34,13 +34,16 @@ def main(fabric: Fabric, hparams: Namespace) -> None:
 
     exp_duration = time.time() - exp_start_time
     fabric.print(f"Experiment ended. Duration: {exp_duration}")
-    
-    fabric.print(f"creating experiment report..")
-    file_loaction = create_job_report(hparams.exp_name, logger.log_dir)
-    split_path = file_loaction.split('/reports/', 1)
-    if len(split_path) > 1:
-        trimmed_path = split_path[1]
-        S3Helper().upload_to_s3(file_loaction, 'superreports23',trimmed_path)
+    with fabric.rank_zero_first:
+        fabric.print(f"creating experiment report..")
+        file_loaction = create_job_report(hparams.exp_name, logger.log_dir)
+        split_path = file_loaction.split('/reports/', 1)
+        if len(split_path) > 1:
+            trimmed_path = split_path[1]
+            S3Helper().upload_to_s3(file_loaction, 'superreports23',trimmed_path)
+        else:
+            S3Helper().upload_to_s3(file_loaction, 'superreports23',file_loaction)
+
 
 def prepare_for_training(fabric: Fabric, hparams: Namespace):
     # Set seed
