@@ -98,7 +98,7 @@ def setup(config_file: str, devices: int, precision: Optional[str]) -> None:
         hparams.max_minibatches_per_epoch //= fabric.world_size
     hparams.job_id = os.getpid()
     hparams.exp_version = get_next_exp_version(hparams.report_dir,hparams.exp_name)
-    #fabric.print(hparams)
+    fabric.print(hparams)
     fabric.launch(main, hparams=hparams)
 
 
@@ -128,7 +128,7 @@ if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")
 
     defaults = {
-       "config_file": 'language/configs/gpt2-pytorch.yaml',
+       "config_file": 'language/configs/gpt2-medium-pytorch.yaml',
         # "config_file": 'language/configs/gpt2-classic-pytorch.yaml',
         # "config_file": 'configs/exp1/resnet_resnet18_super.yaml',
 
