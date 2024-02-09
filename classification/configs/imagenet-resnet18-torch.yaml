@@ -23,7 +23,7 @@ shuffle: False
 drop_last: False
 
 #expiement/logging
-exp_name: imagenet-pytorch
+exp_name: imagenet-resnet18-pytorch
 print_freq: 10
 flush_logs_every_n_steps: 25
 run_training: True
