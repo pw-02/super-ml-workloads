@@ -6,7 +6,7 @@ training_seed: 1
 workload_type: 'language'
 
 #model
-arch: gpt2 #'gpt2' (124M), 'gpt2-medium' (350M), 'gpt2-large' (774m), 'gpt2-xl' (1558M)
+arch: gpt2-medium #'gpt2' (124M), 'gpt2-medium' (350M), 'gpt2-large' (774m), 'gpt2-xl' (1558M)
 weight_decay: 0.1
 lr: 0.0006
 momentum: 0.875
