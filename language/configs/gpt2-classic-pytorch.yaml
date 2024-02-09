@@ -1,5 +1,5 @@
 #env
-num_workers: 2
+num_workers: 0
 devices: 4
 accelerator: 'gpu'
 training_seed: 1
@@ -18,7 +18,7 @@ dataloader_backend: classic_pytorch
 train_data_dir: s3://openwebtxt/owt/train/  #s3://sdl-tiny-imagenet-200/train/
 eval_data_dir: s3://openwebtxt/owt/val/ #s3://sdl-tiny-imagenet-200/test/
 epochs: 3
-batch_size: 8
+batch_size: 5
 block_size: 1024
 max_minibatches_per_epoch: 10000
 shuffle: False

@@ -1,5 +1,5 @@
 #env
-num_workers: 2
+num_workers: 0
 devices: 2
 accelerator: 'cpu'
 training_seed: 1
