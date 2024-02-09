@@ -1,10 +1,7 @@
-datasets/
 useful.txt
-mlworkloads/classification/reports/
-reports/
-exps/
-data/openweb2000/
-data\openweb2000\
-data/original/
-data\original\
+classification/datasets/
+classification/reports/
+language/datasets/
+language/reports
+
 
