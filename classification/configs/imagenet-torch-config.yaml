@@ -1,6 +1,6 @@
 #env
 num_workers: 0
-devices: 1
+devices: 4
 accelerator: 'gpu'
 training_seed: 1
 
@@ -14,18 +14,18 @@ grad_acc_steps: null
 
 #data
 dataloader_backend: classic_pytorch
-train_data_dir: s3://sdl-cifar10/train/
-eval_data_dir: s3://sdl-cifar10/test/
+train_data_dir: s3://sdl-tiny-imagenet-200/train/
+eval_data_dir: s3://sdl-tiny-imagenet-200/val/
 epochs: 3
-batch_size: 16
-max_minibatches_per_epoch: 16
+batch_size: 128
+max_minibatches_per_epoch: null
 shuffle: False
 drop_last: False
 
 #expiement/logging
-exp_name: cifar10
-print_freq: 1
-flush_logs_every_n_steps: 1
+exp_name: imagenet-pytorch
+print_freq: 10
+flush_logs_every_n_steps: 25
 run_training: True
 run_evaluate: False
 save_checkpoints: False

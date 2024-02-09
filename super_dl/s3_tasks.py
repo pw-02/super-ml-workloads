@@ -80,9 +80,12 @@ class S3Helper():
     def is_image_file(self, filename: str):
         return any(filename.endswith(extension) for extension in ['.jpg', '.JPG', '.jpeg', '.JPEG', '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP'])
     
-    def load_s3_file_into_memory(self, bucket, file_path):
+    def load_s3_file_into_memory(self, bucket, file_path, is_image=False):
         obj = self.s3_client.get_object(Bucket=bucket, Key=file_path)
-        content = obj['Body'].read().decode('utf-8')
+        if is_image:
+            content = obj['Body'].read()
+        else:    
+            content = obj['Body'].read().decode('utf-8')
         return content
 
 

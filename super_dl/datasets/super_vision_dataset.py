@@ -38,7 +38,7 @@ class SUPERVisionDataset(BaseSUPERDataset):
             file_path, label = self._classed_items[idx]
             if self.use_s3:
                 # Download file into memory
-                content = self.s3_helper.load_s3_file_into_memory(self.bucket_name, file_path)
+                content = self.s3_helper.load_s3_file_into_memory(self.bucket_name, file_path, is_image=True)
                 img = Image.open(io.BytesIO(content))
             else:
                 img = Image.open(file_path)

@@ -1,9 +1,8 @@
 #env
 num_workers: 0
-devices: 2
-accelerator: 'cpu'
+devices: 1
+accelerator: 'gpu'
 training_seed: 1
-workload_type: 'vision'
 
 #model
 arch: resnet18
@@ -15,11 +14,11 @@ grad_acc_steps: null
 
 #data
 dataloader_backend: classic_pytorch
-train_data_dir: classification/datasets/cifar-10/train
-eval_data_dir: classification/datasets/cifar-10/val
+train_data_dir: s3://sdl-cifar10/train/
+eval_data_dir: s3://sdl-cifar10/test/
 epochs: 3
-batch_size: 16
-max_minibatches_per_epoch: 16
+batch_size: 128
+max_minibatches_per_epoch: null
 shuffle: False
 drop_last: False
 
