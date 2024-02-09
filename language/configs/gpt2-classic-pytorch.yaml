@@ -18,7 +18,7 @@ dataloader_backend: classic_pytorch
 train_data_dir: s3://openwebtxt/owt/train/  #s3://sdl-tiny-imagenet-200/train/
 eval_data_dir: s3://openwebtxt/owt/val/ #s3://sdl-tiny-imagenet-200/test/
 epochs: 1
-batch_size: 8
+batch_size: 5
 block_size: 1024
 max_minibatches_per_epoch: 2500
 shuffle: False

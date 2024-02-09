@@ -46,15 +46,16 @@ class SUPERTextDataset(BaseSUPERDataset, IterableDataset):
             for x, y in tokenized_chunks:
                 yield x, y
         
- 
+if __name__ == "__main__":
+
 # # Example usage
-# train_data_dir = 's3://openwebtxt/owt/train/'
-# block_size = 2048
-# dataset = SUPERTextDataset(1, train_data_dir, block_size,None)
-# sampler = SequentialSampler(dataset)
+    train_data_dir = 's3://openwebtxt/owt/train/'
+    block_size = 2048
+    dataset = SUPERTextDataset(1, train_data_dir, block_size,None)
+    sampler = SequentialSampler(dataset)
 
-# data_loader = DataLoader(dataset, batch_size=5)
+    data_loader = DataLoader(dataset, batch_size=5)
 
-# for input, target in data_loader:
-#     print(input.shape, target.shape)
+    for input, target in data_loader:
+        print(input.shape, target.shape)
 
