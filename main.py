@@ -29,15 +29,15 @@ def main(fabric: Fabric, hparams: Namespace) -> None:
     
     if fabric.is_global_zero:
         logger.log_hyperparams(hparams)
-        
+
     if hparams.workload_type =='vision':
         # Run training
         run_vision_training(fabric,model,optimizer,scheduler,train_dataloader,val_dataloader,hparams=hparams,logger=logger,)
     elif hparams.workload_type =='language':
         run_gpt_training(fabric,model,optimizer,scheduler,train_dataloader,val_dataloader,hparams=hparams,logger=logger,)
     
-    if fabric.is_global_zero:
-        logger.log_hyperparams(hparams)
+    # if fabric.is_global_zero:
+    #     logger.log_hyperparams(hparams)
 
     exp_duration = time.time() - exp_start_time
     fabric.print(f"Experiment ended. Duration: {exp_duration}")
