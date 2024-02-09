@@ -291,6 +291,8 @@ def create_job_report(job_id, folder_path):
                         df[col] = df[col].apply(lambda x: '{:.0f}'.format(x))
                 
                 df.to_excel(writer, sheet_name=category, index=False)
+    
+    return output_file_path
 
 def summarize_across_all_devices(category_data):
     summary = OrderedDict({

@@ -16,7 +16,7 @@ grad_acc_steps: null
 dataloader_backend: classic_pytorch
 train_data_dir: s3://sdl-tiny-imagenet-200/train/
 eval_data_dir: s3://sdl-tiny-imagenet-200/val/
-epochs: 3
+epochs: 1
 batch_size: 128
 max_minibatches_per_epoch: null
 shuffle: False

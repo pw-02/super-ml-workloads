@@ -87,8 +87,17 @@ class S3Helper():
         else:    
             content = obj['Body'].read().decode('utf-8')
         return content
-
-
+    
+    def upload_to_s3(self, file_path, bucket_name, s3_prefix=''):
+        # Create an S3 client
+        s3 = boto3.client('s3')
+        try:
+            # Upload the file with the specified key (path) to the specified bucket
+            s3.upload_file(file_path, bucket_name, file_path)
+            print(f"File '{file_path}' uploaded to S3 bucket '{bucket_name}'")
+        except FileNotFoundError:
+            print(f"The file '{file_path}' was not found.")
+  
 
 
       
@@ -133,3 +142,17 @@ def remove_prefix(s: str, prefix: str) -> str:
         if not s.startswith(prefix):
             return s
         return s[len(prefix) :]
+
+
+test = S3Helper()
+file_path = '/workspaces/super-ml-workloads/language/reports/gpt2-pytorch-classic/version_0/hparams.yaml'
+# Split the path based on the 'reports/' term
+split_path = file_path.split('/reports/', 1)
+# Check if the split was successful
+if len(split_path) > 1:
+    # Use the second part of the split as the trimmed path
+    trimmed_path = split_path[1]
+    print(trimmed_path)
+else:
+    print("Prefix not found in the path.")
+test.upload_to_s3(file_path, 'superreports23',split_path)
