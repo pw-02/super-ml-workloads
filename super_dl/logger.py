@@ -54,11 +54,11 @@ class EpochMetrics(BaseMetrics):
 
 class SUPERLogger(Logger):
     
-    def __init__(self, fabric:Fabric, root_dir:str, flush_logs_every_n_steps:int, print_freq:int, exp_name: str = "logs"):
+    def __init__(self, fabric:Fabric, root_dir:str, flush_logs_every_n_steps:int, print_freq:int, version, exp_name: str = "logs"):
         self._root_dir = os.fspath(root_dir)
         self._name = exp_name
-        self._version = self._get_next_exp_version()
-        self._fs = get_filesystem(root_dir)
+        self._version = version
+        self._fs = get_filesystem(root_dir) 
         self._flush_logs_every_n_steps = flush_logs_every_n_steps
         self._fabric = fabric
         self._experiment: Optional[_ExperimentWriter] = None

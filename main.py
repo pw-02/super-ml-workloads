@@ -24,7 +24,9 @@ def main(fabric: Fabric, hparams: Namespace) -> None:
     exp_start_time = time.time()
     # Prepare for training
     model, optimizer, scheduler, train_dataloader, val_dataloader, logger = prepare_for_training(fabric=fabric, hparams=hparams)
-    logger.log_hyperparams(hparams)
+    
+    with fabric.rank_zero_first:
+        logger.log_hyperparams(hparams)
 
     if hparams.workload_type =='vision':
         # Run training
@@ -101,7 +103,7 @@ def prepare_for_training(fabric: Fabric, hparams: Namespace):
     if hparams.dataloader_backend == 'superdl':
        register_job_and_datasets_with_superdl(hparams.superdl_address,hparams.job_id,train_dataset, eval_dataset)
     # Initialize logger
-    logger = SUPERLogger(fabric, hparams.report_dir, hparams.flush_logs_every_n_steps, hparams.print_freq, hparams.exp_name)
+    logger = SUPERLogger(fabric, hparams.report_dir, hparams.flush_logs_every_n_steps, hparams.print_freq,  hparams.exp_version, hparams.exp_name)
 
     return model, optimizer, scheduler, train_dataloader, eval_dataloader, logger
 
@@ -215,6 +217,7 @@ def initialize_transformations() -> transforms.Compose:
 
 def initialize_tokenizer():
     return tiktoken.get_encoding("gpt2")
+
 
 # def custom_collate(batch):
 

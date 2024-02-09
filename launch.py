@@ -97,10 +97,30 @@ def setup(config_file: str, devices: int, precision: Optional[str]) -> None:
     if hparams.max_minibatches_per_epoch:
         hparams.max_minibatches_per_epoch //= fabric.world_size
     hparams.job_id = os.getpid()
+    hparams.exp_version = get_next_exp_version()
     #fabric.print(hparams)
     fabric.launch(main, hparams=hparams)
 
-    
+
+def get_next_exp_version(self):
+        from lightning.fabric.utilities.cloud_io import _is_dir, get_filesystem
+        versions_root = os.path.join(self.root_dir, self.name)
+        fs = get_filesystem(self.root_dir)
+        if not _is_dir(fs, versions_root, strict=True):
+                #log.warning("Missing logger folder: %s", versions_root)
+                return 0
+        
+        existing_versions = []
+        for d in fs.listdir(versions_root):
+            full_path = d["name"]
+            name = os.path.basename(full_path)
+            if _is_dir(fs, full_path) and name.startswith("version_"):
+                dir_ver = name.split("_")[1]
+                if dir_ver.isdigit():
+                    existing_versions.append(int(dir_ver))
+        if len(existing_versions) == 0:
+            return 0
+        return max(existing_versions) + 1   
 
 if __name__ == "__main__":
     # Uncomment this line if you see an error: "Expected is_sm80 to be true, but got false"
@@ -108,7 +128,7 @@ if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")
 
     defaults = {
-       "config_file": 'language/configs/gpt2-medium-pytorch.yaml',
+       "config_file": 'language/configs/gpt2-pytorch.yaml',
         # "config_file": 'language/configs/gpt2-classic-pytorch.yaml',
         # "config_file": 'configs/exp1/resnet_resnet18_super.yaml',
 
