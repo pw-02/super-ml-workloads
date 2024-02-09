@@ -20,7 +20,7 @@ eval_data_dir: s3://openwebtxt/owt/val/ #s3://sdl-tiny-imagenet-200/test/
 epochs: 1
 batch_size: 5
 block_size: 1024
-max_minibatches_per_epoch: 2500
+max_minibatches_per_epoch: 10000
 shuffle: False
 drop_last: False
 
