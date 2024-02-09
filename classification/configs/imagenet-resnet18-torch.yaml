@@ -1,5 +1,5 @@
 #env
-num_workers: 0
+num_workers: 4
 devices: 4
 accelerator: 'gpu'
 training_seed: 1
