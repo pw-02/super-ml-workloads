@@ -128,7 +128,7 @@ if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")
 
     defaults = {
-       "config_file": 'language/configs/gpt2-medium-pytorch.yaml',
+       "config_file": 'language/configs/gpt2-pytorch.yaml',
         # "config_file": 'language/configs/gpt2-classic-pytorch.yaml',
         # "config_file": 'configs/exp1/resnet_resnet18_super.yaml',
 
