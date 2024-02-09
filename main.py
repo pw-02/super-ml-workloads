@@ -20,23 +20,28 @@ from super_dl.s3_tasks import S3Helper
 import tiktoken
 from language.gpt.model import GPT, GPTConfig
 def main(fabric: Fabric, hparams: Namespace) -> None:
+    
+
 
     exp_start_time = time.time()
     # Prepare for training
     model, optimizer, scheduler, train_dataloader, val_dataloader, logger = prepare_for_training(fabric=fabric, hparams=hparams)
     
-    with fabric.rank_zero_first:
+    if fabric.is_global_zero:
         logger.log_hyperparams(hparams)
-
+        
     if hparams.workload_type =='vision':
         # Run training
         run_vision_training(fabric,model,optimizer,scheduler,train_dataloader,val_dataloader,hparams=hparams,logger=logger,)
     elif hparams.workload_type =='language':
         run_gpt_training(fabric,model,optimizer,scheduler,train_dataloader,val_dataloader,hparams=hparams,logger=logger,)
+    
+    if fabric.is_global_zero:
+        logger.log_hyperparams(hparams)
 
     exp_duration = time.time() - exp_start_time
     fabric.print(f"Experiment ended. Duration: {exp_duration}")
-    with fabric.rank_zero_first:
+    if fabric.is_global_zero:
         fabric.print(f"creating experiment report..")
         file_loaction = create_job_report(hparams.exp_name, logger.log_dir)
         split_path = file_loaction.split('/reports/', 1)
