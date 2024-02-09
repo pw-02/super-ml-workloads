@@ -93,7 +93,7 @@ class S3Helper():
         s3 = boto3.client('s3')
         try:
             # Upload the file with the specified key (path) to the specified bucket
-            s3.upload_file(file_path, bucket_name, file_path)
+            s3.upload_file(file_path, bucket_name, s3_prefix)
             print(f"File '{file_path}' uploaded to S3 bucket '{bucket_name}'")
         except FileNotFoundError:
             print(f"The file '{file_path}' was not found.")
@@ -155,4 +155,4 @@ if len(split_path) > 1:
     print(trimmed_path)
 else:
     print("Prefix not found in the path.")
-test.upload_to_s3(file_path, 'superreports23',split_path)
+test.upload_to_s3(file_path, 'superreports23',trimmed_path)
