@@ -97,15 +97,15 @@ def setup(config_file: str, devices: int, precision: Optional[str]) -> None:
     if hparams.max_minibatches_per_epoch:
         hparams.max_minibatches_per_epoch //= fabric.world_size
     hparams.job_id = os.getpid()
-    hparams.exp_version = get_next_exp_version()
+    hparams.exp_version = get_next_exp_version(hparams.report_dir,hparams.exp_name)
     #fabric.print(hparams)
     fabric.launch(main, hparams=hparams)
 
 
-def get_next_exp_version(self):
+def get_next_exp_version(root_dir, name):
         from lightning.fabric.utilities.cloud_io import _is_dir, get_filesystem
-        versions_root = os.path.join(self.root_dir, self.name)
-        fs = get_filesystem(self.root_dir)
+        versions_root = os.path.join(root_dir, name)
+        fs = get_filesystem(root_dir)
         if not _is_dir(fs, versions_root, strict=True):
                 #log.warning("Missing logger folder: %s", versions_root)
                 return 0
