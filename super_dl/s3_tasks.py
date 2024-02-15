@@ -144,15 +144,15 @@ def remove_prefix(s: str, prefix: str) -> str:
         return s[len(prefix) :]
 
 
-test = S3Helper()
-file_path = '/workspaces/super-ml-workloads/language/reports/gpt2-pytorch-classic/version_0/hparams.yaml'
-# Split the path based on the 'reports/' term
-split_path = file_path.split('/reports/', 1)
-# Check if the split was successful
-if len(split_path) > 1:
-    # Use the second part of the split as the trimmed path
-    trimmed_path = split_path[1]
-    print(trimmed_path)
-else:
-    print("Prefix not found in the path.")
-test.upload_to_s3(file_path, 'superreports23',trimmed_path)
+# test = S3Helper()
+# file_path = '/workspaces/super-ml-workloads/language/reports/gpt2-pytorch-classic/version_0/hparams.yaml'
+# # Split the path based on the 'reports/' term
+# split_path = file_path.split('/reports/', 1)
+# # Check if the split was successful
+# if len(split_path) > 1:
+#     # Use the second part of the split as the trimmed path
+#     trimmed_path = split_path[1]
+#     print(trimmed_path)
+# else:
+#     print("Prefix not found in the path.")
+# test.upload_to_s3(file_path, 'superreports23',trimmed_path)

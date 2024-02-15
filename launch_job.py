@@ -3,14 +3,18 @@ from typing import Any, Optional, Tuple, Union
 from lightning.fabric.strategies import FSDPStrategy
 from lightning.fabric import Fabric
 import torch
-from main import main
+from hpo_main import main
 import os
+from ray.air import session
+from super_dl.utils import create_job_report
+from super_dl.s3_tasks import S3Helper
+
 #import cProfile
 
 def initialize_parser(config_file: str) -> ArgumentParser:
     
     from torchvision.models import list_models
-
+    print(config_file)
     data_backend_choices = ['superdl', 'classic_pytorch']
     gpt_model_choices = ['gpt2','gpt2-medium','gpt2-large','gpt2-xl']
     parser = ArgumentParser(prog="app", description="Description for my app", default_config_files=[config_file])
@@ -79,27 +83,41 @@ def get_default_supported_precision(training: bool) -> str:
         return "16-mixed" if training else "16-true"
     return "bf16-mixed" if training else "bf16-true"
 
+def launch_job(hpo_config:dict=None, job_config_file:str = None) -> None:
+    precision = get_default_supported_precision(training=True)    
+    parser: ArgumentParser = initialize_parser(job_config_file)
+    hparams = parser.parse_args(["--config", job_config_file])
 
-def setup(config_file: str, devices: int, precision: Optional[str]) -> None:
-
-    
-    parser: ArgumentParser = initialize_parser(config_file)
-    hparams = parser.parse_args(["--config", config_file])
-
-    precision = precision or get_default_supported_precision(training=True)
-
-    strategy = FSDPStrategy(state_dict_type="full", limit_all_gathers=True, cpu_offload=False) if devices > 1 else "auto"
-
+    if hpo_config is not None:
+          #update the hparams here
+         pass
+       
+    strategy = FSDPStrategy(state_dict_type="full", limit_all_gathers=True, cpu_offload=False) if hparams.devices > 1 else "auto"
     fabric = Fabric(accelerator=hparams.accelerator, devices=hparams.devices, strategy=strategy, precision=precision)
-
     
     if hparams.max_minibatches_per_epoch:
         hparams.max_minibatches_per_epoch //= fabric.world_size
     hparams.job_id = os.getpid()
     hparams.exp_version = get_next_exp_version(hparams.report_dir,hparams.exp_name)
     fabric.print(hparams)
-    fabric.launch(main, hparams=hparams)
+    avg_loss, avg_acc, log_dir = fabric.launch(main, hparams=hparams)
+    session.report({"loss": avg_loss, "accuracy": avg_acc})
 
+    # if fabric.is_global_zero:
+    #     logger.log_hyperparams(hparams)
+
+    # exp_duration = time.time() - exp_start_time
+    # fabric.print(f"Experiment ended. Duration: {exp_duration}")
+    
+    if fabric.is_global_zero:
+        fabric.print(f"creating experiment report..")
+        file_loaction = create_job_report(hparams.exp_name, log_dir)
+        split_path = file_loaction.split('/reports/', 1)
+        if len(split_path) > 1:
+            trimmed_path = split_path[1]
+            #S3Helper().upload_to_s3(file_loaction, 'superreports23',trimmed_path)
+        else:
+            pass #S3Helper().upload_to_s3(file_loaction, 'superreports23',file_loaction)
 
 def get_next_exp_version(root_dir, name):
         from lightning.fabric.utilities.cloud_io import _is_dir, get_filesystem
@@ -125,15 +143,10 @@ if __name__ == "__main__":
     # Uncomment this line if you see an error: "Expected is_sm80 to be true, but got false"
     # torch.backends.cuda.enable_flash_sdp(False)
     torch.set_float32_matmul_precision("high")
-
+    config_file = '/workspaces/super-ml-workloads/configs/hpo-base-example-cfg.yaml'
     defaults = {
-       "config_file": 'language/configs/gpt2-medium-pytorch.yaml',
-        # "config_file": 'language/configs/gpt2-classic-pytorch.yaml',
-        # "config_file": 'configs/exp1/resnet_resnet18_super.yaml',
-
-        'devices': 1,
-        'precision': None,
-    }
+         "job_config_file": config_file}
     
     from jsonargparse import CLI
-    CLI(setup, set_defaults=defaults)
+    CLI(launch_job, set_defaults=defaults)
+    # launch_job(job_config_file=config_file)

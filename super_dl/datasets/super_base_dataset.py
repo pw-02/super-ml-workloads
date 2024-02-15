@@ -113,3 +113,7 @@ class BaseSUPERDataset(Dataset):
         buffer = io.BytesIO(decoded_data)
         batch_samples, batch_labels = torch.load(buffer)
         return  batch_samples, batch_labels
+    
+    def is_image_file(self, filename: str):
+        return any(filename.endswith(extension) for extension in ['.jpg', '.JPG', '.jpeg', '.JPEG', '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP'])
+    

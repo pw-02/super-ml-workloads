@@ -19,8 +19,9 @@ from mlworklaods.language.train_gpt import run_gpt_training
 from super_dl.s3_tasks import S3Helper
 import tiktoken
 from mlworklaods.language.model import GPT, GPTConfig
-def main(fabric: Fabric, hparams: Namespace) -> None:
 
+def main(fabric: Fabric, hparams: Namespace) -> None:
+    
     exp_start_time = time.time()
     # Prepare for training
     model, optimizer, scheduler, train_dataloader, val_dataloader, logger = prepare_for_training(fabric=fabric, hparams=hparams)
@@ -30,25 +31,14 @@ def main(fabric: Fabric, hparams: Namespace) -> None:
 
     if hparams.workload_type =='vision':
         # Run training
-        run_vision_training(fabric,model,optimizer,scheduler,train_dataloader,val_dataloader,hparams=hparams,logger=logger,)
+        avg_loss, avg_acc = run_vision_training(fabric,model,optimizer,scheduler,train_dataloader,val_dataloader,hparams=hparams,logger=logger,)
     elif hparams.workload_type =='language':
-        run_gpt_training(fabric,model,optimizer,scheduler,train_dataloader,val_dataloader,hparams=hparams,logger=logger,)
+        avg_loss, avg_acc  = run_gpt_training(fabric,model,optimizer,scheduler,train_dataloader,val_dataloader,hparams=hparams,logger=logger,)
     
-    # if fabric.is_global_zero:
-    #     logger.log_hyperparams(hparams)
+    return avg_loss, avg_acc, logger.log_dir
 
-    exp_duration = time.time() - exp_start_time
-    fabric.print(f"Experiment ended. Duration: {exp_duration}")
-    if fabric.is_global_zero:
-        fabric.print(f"creating experiment report..")
-        file_loaction = create_job_report(hparams.exp_name, logger.log_dir)
-        split_path = file_loaction.split('/reports/', 1)
-        if len(split_path) > 1:
-            trimmed_path = split_path[1]
-            S3Helper().upload_to_s3(file_loaction, 'superreports23',trimmed_path)
-        else:
-            S3Helper().upload_to_s3(file_loaction, 'superreports23',file_loaction)
 
+    
 
 def prepare_for_training(fabric: Fabric, hparams: Namespace):
     # Set seed

@@ -212,7 +212,7 @@ class SUPERLogger(Logger):
         print_seperator_line()
         
         self.iteration_aggregator = IterationMetrics()
-    
+        return self.epoch_aggregator[dataset_type].losses.avg, self.epoch_aggregator[dataset_type].top1.avg
 
     def job_end(self):
 
