@@ -143,7 +143,7 @@ if __name__ == "__main__":
     # Uncomment this line if you see an error: "Expected is_sm80 to be true, but got false"
     # torch.backends.cuda.enable_flash_sdp(False)
     torch.set_float32_matmul_precision("high")
-    config_file = '/workspaces/super-ml-workloads/configs/gpt2-pytorch.yaml'
+    config_file = 'configs/gpt2-pytorch-1-gpu.yaml'
     defaults = {
          "job_config_file": config_file}
     
