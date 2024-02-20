@@ -3,7 +3,7 @@ from typing import Any, Optional, Tuple, Union
 from lightning.fabric.strategies import FSDPStrategy
 from lightning.fabric import Fabric
 import torch
-from hpo_main import main
+from main import main
 import os
 from ray.air import session
 from super_dl.utils import create_job_report
@@ -143,7 +143,7 @@ if __name__ == "__main__":
     # Uncomment this line if you see an error: "Expected is_sm80 to be true, but got false"
     # torch.backends.cuda.enable_flash_sdp(False)
     torch.set_float32_matmul_precision("high")
-    config_file = '/workspaces/super-ml-workloads/configs/hpo-base-example-cfg.yaml'
+    config_file = '/workspaces/super-ml-workloads/configs/gpt2-pytorch.yaml'
     defaults = {
          "job_config_file": config_file}
     

@@ -19,13 +19,13 @@ def initialize_parser(hpo_config_file: str) -> ArgumentParser:
 def launch_hpo(config_file: str) -> None:
     parser: ArgumentParser = initialize_parser(config_file)
     hparams = parser.parse_args(["--config", config_file])
-    
-    config = {
-            "l1": tune.choice([2**i for i in range(9)]),
-            "l2": tune.choice([2**i for i in range(9)]),
-            "lr": tune.loguniform(1e-4, 1e-1),
-            "batch_size": tune.choice([256]),
-            }
+    config = tune.Experiment.from_json(hparams.search_space_file)
+    # config = {
+    #         "l1": tune.choice([2**i for i in range(9)]),
+    #         "l2": tune.choice([2**i for i in range(9)]),
+    #         "lr": tune.loguniform(1e-4, 1e-1),
+    #         "batch_size": tune.choice([256]),
+    #         }
     
     scheduler = ASHAScheduler(
         metric="loss",
@@ -52,7 +52,6 @@ def launch_hpo(config_file: str) -> None:
 
 
 if __name__ == "__main__":
-
     defaults = {
        "config_file": 'configs/hpo-example-cfg.yaml',}
     

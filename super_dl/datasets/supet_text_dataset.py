@@ -45,17 +45,33 @@ class SUPERTextDataset(BaseSUPERDataset, IterableDataset):
             tokenized_chunks = self.tokenize(text)
             for x, y in tokenized_chunks:
                 yield x, y
-        
+
+def get_batch_size_mb(batch_tensor):
+    import sys
+    # Convert the batch to a tensor
+    # Get the size of the tensor in bytes
+    size_bytes = sys.getsizeof(batch_tensor.storage()) + sys.getsizeof(batch_tensor)
+
+    #size_bytes = batch_tensor.element_size() * batch_tensor.nelement()
+    # Convert bytes to megabytes
+    size_mb = size_bytes / (1024 ** 2)
+    # Convert bytes to kb
+    size_in_kb = size_bytes / 1024
+    return size_mb,size_in_kb
+
 if __name__ == "__main__":
+
 
 # # Example usage
     train_data_dir = 's3://openwebtxt/owt/train/'
     block_size = 2048
-    dataset = SUPERTextDataset(1, train_data_dir, block_size,None)
+    dataset = SUPERTextDataset(1, train_data_dir, tiktoken.get_encoding("gpt2"), block_size,None)
     sampler = SequentialSampler(dataset)
 
-    data_loader = DataLoader(dataset, batch_size=5)
-
+    data_loader = DataLoader(dataset, batch_size=8)
+    # Get the size of the tensor using pympler
     for input, target in data_loader:
+        batch_size_mb,size_in_kb  = get_batch_size_mb(input)
+        print(f"Batch size: {batch_size_mb:.2f} MB, {size_in_kb:.2f} KB")
         print(input.shape, target.shape)
 
