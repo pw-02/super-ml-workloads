@@ -19,7 +19,7 @@ train_data_dir: s3://openwebtxt/owt/train/  #s3://sdl-tiny-imagenet-200/train/
 eval_data_dir: s3://openwebtxt/owt/val/ #s3://sdl-tiny-imagenet-200/test/
 epochs: 1
 batch_size: 8
-block_size: 1024
+block_size: 2048
 max_minibatches_per_epoch: 10000 #this number is global. Per device minibatches= max_minibatches_per_epoch/num_workers
 shuffle: False
 drop_last: False
