@@ -1,6 +1,6 @@
 #env
-num_workers: 0
-devices: git 
+num_workers: 2
+devices: 4 
 accelerator: 'gpu'
 training_seed: 1
 workload_type: 'language'
