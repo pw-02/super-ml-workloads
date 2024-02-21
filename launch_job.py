@@ -100,9 +100,6 @@ def launch_job(hpo_config:dict=None, job_config_file:str = None) -> None:
     avg_loss, avg_acc, log_dir = fabric.launch(main, hparams=hparams)
     #session.report({"loss": avg_loss, "accuracy": avg_acc})
 
-    # if fabric.is_global_zero:
-    #     logger.log_hyperparams(hparams)
-
     exp_duration = time.time() - exp_start_time
     fabric.print(f"Experiment ended. Duration: {exp_duration}")
     

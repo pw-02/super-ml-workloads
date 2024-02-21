@@ -1,7 +1,7 @@
 #env
 num_workers: 0
 devices: 2
-accelerator: 'cpu'
+accelerator: 'gpu'
 training_seed: 1
 workload_type: 'language'
 
@@ -20,7 +20,7 @@ eval_data_dir: s3://openwebtxt/owt/val/ #s3://sdl-tiny-imagenet-200/test/
 epochs: 1
 batch_size: 5
 block_size: 1024
-max_minibatches_per_epoch: 16
+max_minibatches_per_epoch: 32
 shuffle: False
 drop_last: False
 
