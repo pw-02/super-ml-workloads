@@ -1,6 +1,6 @@
 #env
-num_workers: 0
-devices: 4
+num_workers: 2
+devices: 1
 accelerator: 'gpu'
 training_seed: 1
 workload_type: 'language'
