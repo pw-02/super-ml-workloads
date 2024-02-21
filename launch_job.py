@@ -8,7 +8,7 @@ import os
 from ray.air import session
 from super_dl.utils import create_job_report
 from super_dl.s3_tasks import S3Helper
-
+import time
 #import cProfile
 
 def initialize_parser(config_file: str) -> ArgumentParser:
@@ -100,14 +100,15 @@ def launch_job(hpo_config:dict=None, job_config_file:str = None) -> None:
     hparams.job_id = os.getpid()
     hparams.exp_version = get_next_exp_version(hparams.report_dir,hparams.exp_name)
     fabric.print(hparams)
+    exp_start_time = time.time()
     avg_loss, avg_acc, log_dir = fabric.launch(main, hparams=hparams)
     session.report({"loss": avg_loss, "accuracy": avg_acc})
 
     # if fabric.is_global_zero:
     #     logger.log_hyperparams(hparams)
 
-    # exp_duration = time.time() - exp_start_time
-    # fabric.print(f"Experiment ended. Duration: {exp_duration}")
+    exp_duration = time.time() - exp_start_time
+    fabric.print(f"Experiment ended. Duration: {exp_duration}")
     
     if fabric.is_global_zero:
         fabric.print(f"creating experiment report..")

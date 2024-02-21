@@ -14,6 +14,8 @@ def run_gpt_training(fabric: Fabric, model:torch.nn.Module, optimizer:optim.Opti
                 train_dataloader: DataLoader, val_dataloader: DataLoader, hparams:Namespace,
                  logger:SUPERLogger, super_client:SuperClient = None) -> None:
     
+    exp_start_time = time.time()
+
     for epoch in range(hparams.epochs):
 
         if hparams.run_evaluate:
@@ -58,6 +60,9 @@ def run_gpt_training(fabric: Fabric, model:torch.nn.Module, optimizer:optim.Opti
                          total_batches=total_batches)
 
     logger.job_end()
+    trainign_duration = time.time() - exp_start_time
+    fabric.print(f"training ended. Duration: {trainign_duration}")
+
     return train_loss, train_acc
 
 
