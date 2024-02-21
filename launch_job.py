@@ -115,9 +115,9 @@ def launch_job(hpo_config:dict=None, job_config_file:str = None) -> None:
         split_path = file_loaction.split('/reports/', 1)
         if len(split_path) > 1:
             trimmed_path = split_path[1]
-            #S3Helper().upload_to_s3(file_loaction, 'superreports23',trimmed_path)
+            S3Helper().upload_to_s3(file_loaction, 'superreports23',trimmed_path)
         else:
-            pass #S3Helper().upload_to_s3(file_loaction, 'superreports23',file_loaction)
+            S3Helper().upload_to_s3(file_loaction, 'superreports23',file_loaction)
 
 def get_next_exp_version(root_dir, name):
         from lightning.fabric.utilities.cloud_io import _is_dir, get_filesystem
