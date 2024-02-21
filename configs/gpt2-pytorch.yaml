@@ -1,6 +1,6 @@
 #env
-num_workers: 0
-devices: 8
+num_workers: 2
+devices: 4
 accelerator: 'gpu'
 training_seed: 1
 workload_type: 'language'
@@ -20,7 +20,7 @@ eval_data_dir: s3://openwebtxt/owt/val/ #s3://sdl-tiny-imagenet-200/test/
 epochs: 1
 batch_size: 5
 block_size: 1024
-max_minibatches_per_epoch: 10000 #this number is global. Per device minibatches= max_minibatches_per_epoch/num_workers
+max_minibatches_per_epoch: 4000 #this number is global. Per device minibatches= max_minibatches_per_epoch/num_workers
 shuffle: False
 drop_last: False
 

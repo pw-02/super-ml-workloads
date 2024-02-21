@@ -59,18 +59,7 @@ def run_gpt_training(fabric: Fabric, model:torch.nn.Module, optimizer:optim.Opti
 
     logger.job_end()
   
-def get_batch_size_mb(batch_tensor):
-    import sys
-    # Convert the batch to a tensor
-    # Get the size of the tensor in bytes
-    size_bytes = sys.getsizeof(batch_tensor.storage()) + sys.getsizeof(batch_tensor)
 
-    #size_bytes = batch_tensor.element_size() * batch_tensor.nelement()
-    # Convert bytes to megabytes
-    size_mb = size_bytes / (1024 ** 2)
-    # Convert bytes to kb
-    size_in_kb = size_bytes / 1024
-    return size_mb,size_in_kb
 
 def process_data(fabric: Fabric, dataloader: DataLoader,
                  global_step:int, model:torch.nn.Module, 
@@ -80,7 +69,7 @@ def process_data(fabric: Fabric, dataloader: DataLoader,
     logger.epoch_start(epoch_length=total_batches,is_training=is_training)
     model.train(is_training)
     end = time.perf_counter()
-    # start_time = time.time()
+    start_time = time.time()
     for iteration, (inputs, targets,) in enumerate(dataloader):
         cache_hit = False
         batch_id = iteration
@@ -94,26 +83,21 @@ def process_data(fabric: Fabric, dataloader: DataLoader,
 
         if hparams.profile:
             torch.cuda.synchronize()
+
+        # Forward pass and loss calculation
+        with fabric.no_backward_sync(model, enabled=is_accumulating):
+            logits, loss = model(inputs, targets)
+            if hparams.grad_acc_steps is not None:
+                loss = loss / hparams.grad_acc_steps
+
+            if is_training:
+                fabric.backward(loss) # .backward() accumulates when .zero_grad() wasn't called
         
-        batch_size_mb,size_in_kb  = get_batch_size_mb(inputs)
-        print(f"Batch size: {batch_size_mb:.2f} MB, {size_in_kb:.2f} KB")        
-        start_time = time.perf_counter()
-        for i in range(100):
-            # Forward pass and loss calculation
-            with fabric.no_backward_sync(model, enabled=is_accumulating):
-                logits, loss = model(inputs, targets)
-                if hparams.grad_acc_steps is not None:
-                    loss = loss / hparams.grad_acc_steps
-
-                if is_training:
-                    fabric.backward(loss) # .backward() accumulates when .zero_grad() wasn't called
-            
-            if not is_accumulating and is_training:
-                # Step the optimizer after accumulation phase is over
-                optimizer.step()
-                optimizer.zero_grad()
-            print(f"{i}:\t{time.perf_counter()-start_time}")
-
+        if not is_accumulating and is_training:
+            # Step the optimizer after accumulation phase is over
+            optimizer.step()
+            optimizer.zero_grad()
+        
         if hparams.profile:
             torch.cuda.synchronize()    
           
