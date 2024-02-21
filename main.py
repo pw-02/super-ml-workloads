@@ -52,11 +52,11 @@ def prepare_for_training(fabric: Fabric, hparams: Namespace):
 
     optimizer = initialize_optimizer(hparams.optimizer, model.parameters(), hparams.lr, hparams.momentum, hparams.weight_decay)
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 0.1 ** (epoch // 30))  # TODO: Add support for other scheduler
-    model = fabric.setup_module(model,move_to_device=True)
-    model = fabric.setup_optimizers(optimizer)
+    #model = fabric.setup_module(model,move_to_device=True)
+    #model = fabric.setup_optimizers(optimizer)
 
     # call `setup` to prepare for model / optimizer for distributed training. The model is moved automatically to the right device.
-    # model, optimizer = fabric.setup(model, optimizer, move_to_device=True)
+    model, optimizer = fabric.setup(model, optimizer, move_to_device=True)
 
     # Confirm the dataloader backend and access to super/cache
     verify_dataloader_backend_is_ok(fabric, hparams.dataloader_backend, hparams.cache_adress, hparams.superdl_address)
@@ -159,7 +159,7 @@ def initialize_model(fabric: Fabric, arch: str, workload_type, block_size) -> nn
                 'gpt2-large':   dict(n_layer=36, n_head=20, n_embd=1280), # 774M params
                 'gpt2-xl':      dict(n_layer=48, n_head=25, n_embd=1600), # 1558M params
             }
-            gptconf = GPTConfig(**config_args[arch])
+            #gptconf = GPTConfig(**config_args[arch])
             model = GPT(gptconf)
             
             if block_size < model.config.block_size:
