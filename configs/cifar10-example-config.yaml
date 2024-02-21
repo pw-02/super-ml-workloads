@@ -1,7 +1,7 @@
 #env
 num_workers: 0
 devices: 2
-accelerator: 'cpu'
+accelerator: 'gpu'
 training_seed: 1
 
 #model
