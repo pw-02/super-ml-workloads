@@ -85,11 +85,13 @@ def get_default_supported_precision(training: bool) -> str:
 
 def launch_job(hpo_config:dict=None, job_config_file:str = None) -> None:
     precision = get_default_supported_precision(training=True)    
+    
     parser: ArgumentParser = initialize_parser(job_config_file)
+    
     hparams = parser.parse_args(["--config", job_config_file])
        
     strategy = FSDPStrategy(state_dict_type="full", limit_all_gathers=True, cpu_offload=False) if hparams.devices > 1 and hparams.accelerator =='gpu' else "auto"
-    fabric = Fabric(accelerator=hparams.accelerator, devices=hparams.devices, strategy=strategy, precision=precision)
+    fabric = Fabric(accelerator=hparams.accelerator, devices=hparams.devices, strategy="auto", precision=precision)
     
     if hparams.max_minibatches_per_epoch:
         hparams.max_minibatches_per_epoch //= fabric.world_size
