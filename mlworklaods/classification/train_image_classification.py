@@ -63,6 +63,8 @@ def run_vision_training(fabric: Fabric, model:torch.nn.Module, optimizer:optim.O
     # else:
     return train_loss, train_acc
 
+
+
 def process_data(fabric: Fabric, dataloader: DataLoader, 
                  global_step:int, model:torch.nn.Module, 
                  optimizer:optim.SGD, logger:SUPERLogger, epoch, hparams:Namespace,
@@ -128,9 +130,6 @@ def process_data(fabric: Fabric, dataloader: DataLoader,
             #super_client.share_job_metrics(hparams.job_id, dataset_id=dataloader.dataset.dataset_id, metrics=metrics_dict)
 
         global_step+=1
-
-        #if (iteration + 1) % hparams.log_interval == 0:
-        #    progress.display(iteration)
 
         if hparams.max_minibatches_per_epoch and iteration >= hparams.max_minibatches_per_epoch - 1:
             # end epoch early based on num_minibatches that have been processed 

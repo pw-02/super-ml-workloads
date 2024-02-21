@@ -11,3 +11,4 @@ super-client
 datasets
 tiktoken
 transformers
+ray

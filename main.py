@@ -20,8 +20,7 @@ import tiktoken
 from mlworklaods.language.gpt_model import GPT, GPTConfig
 
 def main(fabric: Fabric, hparams: Namespace) -> None:
-    
-    exp_start_time = time.time()
+
     # Prepare for training
     model, optimizer, scheduler, train_dataloader, val_dataloader, logger = prepare_for_training(fabric=fabric, hparams=hparams)
     
@@ -29,12 +28,12 @@ def main(fabric: Fabric, hparams: Namespace) -> None:
         logger.log_hyperparams(hparams)
 
     if hparams.workload_type =='vision':
-        # Run training
         avg_loss, avg_acc = run_vision_training(fabric,model,optimizer,scheduler,train_dataloader,val_dataloader,hparams=hparams,logger=logger,)
     elif hparams.workload_type =='language':
         avg_loss, avg_acc  = run_gpt_training(fabric,model,optimizer,scheduler,train_dataloader,val_dataloader,hparams=hparams,logger=logger,)
     
     return avg_loss, avg_acc, logger.log_dir
+
 
 def prepare_for_training(fabric: Fabric, hparams: Namespace):
     # Set seed
@@ -48,13 +47,8 @@ def prepare_for_training(fabric: Fabric, hparams: Namespace):
     fabric.print(f"Total parameters in {hparams.arch} model: {num_model_parameters(model):,}")
 
     # Initialize loss, optimizer, and scheduler
-    #optimizer = model.configure_optimizers(hparams.weight_decay, hparams.lr, (0.9, 0.95), 'cuda')
-
     optimizer = initialize_optimizer(hparams.optimizer, model.parameters(), hparams.lr, hparams.momentum, hparams.weight_decay)
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 0.1 ** (epoch // 30))  # TODO: Add support for other scheduler
-    #model = fabric.setup_module(model,move_to_device=True)
-    #model = fabric.setup_optimizers(optimizer)
-
     # call `setup` to prepare for model / optimizer for distributed training. The model is moved automatically to the right device.
     model, optimizer = fabric.setup(model, optimizer, move_to_device=True)
 
@@ -145,13 +139,9 @@ def verify_dataloader_backend_is_ok(fabric: Fabric, dataloader_backend:str, cach
 
 def initialize_model(fabric: Fabric, arch: str, workload_type, block_size) -> nn.Module:
     
-    if workload_type == 'vision':
-        with fabric.init_module(empty_init=True):  # model is instantiated with randomly initialized weights by default.
-            model: nn.Module = models.get_model(arch)
-    
-    elif workload_type == 'language':
-        with fabric.init_module(empty_init=True):
-            gptconf = GPTConfig()    
+    with fabric.init_module(empty_init=True):    
+        if 'gpt2' in arch:
+            # gptconf = GPTConfig()
             # n_layer, n_head and n_embd are determined from model_type
             config_args = {
                 'gpt2':         dict(n_layer=12, n_head=12, n_embd=768),  # 124M params
@@ -159,11 +149,13 @@ def initialize_model(fabric: Fabric, arch: str, workload_type, block_size) -> nn
                 'gpt2-large':   dict(n_layer=36, n_head=20, n_embd=1280), # 774M params
                 'gpt2-xl':      dict(n_layer=48, n_head=25, n_embd=1600), # 1558M params
             }
-            #gptconf = GPTConfig(**config_args[arch])
+            gptconf = GPTConfig(**config_args[arch])
             model = GPT(gptconf)
-            
             if block_size < model.config.block_size:
                  model.crop_block_size(block_size)
+        else:
+            model: nn.Module = models.get_model(arch)
+
     return model
 
 

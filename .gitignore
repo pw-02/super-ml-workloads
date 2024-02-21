@@ -1,8 +1,4 @@
 useful.txt
-mlworklaods/classification/datasets/
-mlworklaods/classification/reports/
-mlworklaods/language/datasets/
-mlworklaods/language/reports/
-backup
-mlworklaods/classification/datasets/
+backup/
 datasets/
+reports/

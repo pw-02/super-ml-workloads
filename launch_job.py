@@ -5,7 +5,7 @@ from lightning.fabric import Fabric
 import torch
 from main import main
 import os
-from ray.air import session
+#from ray.air import session
 from super_dl.utils import create_job_report
 from super_dl.s3_tasks import S3Helper
 import time
@@ -87,12 +87,8 @@ def launch_job(hpo_config:dict=None, job_config_file:str = None) -> None:
     precision = get_default_supported_precision(training=True)    
     parser: ArgumentParser = initialize_parser(job_config_file)
     hparams = parser.parse_args(["--config", job_config_file])
-
-    if hpo_config is not None:
-          #update the hparams here
-         pass
        
-    strategy = FSDPStrategy(state_dict_type="full", limit_all_gathers=True, cpu_offload=False) if hparams.devices > 1 else "auto"
+    strategy = FSDPStrategy(state_dict_type="full", limit_all_gathers=True, cpu_offload=False) if hparams.devices > 1 and hparams.accelerator =='gpu' else "auto"
     fabric = Fabric(accelerator=hparams.accelerator, devices=hparams.devices, strategy=strategy, precision=precision)
     
     if hparams.max_minibatches_per_epoch:
@@ -102,7 +98,7 @@ def launch_job(hpo_config:dict=None, job_config_file:str = None) -> None:
     fabric.print(hparams)
     exp_start_time = time.time()
     avg_loss, avg_acc, log_dir = fabric.launch(main, hparams=hparams)
-    session.report({"loss": avg_loss, "accuracy": avg_acc})
+    #session.report({"loss": avg_loss, "accuracy": avg_acc})
 
     # if fabric.is_global_zero:
     #     logger.log_hyperparams(hparams)
@@ -144,7 +140,7 @@ if __name__ == "__main__":
     # Uncomment this line if you see an error: "Expected is_sm80 to be true, but got false"
     # torch.backends.cuda.enable_flash_sdp(False)
     torch.set_float32_matmul_precision("high")
-    config_file = 'configs/gpt2-pytorch.yaml'
+    config_file = 'configs/gpt2-example-config.yaml'
     defaults = {
          "job_config_file": config_file}
     

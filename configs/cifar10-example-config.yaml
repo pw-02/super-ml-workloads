@@ -1,7 +1,7 @@
 #env
 num_workers: 0
-devices: 1
-accelerator: 'gpu'
+devices: 2
+accelerator: 'cpu'
 training_seed: 1
 
 #model
@@ -16,9 +16,9 @@ grad_acc_steps: null
 dataloader_backend: classic_pytorch
 train_data_dir: s3://sdl-cifar10/train/
 eval_data_dir: s3://sdl-cifar10/test/
-epochs: 3
+epochs: 1
 batch_size: 128
-max_minibatches_per_epoch: null
+max_minibatches_per_epoch: 16
 shuffle: False
 drop_last: False
 
@@ -30,7 +30,7 @@ run_training: True
 run_evaluate: False
 save_checkpoints: False
 save_checkpoint_dir: models
-report_dir: classification/reports
+report_dir: reports/classification
 profile: True
 
 #only used when super is thed datalaoder backend or caching is enabled for some other data loader that supports it
