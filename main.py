@@ -48,7 +48,9 @@ def prepare_for_training(fabric: Fabric, hparams: Namespace):
     fabric.print(f"Total parameters in {hparams.arch} model: {num_model_parameters(model):,}")
 
     # Initialize loss, optimizer, and scheduler
-    optimizer = initialize_optimizer(hparams.optimizer, model.parameters(), hparams.lr, hparams.momentum, hparams.weight_decay)
+    optimizer = model.configure_optimizers(hparams.weight_decay, hparams.lr, (0.9, 0.95), 'cuda')
+
+    #optimizer = initialize_optimizer(hparams.optimizer, model.parameters(), hparams.lr, hparams.momentum, hparams.weight_decay)
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 0.1 ** (epoch // 30))  # TODO: Add support for other scheduler
     
     # call `setup` to prepare for model / optimizer for distributed training. The model is moved automatically to the right device.
@@ -157,6 +159,7 @@ def initialize_model(fabric: Fabric, arch: str, workload_type, block_size) -> nn
             }
             gptconf = GPTConfig(**config_args[arch])
             model = GPT(gptconf)
+            
             if block_size < model.config.block_size:
                  model.crop_block_size(block_size)
     return model
