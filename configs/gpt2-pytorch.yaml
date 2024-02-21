@@ -25,7 +25,7 @@ shuffle: False
 drop_last: False
 
 #expiement/logging
-exp_name: gpt2-pytorch-classic-8gpus
+exp_name: gpt2-pytorch-classic-4gpus-2workers
 print_freq: 10
 flush_logs_every_n_steps: 25
 run_training: True
