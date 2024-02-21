@@ -24,7 +24,7 @@ def run_gpt_training(fabric: Fabric, model:torch.nn.Module, optimizer:optim.Opti
             else:
                 total_batches = len(val_dataloader)
 
-            process_data(fabric,
+            val_loss, val_acc = process_data(fabric,
                          dataloader=val_dataloader,
                          global_step=epoch * total_batches,
                          model=model,
@@ -45,7 +45,7 @@ def run_gpt_training(fabric: Fabric, model:torch.nn.Module, optimizer:optim.Opti
             else:
                 total_batches= len(train_dataloader)
 
-            process_data(fabric=fabric,
+            train_loss, train_acc= process_data(fabric=fabric,
                          dataloader=train_dataloader,
                          global_step=epoch * total_batches,
                          model=model,
@@ -58,7 +58,8 @@ def run_gpt_training(fabric: Fabric, model:torch.nn.Module, optimizer:optim.Opti
                          total_batches=total_batches)
 
     logger.job_end()
-  
+    return train_loss, train_acc
+
 
 
 def process_data(fabric: Fabric, dataloader: DataLoader,
@@ -139,8 +140,8 @@ def process_data(fabric: Fabric, dataloader: DataLoader,
         end = time.perf_counter()
         start_time = time.time()
     
-    logger.epoch_end(epoch, is_training=is_training)
-
+    avg_loss, avg_acc = logger.epoch_end(epoch, is_training=is_training)
+    return avg_loss, avg_acc 
 
 
 def accuracy(output: torch.Tensor, target:torch.Tensor, topk=(1,))-> List[torch.Tensor]:
