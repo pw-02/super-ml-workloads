@@ -48,9 +48,9 @@ def prepare_for_training(fabric: Fabric, hparams: Namespace):
     fabric.print(f"Total parameters in {hparams.arch} model: {num_model_parameters(model):,}")
 
     # Initialize loss, optimizer, and scheduler
-    #optimizer = model.configure_optimizers(hparams.weight_decay, hparams.lr, (0.9, 0.95), 'cuda')
+    optimizer = model.configure_optimizers(hparams.weight_decay, hparams.lr, (0.9, 0.95), 'cuda')
 
-    optimizer = initialize_optimizer(hparams.optimizer, model.parameters(), hparams.lr, hparams.momentum, hparams.weight_decay)
+    #optimizer = initialize_optimizer(hparams.optimizer, model.parameters(), hparams.lr, hparams.momentum, hparams.weight_decay)
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 0.1 ** (epoch // 30))  # TODO: Add support for other scheduler
     
     # call `setup` to prepare for model / optimizer for distributed training. The model is moved automatically to the right device.
