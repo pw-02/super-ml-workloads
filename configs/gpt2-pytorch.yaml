@@ -1,5 +1,5 @@
 #env
-num_workers: 0
+num_workers: 4
 devices: 1
 accelerator: 'gpu'
 training_seed: 1
@@ -25,7 +25,7 @@ shuffle: False
 drop_last: False
 
 #expiement/logging
-exp_name: gpt2-pytorch-classic-4gpus-0workers
+exp_name: gpt2-pytorch-classic-4gpus-4workers
 print_freq: 10
 flush_logs_every_n_steps: 25
 run_training: True
