@@ -165,7 +165,7 @@ def initialize_optimizer(optimizer_type: str, model_parameters: Iterator[nn.Para
     elif optimizer_type == "rmsprop":
         optimizer = optim.RMSprop(params=model_parameters,lr=learning_rate,momentum=momentum,weight_decay=weight_decay)
     
-    optimizer = optim.Adam(model_parameters)
+    #optimizer = optim.Adam(model_parameters)
     
     return optimizer
 
