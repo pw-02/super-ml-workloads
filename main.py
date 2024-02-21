@@ -52,9 +52,11 @@ def prepare_for_training(fabric: Fabric, hparams: Namespace):
 
     #optimizer = initialize_optimizer(hparams.optimizer, model.parameters(), hparams.lr, hparams.momentum, hparams.weight_decay)
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 0.1 ** (epoch // 30))  # TODO: Add support for other scheduler
-    
+    model = fabric.setup_module(model,move_to_device=True)
+    model = fabric.setup_optimizers(optimizer)
+
     # call `setup` to prepare for model / optimizer for distributed training. The model is moved automatically to the right device.
-    model, optimizer = fabric.setup(model, optimizer, move_to_device=True)
+    # model, optimizer = fabric.setup(model, optimizer, move_to_device=True)
 
     # Confirm the dataloader backend and access to super/cache
     verify_dataloader_backend_is_ok(fabric, hparams.dataloader_backend, hparams.cache_adress, hparams.superdl_address)
