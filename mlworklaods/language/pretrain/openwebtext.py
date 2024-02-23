@@ -28,8 +28,8 @@ def setup(
     model_name: str = "pythia-6.9b",
     precision: Optional[str] = None,
     resume: Union[bool, Path] = False,
-    devices: int = 4,
-    #io: IOArgs = IOArgs(train_data_dir=Path("data/openwebtext"), val_data_dir=None, out_dir=Path("out/openwebtext")),
+    devices: int = 1,
+    io: IOArgs = IOArgs(train_data_dir=Path("data/openwebtext"), val_data_dir=None, out_dir=Path("out/openwebtext")),
     train: TrainArgs = TrainArgs(
         save_interval=1000,
         log_interval=1,
@@ -61,29 +61,11 @@ def setup(
     else:
         strategy = "auto"
 
-    fabric = L.Fabric(devices=devices, strategy=strategy, precision=precision)
-    config = Config.from_name(name=model_name)
-    fabric.print(f"Loading model with {config.__dict__}")
-    t0 = time.perf_counter()
-    with fabric.init_module(empty_init=(fabric.world_size > 1)):
-        model = GPT(config)
-    model.apply(model._init_weights)
+    logger = CSVLogger(io.out_dir.parent, io.out_dir.name, flush_logs_every_n_steps=train.log_interval)
+    fabric = L.Fabric(devices=devices, strategy=strategy, precision=precision, loggers=logger)
 
-    fabric.print(f"Time to instantiate model: {time.perf_counter() - t0:.02f} seconds.")
-    fabric.print(f"Total parameters {num_parameters(model):,}")
+    fabric.launch(main, devices, resume, Config.from_name(name=model_name), io, train, eval)
 
-    model = fabric.setup(model)
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=train.learning_rate,
-        weight_decay=train.weight_decay,
-        betas=(train.beta1, train.beta2),
-        foreach=False,
-    )
-    optimizer = fabric.setup_optimizers(optimizer)
-    meta_model = GPT(model.config)
-    estimated_flops = estimate_flops(meta_model, training=True) * train.micro_batch_size
-    fabric.print(f"Estimated TFLOPs: {estimated_flops * fabric.world_size / 1e12:.2f}")
 
 def main(
     fabric: L.Fabric,
@@ -118,30 +100,16 @@ def main(
         betas=(train.beta1, train.beta2),
         foreach=False,
     )
-    optimizer = fabric.setup_optimizers(optimizer)
-    meta_model = GPT(model.config)
-    estimated_flops = estimate_flops(meta_model, training=True) * train.micro_batch_size
-    fabric.print(f"Estimated TFLOPs: {estimated_flops * fabric.world_size / 1e12:.2f}")
+    optimizer = fabric.setup_optsimizers(optimizer)
 
-    train_data, val_data = load_datasets(io, max_seq_length=model.max_seq_length)
-    train_dataloader = DataLoader(train_data, batch_size=train.micro_batch_size, num_workers=2)
-    val_dataloader = DataLoader(val_data, batch_size=train.micro_batch_size, num_workers=2)
-    train_dataloader, val_dataloader = fabric.setup_dataloaders(train_dataloader, val_dataloader)
-
-    state = {"model": model, "optimizer": optimizer, "iter_num": 0, "step_count": 0}
-
-    if resume is True:
-        resume = max(io.out_dir.glob("*.pth"), key=lambda p: int(p.name.split("-")[1]))
-    if resume:
-        fabric.print(f"Resuming training from {resume}")
-        fabric.load(resume, state)
-
-    train_time = time.perf_counter()
-    fit(fabric, devices, state, train_dataloader, val_dataloader, io, train, eval)
-    fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
-    if fabric.device.type == "cuda":
-        fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
-
+    with torch.device("meta"):
+        meta_model = GPT(model.config)
+        # "estimated" is not as precise as "measured". Estimated is optimistic but widely used in the wild.
+        # When comparing MFU or FLOP numbers with other projects that use estimated FLOPs,
+        # consider passing `flops_per_batch=estimated_flops` instead
+        estimated_flops = estimate_flops(meta_model, training=True) * train.micro_batch_size
+        fabric.print(f"Estimated TFLOPs: {estimated_flops * fabric.world_size / 1e12:.2f}")
+  
 
 def fit(
     fabric: L.Fabric,
