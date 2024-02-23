@@ -25,7 +25,7 @@ from lit_gpt.utils import CLI, chunked_cross_entropy, estimate_flops, get_defaul
 
 
 def setup(
-    model_name: str = "pythia-70m",
+    model_name: str = "tiny-llama-1.1b",
     precision: Optional[str] = None,
     resume: Union[bool, Path] = False,
     devices: int = 1,
