@@ -76,12 +76,6 @@ def main(
     train: TrainArgs,
     eval: EvalArgs,
 ) -> None:
-    validate_args(io, train, eval)
-
-    if fabric.global_rank == 0:
-        io.out_dir.mkdir(parents=True, exist_ok=True)
-
-    fabric.seed_everything(1337, workers=True)  # same seed for every process to init model (FSDP)
 
     fabric.print(f"Loading model with {config.__dict__}")
     t0 = time.perf_counter()
@@ -100,7 +94,7 @@ def main(
         betas=(train.beta1, train.beta2),
         foreach=False,
     )
-    optimizer = fabric.setup_optsimizers(optimizer)
+    optimizer = fabric.setup_optimizers(optimizer)
 
     with torch.device("meta"):
         meta_model = GPT(model.config)
