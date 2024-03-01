@@ -25,7 +25,7 @@ from lit_gpt.utils import CLI, chunked_cross_entropy, estimate_flops, get_defaul
 
 
 def setup(
-    model_name: str = "pythia-14m",
+    model_name: str = "pythia-1b",
     dataload_delay: int = 0,
     precision: Optional[str] = None,
     resume: Union[bool, Path] = False,
@@ -300,4 +300,4 @@ def validate_args(io: IOArgs, train: TrainArgs, eval: EvalArgs) -> None:
 if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")
 
-    CLI(setup())
+    CLI(setup(dataload_delay=0))
