@@ -56,4 +56,4 @@ if __name__ == "__main__":
     ]
 
     for model in model_names:
-        estimate_tflops_for_model(model_name=model)
+        estimate_tflops_for_model(model_name=model, micro_batch_size=25)
