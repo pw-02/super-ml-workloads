@@ -30,7 +30,7 @@ def setup(
     precision: Optional[str] = None,
     resume: Union[bool, Path] = False,
     seed: int = 1337,
-    devices: int = 1,
+    devices: int = 4,
     io: IOArgs = IOArgs(train_data_dir=Path("data/openwebtext"), val_data_dir=None, out_dir=Path("out/openwebtext")),
     train: TrainArgs = TrainArgs(
         save_interval=1000,
