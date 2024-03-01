@@ -300,4 +300,4 @@ def validate_args(io: IOArgs, train: TrainArgs, eval: EvalArgs) -> None:
 if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")
 
-    CLI(setup(dataload_delay=0.5))
+    CLI(setup(dataload_delay=0))
