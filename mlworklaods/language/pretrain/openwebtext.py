@@ -25,7 +25,7 @@ from lit_gpt.utils import CLI, chunked_cross_entropy, estimate_flops, get_defaul
 
 
 def setup(
-    model_name: str = "pythia-70m",
+    model_name: str = "pythia-160m",
     dataload_delay: int = 0,
     precision: Optional[str] = None,
     resume: Union[bool, Path] = False,
@@ -107,8 +107,8 @@ def main(
     optimizer = fabric.setup_optimizers(optimizer)
 
     train_data, val_data = load_datasets(io, max_seq_length=model.max_seq_length,delay=dataload_delay)
-    train_dataloader = DataLoader(train_data, batch_size=train.micro_batch_size, num_workers=4)
-    val_dataloader = DataLoader(val_data, batch_size=train.micro_batch_size, num_workers=4)
+    train_dataloader = DataLoader(train_data, batch_size=train.micro_batch_size, num_workers=2)
+    val_dataloader = DataLoader(val_data, batch_size=train.micro_batch_size, num_workers=2)
     train_dataloader, val_dataloader = fabric.setup_dataloaders(train_dataloader, val_dataloader)
 
     state = {"model": model, "optimizer": optimizer, "iter_num": 0, "step_count": 0}
@@ -174,7 +174,7 @@ def fit(
 
         input_ids, targets = next(train_iter)
 
-        fabric.print(time.perf_counter()-iter_t0)
+        #fabric.print(time.perf_counter()-iter_t0)
 
         is_accumulating = iter_num % train.gradient_accumulation_iters(devices) != 0
         with fabric.no_backward_sync(model, enabled=is_accumulating):
@@ -300,4 +300,5 @@ def validate_args(io: IOArgs, train: TrainArgs, eval: EvalArgs) -> None:
 if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")
 
-    CLI(setup(dataload_delay=2.5))
+    for i in [0,1,2.5,5]:
+        CLI(setup(dataload_delay=i))
