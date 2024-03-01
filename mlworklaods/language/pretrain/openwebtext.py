@@ -39,7 +39,7 @@ def setup(
         micro_batch_size=5,
         lr_warmup_steps=100,
         epochs=1,
-        epoch_size=125,
+        epoch_size=250,
         learning_rate=6e-4,
         weight_decay=1e-1,
         beta1=0.9,
