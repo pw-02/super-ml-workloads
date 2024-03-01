@@ -25,7 +25,7 @@ from lit_gpt.utils import CLI, chunked_cross_entropy, estimate_flops, get_defaul
 
 
 def setup(
-    model_name: str = "tiny-llama-1.1b",
+    model_name: str = "pythia-14m",
     dataload_delay: int = 0,
     precision: Optional[str] = None,
     resume: Union[bool, Path] = False,
@@ -173,7 +173,7 @@ def fit(
         iter_t0 = time.perf_counter()
 
         input_ids, targets = next(train_iter)
-        
+
         print(time.perf_counter()-iter_t0)
 
         is_accumulating = iter_num % train.gradient_accumulation_iters(devices) != 0
