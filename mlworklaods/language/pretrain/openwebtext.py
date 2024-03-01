@@ -199,9 +199,9 @@ def fit(
                 flops=measured_flops * train.log_interval,
             )
             fabric.print(throughput.compute())
-            metrics = throughput.compute_and_log(step=iter_num)
+            # metrics = throughput.compute_and_log(step=iter_num)
 
-            metrics['tokens/sec'] = metrics['lengths']/metrics['time']
+            # metrics['tokens/sec'] = metrics['lengths']/metrics['time']
             
             #fabric.print(metrics)
 
