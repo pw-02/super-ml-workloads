@@ -25,7 +25,7 @@ from lit_gpt.utils import CLI, chunked_cross_entropy, estimate_flops, get_defaul
 
 
 def setup(
-    model_name: str = "pythia-410m",
+    model_name: str = "pythia-14m",
     dataload_delay: int = 0,
     precision: Optional[str] = None,
     resume: Union[bool, Path] = False,
@@ -51,7 +51,7 @@ def setup(
 ) -> None:
     #print(locals())
     precision = precision or get_default_supported_precision(training=True)
-
+    dataload_delay = dataload_delay/5
     if devices > 1:
         strategy = FSDPStrategy(
             auto_wrap_policy={Block},
@@ -107,8 +107,8 @@ def main(
     optimizer = fabric.setup_optimizers(optimizer)
 
     train_data, val_data = load_datasets(io, max_seq_length=model.max_seq_length,delay=dataload_delay)
-    train_dataloader = DataLoader(train_data, batch_size=train.micro_batch_size, num_workers=2)
-    val_dataloader = DataLoader(val_data, batch_size=train.micro_batch_size, num_workers=2)
+    train_dataloader = DataLoader(train_data, batch_size=train.micro_batch_size, num_workers=0)
+    val_dataloader = DataLoader(val_data, batch_size=train.micro_batch_size, num_workers=0)
     train_dataloader, val_dataloader = fabric.setup_dataloaders(train_dataloader, val_dataloader)
 
     state = {"model": model, "optimizer": optimizer, "iter_num": 0, "step_count": 0}
