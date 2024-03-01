@@ -173,6 +173,8 @@ def fit(
         iter_t0 = time.perf_counter()
 
         input_ids, targets = next(train_iter)
+        
+        print(time.perf_counter()-iter_t0)
 
         is_accumulating = iter_num % train.gradient_accumulation_iters(devices) != 0
         with fabric.no_backward_sync(model, enabled=is_accumulating):
@@ -259,7 +261,7 @@ class Dataset(IterableDataset):
             y = torch.from_numpy((data[i + 1 : i + 1 + self.max_seq_length]).astype(np.int64))
 
             if self.delay  > 0:
-                time.sleep(  self.delay )
+                time.sleep(self.delay)
 
             yield x, y
 
@@ -298,4 +300,4 @@ def validate_args(io: IOArgs, train: TrainArgs, eval: EvalArgs) -> None:
 if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")
 
-    CLI(setup(dataload_delay=1))
+    CLI(setup(dataload_delay=0))
