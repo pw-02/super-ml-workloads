@@ -25,7 +25,7 @@ from lit_gpt.utils import CLI, chunked_cross_entropy, estimate_flops, get_defaul
 
 
 def setup(
-    model_name: str = "pythia-1b",
+    model_name: str = "pythia-410m",
     dataload_delay: int = 0,
     precision: Optional[str] = None,
     resume: Union[bool, Path] = False,
@@ -39,7 +39,7 @@ def setup(
         micro_batch_size=5,
         lr_warmup_steps=100,
         epochs=1,
-        epoch_size=250,
+        epoch_size=125,
         learning_rate=6e-4,
         weight_decay=1e-1,
         beta1=0.9,
