@@ -80,7 +80,7 @@ def main(
     eval: EvalArgs,
     dataload_delay
 ) -> None:
-    validate_args(io, train, eval)
+    #validate_args(io, train, eval)
 
     if fabric.global_rank == 0:
         io.out_dir.mkdir(parents=True, exist_ok=True)
@@ -234,7 +234,7 @@ def validate(fabric: L.Fabric, model: torch.nn.Module, val_dataloader: DataLoade
 
 def load_datasets(io: IOArgs, max_seq_length: int,  delay:int = 0) -> Tuple["Dataset", "Dataset"]:
     train_data = Dataset(io.train_data_dir / "val.bin", max_seq_length, delay)
-    val_data = Dataset(io.val_data_dir / "val.bin", max_seq_length, delay)
+    val_data = Dataset(io.train_data_dir / "val.bin", max_seq_length, delay)
     return train_data, val_data
 
 
