@@ -174,7 +174,7 @@ def fit(
 
         input_ids, targets = next(train_iter)
 
-        print(time.perf_counter()-iter_t0)
+        fabric.print(time.perf_counter()-iter_t0)
 
         is_accumulating = iter_num % train.gradient_accumulation_iters(devices) != 0
         with fabric.no_backward_sync(model, enabled=is_accumulating):
@@ -198,7 +198,7 @@ def fit(
                 lengths=iter_num * train.micro_batch_size * model.max_seq_length,
                 flops=measured_flops * train.log_interval,
             )
-            print(throughput.compute())
+            fabric.print(throughput.compute())
             metrics = throughput.compute_and_log(step=iter_num)
 
             metrics['tokens/sec'] = metrics['lengths']/metrics['time']
