@@ -1,0 +1,5 @@
+kind: s3mapdataset
+batch_size: 5
+num_workers: 0
+shuffle: True
+sampler_kind: classic_pytorch

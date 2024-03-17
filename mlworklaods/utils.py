@@ -1,5 +1,3 @@
-#  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-#  // SPDX-License-Identifier: BSD
 import json
 import threading
 import time
@@ -8,7 +6,6 @@ from dataclasses import dataclass
 from functools import cached_property
 from json import JSONEncoder
 from typing import Dict, Any
-
 import numpy as np
 import psutil
 import torch.cuda
@@ -18,11 +15,16 @@ from pynvml import (
     nvmlDeviceGetHandleByIndex,
     nvmlDeviceGetMemoryInfo,
 )
+from torch import nn
+import math
+from typing import  Optional
 
 monitor_gpu = False
 if torch.cuda.is_available():
-    monitor_gpu = True
+    monitor_gpu = False
     nvmlInit()
+
+
 
 
 class Distribution:
@@ -39,6 +41,7 @@ class Distribution:
             )
 
     def add(self, val: float):
+
         self._expand_if_needed()
         self._values[self._idx] = val
         self._idx += 1
@@ -71,22 +74,31 @@ class ExperimentResult:
     @cached_property
     def throughput(self):
         return self.volume / self.elapsed_time
+    
+class AverageMeter(object):
+    """Computes and stores the average and current value."""
+    def __init__(self, name, fmt=":f"):
+        self.name = name
+        self.fmt = fmt
+        self.reset()
 
+    def reset(self):
+        self.val = 0
+        self.avg = 0  # noqa
+        self.sum = 0
+        self.count = 0
 
-class ExperimentResultJsonEncoder(JSONEncoder):
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count  # noqa
 
-    def default(self, o: Any) -> Any:
-        if isinstance(o, ExperimentResult):
-            o: ExperimentResult = o
-            return {
-                "volume": o.volume,
-                "elapsed_time": o.elapsed_time,
-                "throughput": o.throughput,
-                "utilization": {k: v.summarize() for k, v in o.utilization.items()},
-            }
-        return super().default(o)
-
-
+    def __str__(self):
+        #fmtstr = "{name} {val" + self.fmt + "} ({avg" + self.fmt + "})"
+        fmtstr = "{name}:{val" + self.fmt +"}"
+        return fmtstr.format(**self.__dict__)
+    
 class ResourceMonitor:
     """
     Monitors CPU, GPU usage and memory.
@@ -140,8 +152,26 @@ class ResourceMonitor:
         self.stop_event.set()
         self.monitor_thread.join()
 
+
+def num_model_parameters(module: nn.Module, requires_grad: Optional[bool] = None) -> int:
+    total = 0
+    for p in module.parameters():
+        if requires_grad is None or p.requires_grad == requires_grad:
+            if hasattr(p, "quant_state"):
+                # bitsandbytes 4bit layer support
+                total += math.prod(p.quant_state[1])
+            else:
+                total += p.numel()
+    return total
+
+def get_default_supported_precision(training: bool) -> str:
+    from lightning.fabric.accelerators import MPSAccelerator
+    if MPSAccelerator.is_available() or (torch.cuda.is_available() and not torch.cuda.is_bf16_supported()):
+        return "16-mixed" if training else "16-true"
+    return "bf16-mixed" if training else "bf16-true"
+
 def test_resource_moinitor()-> ExperimentResult:
-    with ResourceMonitor() as monitor:
+    with ResourceMonitor(sleep_time_s=4) as monitor:
         num_samples = 0
         start_time = time.perf_counter()
         for epoch in range(0, 50):
@@ -158,6 +188,5 @@ def test_resource_moinitor()-> ExperimentResult:
 
 
 if __name__ == "__main__":
-
     result = test_resource_moinitor()
     print(result)

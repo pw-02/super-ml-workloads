@@ -1,0 +1,5 @@
+kind: s3mapdataset
+batch_size: 5
+num_workers: 8
+shuffle: True
+block_size: 1024

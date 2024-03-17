@@ -1,0 +1,23 @@
+dataloader:
+  kind: s3mapdataset
+  batch_size: 128
+  num_workers: 0
+  shuffle: true
+  sampler_kind: classic_pytorch
+dataset:
+  kind: image
+  train_dir: s3://sdl-cifar10/test/
+  val_dir: s3://sdl-cifar10/test/
+  name: cifar10
+training:
+  model: resnet18
+  max_epochs: 1
+  max_minibatches_per_epoch: null
+  grad_acc_steps: null
+  run_training: true
+  run_evaluation: false
+devices: 1
+accelerator: gpu
+log_dir: mlworklaods/reports
+print_freq: 1
+flush_freq: 1

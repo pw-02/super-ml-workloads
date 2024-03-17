@@ -1,0 +1,19 @@
+defaults:
+  - dataloader: s3mapdataset
+  - dataset: cifar10_s3
+  - training: image_classification
+  - override hydra/job_logging: disabled
+devices: 1
+accelerator: 'gpu'
+log_dir: mlworklaods/reports
+print_freq: 1
+log_freq: 1
+run_training: true
+run_evaluation: false
+
+# hydra:
+#   mode: MULTIRUN
+#   sweeper:
+#     params:
+#       dataloader: s3iterabledataset, fsspec
+#       dataloader.num_workers: 2,4,8,16
