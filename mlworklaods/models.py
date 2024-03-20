@@ -16,7 +16,7 @@ from torch.utils.data.dataloader import DataLoader
 from torchvision.transforms import v2
 from lightning.fabric import Fabric
 import torchvision
-from utils import ExperimentResult, ResourceMonitor, Distribution, num_model_parameters
+from utils import ResourceMonitor, num_model_parameters
 from logutil import ExperimentLogger, AverageMeter, ProgressMeter, Summary
 
 class ModelInterface(metaclass=abc.ABCMeta):
@@ -36,21 +36,21 @@ class ModelInterface(metaclass=abc.ABCMeta):
         raise NotImplementedError
     
 
-    def eval(self, epoch:int, DataLoader,val_dataloader: DataLoader, logger:ExperimentLogger, max_minibatches: int):
+    def validate(self, epoch:int,val_dataloader: DataLoader, logger:ExperimentLogger, max_minibatches: int):
         totoal_batches = min(len(val_dataloader), max_minibatches)
         batch_time = AverageMeter('Time', ':6.3f', Summary.NONE)
-        losses = AverageMeter('Loss', ':.4e', Summary.NONE)
-        top1 = AverageMeter('Acc@1', ':6.2f', Summary.AVERAGE)
-        top5 = AverageMeter('Acc@5', ':6.2f', Summary.AVERAGE)
+        losses = AverageMeter('Loss', ':6.2f')
+        top1 = AverageMeter('Acc1', ':6.2f', Summary.AVERAGE)
+        top5 = AverageMeter('Acc5', ':6.2f', Summary.AVERAGE)
         progress = ProgressMeter(
-        len(totoal_batches),[batch_time, losses, top1, top5],prefix='Test: ')
+        totoal_batches,[batch_time, losses, top1, top5],prefix='Test: ')
         end = time.perf_counter()  
         total_samples  = 0
         for batch_idx,(data, target) in enumerate(val_dataloader):
             loss, acc1, acc5 = self.eval_batch(batch_idx, data, target)
-            losses.update(loss.item(), len(data))
-            top1.update(acc1[0], len(data))
-            top5.update(acc5[0], len(data))
+            losses.update(loss.item(), data.size(0))
+            top1.update(acc1[0], data.size(0))
+            top5.update(acc5[0], data.size(0))
             # measure elapsed time
             batch_time.update(time.perf_counter() - end)
 
@@ -85,6 +85,7 @@ class ModelInterface(metaclass=abc.ABCMeta):
                 top1=top1.avg,
                 top5=top5.avg
             )
+        return top1.avg, top5.avg
 
 
     def train(self, epoch, train_dataloader: DataLoader, logger:ExperimentLogger, max_minibatches:int, grad_acc_steps:int ):
@@ -93,14 +94,14 @@ class ModelInterface(metaclass=abc.ABCMeta):
         batch_time = AverageMeter('Time', ':6.3f')
         data_time = AverageMeter('Data', ':6.3f')
         compute_time = AverageMeter('Compute', ':6.3f')
-        losses = AverageMeter('Loss', ':.4e')
-        top1 = AverageMeter('Acc@1', ':6.2f')
-        top5 = AverageMeter('Acc@5', ':6.2f')
+        losses = AverageMeter('Loss', ':6.2f')
+        top1 = AverageMeter('Acc1', ':6.2f')
+        top5 = AverageMeter('Acc5', ':6.2f')
         progress = ProgressMeter(
             totoal_batches,
             [batch_time, data_time, losses, top1, top5],
             prefix="Epoch: [{}]".format(epoch))
-        
+
         with ResourceMonitor() as monitor:
             end = time.perf_counter()   
             for batch_idx,(data, target) in enumerate(train_dataloader):
@@ -110,8 +111,10 @@ class ModelInterface(metaclass=abc.ABCMeta):
                 is_accumulating = grad_acc_steps is not None and batch_idx % grad_acc_steps != 0
                 
                 #train model on next batch
-                loss = self.train_batch(batch_idx, data, target, is_accumulating)
-                losses.update(loss)
+                loss, acc1, acc5 = self.train_batch(batch_idx, data, target, is_accumulating)
+                losses.update(loss.item(), data.size(0))
+                top1.update(acc1[0], data.size(0))
+                top5.update(acc5[0], data.size(0))
                 # measure computation time
                 compute_time.update(time.perf_counter() - end - data_time.val)
                 
@@ -130,7 +133,9 @@ class ModelInterface(metaclass=abc.ABCMeta):
                         total_time=batch_time.val,
                         data_time=data_time.val,
                         compute_time=compute_time.val,
-                        loss=losses.val)
+                        loss=losses.val,
+                        acc1=top1.val,
+                        acc5=top5.val)
 
                 if max_minibatches and batch_idx+1 >= max_minibatches:
                     # end loop early as max number of minibatches have been processed 
@@ -145,8 +150,11 @@ class ModelInterface(metaclass=abc.ABCMeta):
                 total_time=batch_time.sum,
                 data_time=data_time.sum,
                 compute_time=compute_time.sum,
-                loss=losses.avg
+                loss=losses.avg,
+                acc1=top1.avg,
+                acc5=top5.avg
             )
+        return top1.avg, top5.avg
         
     @property
     @abc.abstractmethod
@@ -202,12 +210,16 @@ class TorchVisionModel(ModelInterface):
             self.optimizer.step()
             self.optimizer.zero_grad()
         
-        # prec1, prec5 = self.accuracy(output.data, target, topk=(1, 5))
+        acc1, acc5 = self.accuracy(output.data, target, topk=(1, 5))
 
-        return loss
+        return loss, acc1, acc5
     
     
     def eval_batch(self, batch_idx: int, data, target):
+
+
+
+
         pass
 
     

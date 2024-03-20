@@ -18,7 +18,7 @@ from pynvml import (
 from torch import nn
 import math
 from typing import  Optional
-
+from enum import Enum
 monitor_gpu = False
 if torch.cuda.is_available():
     monitor_gpu = False
@@ -75,29 +75,6 @@ class ExperimentResult:
     def throughput(self):
         return self.volume / self.elapsed_time
     
-class AverageMeter(object):
-    """Computes and stores the average and current value."""
-    def __init__(self, name, fmt=":f"):
-        self.name = name
-        self.fmt = fmt
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0  # noqa
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count  # noqa
-
-    def __str__(self):
-        #fmtstr = "{name} {val" + self.fmt + "} ({avg" + self.fmt + "})"
-        fmtstr = "{name}:{val" + self.fmt +"}"
-        return fmtstr.format(**self.__dict__)
     
 class ResourceMonitor:
     """
