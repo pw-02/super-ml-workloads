@@ -99,7 +99,7 @@ class ModelInterface(metaclass=abc.ABCMeta):
         top5 = AverageMeter('Acc5', ':6.2f')
         progress = ProgressMeter(
             totoal_batches,
-            [batch_time, data_time, losses, top1, top5],
+            [batch_time, data_time, compute_time, losses, top1, top5],
             prefix="Epoch: [{}]".format(epoch))
 
         with ResourceMonitor() as monitor:
@@ -111,10 +111,12 @@ class ModelInterface(metaclass=abc.ABCMeta):
                 is_accumulating = grad_acc_steps is not None and batch_idx % grad_acc_steps != 0
                 
                 #train model on next batch
-                loss, acc1, acc5 = self.train_batch(batch_idx, data, target, is_accumulating)
-                losses.update(loss.item(), data.size(0))
-                top1.update(acc1[0], data.size(0))
-                top5.update(acc5[0], data.size(0))
+                result = self.train_batch(data, target, is_accumulating)
+                if result:
+                    loss, acc1, acc5 = result
+                    losses.update(loss.item(), data.size(0))
+                    top1.update(acc1[0], data.size(0))
+                    top5.update(acc5[0], data.size(0))
                 # measure computation time
                 compute_time.update(time.perf_counter() - end - data_time.val)
                 
@@ -164,6 +166,8 @@ class ModelInterface(metaclass=abc.ABCMeta):
 
     @property
     def num_parameters(self):
+        if self.name == 'EmptyModel':
+            return 0
         return num_model_parameters(self.model)
     
     @abc.abstractmethod
@@ -198,7 +202,7 @@ class TorchVisionModel(ModelInterface):
         transformations = torchvision.transforms.Compose([torchvision.transforms.ToTensor(), normalize])
         return transformations
 
-    def train_batch(self,  batch_idx: int, data, target, is_accumulating:bool):
+    def train_batch(self, data, target, is_accumulating:bool):
         # Forward pass and loss calculation
         with self.fabric.no_backward_sync(self.model, enabled=is_accumulating):
             output:torch.Tensor = self.model(data)
@@ -215,14 +219,9 @@ class TorchVisionModel(ModelInterface):
         return loss, acc1, acc5
     
     
-    def eval_batch(self, batch_idx: int, data, target):
-
-
-
-
+    def eval_batch(self, int, data, target):
         pass
 
-    
     def accuracy(self, output: torch.Tensor, target:torch.Tensor, topk=(1,))-> List[torch.Tensor]:
         """Computes the accuracy over the k top predictions for the specified values of k."""
         with torch.no_grad():
@@ -237,10 +236,7 @@ class TorchVisionModel(ModelInterface):
             for k in topk:
                 correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
                 res.append(correct_k.mul_(100.0 / batch_size))
-            return res
-        
-        
-
+            return res 
     def save(self):
         raise NotImplementedError
 
@@ -256,8 +252,18 @@ class EmptyModel(ModelInterface):
         super().__init__()
         self.num_labels = num_labels
 
-    def train_batch(self, batch_idx: int, data, target):
+    def train_batch(self, data, target, is_accumulating:bool):
+        pass
+    
+    def eval_batch(self, batch_idx: int, data, target):
         pass
 
+    def model(self):
+        pass
+
+    @cached_property
+    def transform(self):
+        return torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
+    
     def save(self):
         raise NotImplementedError

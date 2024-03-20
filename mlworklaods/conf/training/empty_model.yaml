@@ -1,2 +1,4 @@
 model: emptymodel
 max_epochs: 1
+max_minibatches_per_epoch: 10
+grad_acc_steps: null

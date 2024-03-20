@@ -1,7 +1,7 @@
 defaults:
   - dataloader: s3mapdataset
   - dataset: cifar10_s3
-  - training: image_classification
+  - training: empty_model
   - override hydra/job_logging: disabled
 devices: 1
 accelerator: 'gpu'
