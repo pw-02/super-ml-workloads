@@ -1,0 +1,2 @@
+kind: s3_image_mapped
+sampler_kind: classic_pytorch

@@ -1,4 +1,0 @@
-model: resnet18
-max_epochs: 1
-max_minibatches_per_epoch: 4
-grad_acc_steps: null

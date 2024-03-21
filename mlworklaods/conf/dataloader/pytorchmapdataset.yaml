@@ -1,4 +1,0 @@
-kind: pytorchmapdataset
-batch_size: 128
-num_workers: 8
-shuffle: True

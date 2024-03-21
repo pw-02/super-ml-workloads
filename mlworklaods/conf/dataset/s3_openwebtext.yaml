@@ -1,0 +1,4 @@
+kind: langauge
+train_dir: s3://openwebtxt/owt/train/
+val_dir: s3://openwebtxt/owt/val/
+name: openwebtext

@@ -1,4 +1,0 @@
-kind: image
-train_dir: s3://sdl-cifar10/test/
-val_dir: s3://sdl-cifar10/test/
-name: cifar10

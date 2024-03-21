@@ -1,0 +1,14 @@
+model_name: pythia-14m
+global_batch_size: 125
+batch_size: 10
+max_epochs: 1
+max_minibatches_per_epoch: 10
+learning_rate: 6e-4
+weight_decay: 1e-1
+beta1: 0.9
+beta2: 0.95
+max_norm: 1.0
+min_lr: 6e-5
+shuffle: True
+num_workers: 0
+grad_acc_steps: null

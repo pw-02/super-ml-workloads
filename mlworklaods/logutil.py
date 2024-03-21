@@ -87,6 +87,9 @@ class AggregatedEpochMetrics():
         self.epoch_losses = AverageMeter('Loss', ':.4e')
         self.epoch_acc1 = AverageMeter('Acc@1', ':6.2f')
         self.epoch_acc5  = AverageMeter('Acc@5', ':6.2f')
+        self.cpu_util  = AverageMeter('cpu_util', ':6.2f')
+        self.gpu_util  = AverageMeter('gpu_util', ':6.2f')
+
         self.total_time = None
     
 class ExperimentLogger():
@@ -99,7 +102,10 @@ class ExperimentLogger():
         self.train_job_metrics = None
         self.eval_job_metrics = None
 
-    def save_train_batch_metrics(self,epoch,step,global_step,num_sampels,total_time,data_time,compute_time,loss, acc1, acc5 , cahce_hit = False):
+   
+
+    def save_train_batch_metrics(self,epoch,step,global_step,num_sampels,total_time,data_time,compute_time,loss, avg_cpu, max_cpu, avg_gpu=0, max_gpu=0,
+                                 cahce_hit = False):
         metrics = OrderedDict({
                 "device": self.fabric.local_rank,
                 "epoch": epoch,
@@ -110,12 +116,16 @@ class ExperimentLogger():
                 "data_time": data_time,
                 "compute_time": compute_time,
                 "loss": loss,
-                "acc1" : acc1,
-                "acc5" : acc5,
+                "avg_cpu": avg_cpu,
+                "max_cpu": max_cpu,
+                "avg_gpu": avg_gpu,
+                "max_gpu": max_gpu
+             
             })
         self.log_metrics(metrics = metrics,prefix='train.iteration',step=global_step,force_save=True)
     
-    def save_train_epoch_metrics(self,epoch,num_samples,global_step,num_batches,total_time,data_time,compute_time,loss, acc1, acc5, epoch_cahce_hits =0):
+    def save_train_epoch_metrics(self,epoch,num_samples,global_step,num_batches,total_time,data_time,compute_time,loss, acc1, acc5,
+                                 avg_cpu, max_cpu, avg_gpu=0, max_gpu=0, epoch_cahce_hits =0):
         metrics = OrderedDict({
                 "device": self.fabric.local_rank,
                 "epoch": epoch,
@@ -127,6 +137,10 @@ class ExperimentLogger():
                 "loss": loss,
                 "acc1" : acc1,
                 "acc5" : acc5,
+                "avg_cpu": avg_cpu,
+                "max_cpu": max_cpu,
+                "avg_gpu": avg_gpu,
+                "max_gpu": max_gpu
             }) 
         if self.train_job_metrics == None:
             self.train_job_metrics = AggregatedEpochMetrics()
@@ -140,6 +154,8 @@ class ExperimentLogger():
         self.train_job_metrics.epoch_losses.update(loss)
         self.train_job_metrics.epoch_acc1.update(loss)
         self.train_job_metrics.epoch_acc5.update(loss)
+        self.train_job_metrics.cpu_util.update(avg_cpu)
+        self.train_job_metrics.gpu_util.update(avg_gpu)
 
         self.log_metrics(metrics = metrics,prefix='train.epoch',step=global_step,force_save=True)
     
@@ -196,7 +212,13 @@ class ExperimentLogger():
                     "loss": self.train_job_metrics.epoch_losses.val,
                     "acc1" : self.train_job_metrics.epoch_acc1.val,
                     "acc5" :  self.train_job_metrics.epoch_acc5.val,
+                    "cpu_util" :  self.train_job_metrics.cpu_util.val,
+                    "gpu_util" :  self.train_job_metrics.gpu_util.val,
+
                 })
+        
+        print(f'Total_Batches: {metrics_dict["total_batches"]}\tTotal_Time:{metrics_dict["total_time"]}\tData_time: {metrics_dict["data_time"]}\tCompute_time: {metrics_dict["compute_time"]}\tbps: {metrics_dict["bps"]}')
+
         self.log_metrics(metrics=metrics_dict, step=1,prefix='train.job', force_save = True)
     
         if self.eval_job_metrics:
@@ -376,7 +398,9 @@ def summarize_across_all_devices(category_data):
         "num_devices": [],
         "total_time": [],
         "data_time": [],
-        "compute_time": [],      
+        "compute_time": [],
+        "cpu_util": [],   
+        "gpu_util": [],     
         "total_samples": [],
         "total_batches": [],
         "batches/sec": [],
@@ -404,6 +428,8 @@ def summarize_across_all_devices(category_data):
             summary['loss'].append(calculate_average(category_data[key][f'{key}.loss']))
             summary['acc1'].append(calculate_average(category_data[key][f'{key}.acc1']))
             summary['acc5'].append(calculate_average(category_data[key][f'{key}.acc5']))
+            summary['cpu_util'].append(calculate_average(category_data[key][f'{key}.cpu_util']))
+            summary['gpu_util'].append(calculate_average(category_data[key][f'{key}.gpu_util']))
     
     return summary
 

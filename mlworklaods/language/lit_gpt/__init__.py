@@ -3,9 +3,9 @@
 import re
 import logging
 
-from lit_gpt.model import GPT
-from lit_gpt.config import Config
-from lit_gpt.tokenizer import Tokenizer
+from mlworklaods.language.lit_gpt.model import GPT
+from mlworklaods.language.lit_gpt.config import Config
+from mlworklaods.language.lit_gpt.tokenizer import Tokenizer
 
 from lightning_utilities.core.imports import RequirementCache
 

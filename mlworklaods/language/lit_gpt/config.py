@@ -9,8 +9,8 @@ from typing import Any, Literal, Optional, Type, Union
 import torch
 from typing_extensions import Self
 
-import lit_gpt.model
-from lit_gpt.utils import find_multiple
+import mlworklaods.language.lit_gpt as lit_gpt
+from mlworklaods.language.lit_gpt.utils import find_multiple
 
 
 @dataclass
@@ -59,6 +59,7 @@ class Config:
     rope_base: int = 10000
     n_expert: int = 0
     n_expert_per_token: int = 0
+
 
     def __post_init__(self):
         if not self.name:
