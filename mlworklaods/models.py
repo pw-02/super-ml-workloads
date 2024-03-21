@@ -170,7 +170,7 @@ class ModelInterface(metaclass=abc.ABCMeta):
         
     @property
     @abc.abstractmethod
-    def model(self):
+    def model(self)->nn.Module:
         """Property representing the model"""
         raise NotImplementedError
 
@@ -184,6 +184,12 @@ class ModelInterface(metaclass=abc.ABCMeta):
     def save(self, **kwargs):
         """Save checkpoint"""
         raise NotImplementedError
+    
+    def train_mode(self):
+        self.model.train(mode=True)
+    
+    def eval_mode(self):
+        self.model.eval()
     
     @property
     def block_size(self) -> Optional[Any]:
@@ -301,9 +307,9 @@ class LitGPTModel(ModelInterface):
         )
 
         self._model, self._optimizer = fabric.setup(model, optimizer, move_to_device=True)
-
+    
     @property
-    def model(self):
+    def model(self)->nn.Module:
         return self._model
     
     @property

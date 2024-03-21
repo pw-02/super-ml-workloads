@@ -1,31 +1,33 @@
-defaults:
-  - dataloader: s3_image_mapped
-  - dataset: s3_cifar10
-  - training: vision
-  - override hydra/job_logging: disabled
-devices: 4
-accelerator: 'cpu'
-log_dir: mlworklaods/reports
-print_freq: 1
-log_freq: 1
-run_training: true
-run_evaluation: false
-
-
-
-
 # defaults:
-#   - dataloader: local_text_iterable
-#   - dataset: local_openwebtext
-#   - training: llm
+#   - dataloader: s3_image_mapped
+#   - dataset: s3_cifar10
+#   - training: vision
 #   - override hydra/job_logging: disabled
-# devices: 1
-# accelerator: 'gpu'
+# devices: 4
+# accelerator: 'cpu'
 # log_dir: mlworklaods/reports
 # print_freq: 1
 # log_freq: 1
 # run_training: true
 # run_evaluation: false
+
+
+defaults:
+  - dataloader: local_text_iterable
+  - dataset: local_openwebtext
+  - training: llm
+  - override hydra/job_logging: disabled
+devices: 2
+seed: 41
+accelerator: 'gpu'
+log_dir: mlworklaods/reports
+print_freq: 1
+log_interval: 1
+run_training: true
+run_evaluation: false
+
+
+
 
 # hydra:
 #   mode: MULTIRUN

@@ -80,6 +80,7 @@ def main(fabric: Fabric, config: DictConfig):
     start_time = time.perf_counter()
     for epoch in range(0, config.training.max_epochs):
         if config.run_training:
+            model.train_mode()
             fabric.print(f"Stating training loop for epoch {epoch}")
             acc1,  acc5 = model.train(
                 epoch=epoch,
@@ -93,6 +94,7 @@ def main(fabric: Fabric, config: DictConfig):
             best_acc5 = max(acc5, best_acc5)
         
         if config.run_evaluation:
+            model.eval_mode()
             fabric.print(f"Stating validation loop for epoch {epoch}")
             acc1,  acc5 = model.validate(
                 epoch=epoch,
