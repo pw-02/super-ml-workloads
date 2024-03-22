@@ -1,4 +1,4 @@
-model_name: pythia-31m
+model_name: pythia-14m
 log_interval: 1
 global_batch_size: 8
 micro_batch_size: 8
