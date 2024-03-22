@@ -14,4 +14,15 @@ max_norm: 1.0
 min_lr: 6e-5
 eval_iterval: 16
 max_eval_iters: 50
-max_tokens: 100000
+max_tokens: 1000000
+
+
+
+# /* 'pythia-14m',
+#         'pythia-31m',
+#         'pythia-70m',
+#         'pythia-160m',
+#         'pythia-410m',
+#         'pythia-1b',
+#         'pythia-1.4b',
+#         'pythia-2.8b',
