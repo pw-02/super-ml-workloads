@@ -1,0 +1,4 @@
+kind: local_text_iterable
+sampler_kind: null #iterable datasets do use samplers
+num_pytorch_workers: 0
+shuffle: True

@@ -1,2 +1,0 @@
-kind: s3_text_iterable
-sampler_kind: null #iterable datasets do use samplers

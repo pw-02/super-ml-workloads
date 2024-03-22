@@ -13,15 +13,11 @@ import torch
 wd = Path(__file__).parent.parent.resolve()
 sys.path.append(str(wd))
 
-from lit_gpt import Config
-from lit_gpt.args import EvalArgs, IOArgs, TrainArgs
-from lit_gpt.model import GPT
-from lit_gpt.utils import  estimate_flops, num_parameters
+from litgpt import Config
+from litgpt.model import GPT
+from litgpt.utils import  estimate_flops, num_parameters
 
-
-
-def estimate_tflops_for_model(model_name,micro_batch_size =5 ):
-    
+def estimate_tflops_for_model(model_name,micro_batch_size =5 ):    
     config = Config.from_name(name=model_name)
     model = GPT(config)
     model.apply(model._init_weights)
@@ -32,10 +28,7 @@ def estimate_tflops_for_model(model_name,micro_batch_size =5 ):
         # When comparing MFU or FLOP numbers with other projects that use estimated FLOPs,
         # consider passing `flops_per_batch=estimated_flops` instead
         estimated_flops = estimate_flops(meta_model, training=True) * micro_batch_size
-
         print(f"{model_name} - Total parameters {num_parameters(model):,}, Estimated TFLOPs: {estimated_flops * 1 / 1e12:.2f} ")
-
-
 
 if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")

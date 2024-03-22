@@ -52,13 +52,13 @@ import torch.nn as nn
 from torch.nn import functional as F
 from typing_extensions import Self
 
-import lit_gpt
-from lit_gpt.config import Config as BaseConfig
-from lit_gpt.model import GPT as BaseModel
-from lit_gpt.model import Block as BaseBlock
-from lit_gpt.model import CausalSelfAttention as BaseCausalSelfAttention
-from lit_gpt.model import KVCache
-from lit_gpt.utils import map_old_state_dict_weights
+import litgpt
+from litgpt.config import Config as BaseConfig
+from litgpt.model import GPT as BaseModel
+from litgpt.model import Block as BaseBlock
+from litgpt.model import CausalSelfAttention as BaseCausalSelfAttention
+from litgpt.model import KVCache
+from litgpt.utils import map_old_state_dict_weights
 
 
 class LoRALayer(nn.Module):
@@ -495,7 +495,7 @@ class Config(BaseConfig):
 
     @property
     def mlp_class(self) -> Type:
-        return getattr(lit_gpt.lora, self._mlp_class)
+        return getattr(litgpt.lora, self._mlp_class)
 
 
 class GPT(BaseModel):
@@ -623,7 +623,7 @@ class CausalSelfAttention(BaseCausalSelfAttention):
         super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
 
 
-class GptNeoxMLP(lit_gpt.model.GptNeoxMLP):
+class GptNeoxMLP(litgpt.model.GptNeoxMLP):
     def __init__(self, config: Config) -> None:
         nn.Module.__init__(self)
         self.fc = LoRALinear(
@@ -657,7 +657,7 @@ class GptNeoxMLP(lit_gpt.model.GptNeoxMLP):
         super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
 
 
-class LLaMAMLP(lit_gpt.model.LLaMAMLP):
+class LLaMAMLP(litgpt.model.LLaMAMLP):
     def __init__(self, config: Config) -> None:
         nn.Module.__init__(self)
         self.fc_1 = LoRALinear(
@@ -699,7 +699,7 @@ class LLaMAMLP(lit_gpt.model.LLaMAMLP):
         super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
 
 
-class LLaMAMoE(lit_gpt.model.LLaMAMoE):
+class LLaMAMoE(litgpt.model.LLaMAMoE):
     def __init__(self, config: Config) -> None:
         nn.Module.__init__(self)
         self.gate = LoRALinear(

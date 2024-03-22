@@ -1,0 +1,17 @@
+model_name: pythia-14m
+log_interval: 1
+global_batch_size: 5
+micro_batch_size: 5
+#gradient accumulation every global_batch_size/micro_batch_size iterations
+lr_warmup_steps: 0
+epochs: 1
+epoch_size: 16
+learning_rate: 6e-4
+weight_decay: 1e-1
+beta1: 0.9
+beta2: 0.95
+max_norm: 1.0
+min_lr: 6e-5
+eval_iterval: 16
+max_eval_iters: 50
+max_tokens: 10000

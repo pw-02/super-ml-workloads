@@ -2,18 +2,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+
 @dataclass
 class TrainArgs:
+    model_name: Optional[str] = None
 
-    model_name: str = 'resnet18'
-
-    log_interval: int = 1
-    """Number of iterations between logging calls"""
+    dataloader_kind: Optional[str] = None
+    
     global_batch_size: int = 64
-    """Number of samples/batches between optimizer steps across data-parallel ranks"""
+    """Number of samples between optimizer steps across data-parallel ranks"""
     micro_batch_size: int = 4
-    """Number of samples/batches per data-parallel rank"""
-    lr_warmup_steps: int = 1
+    """Number of samples per data-parallel rank"""
+    lr_warmup_steps: int = 100
     """Number of iterations with learning rate warmup active"""
     epochs: Optional[int] = None
     """Number of epochs to run"""
@@ -32,6 +32,9 @@ class TrainArgs:
     beta2: float = 0.95
     max_norm: Optional[float] = None
     min_lr: float = 6e-5
+
+    num_pytorch_workers:int =0
+    shuffle:bool = True
 
     def max_iters(self, devices: int) -> int:
         """Number of iterations"""
@@ -69,11 +72,13 @@ class IOArgs:
     """Inputs and outputs related arguments"""
 
     # Optional because pretrain/tinyllama hardcodes the path
-    train_data_dir: Optional[Path] = Path("data/alpaca")
+    train_data_dir: Optional[str]= None
     """Where to read training data from"""
-    val_data_dir: Optional[Path] = None
-    """Where to read validation data from"""
-    checkpoint_dir: Optional[Path] = None
-    """Where to read weights and tokenizer data from"""
-    out_dir: Path = Path("out/adapter/alpaca")
-    """Where to save artifacts"""
+    val_data_dir: Optional[str] = None
+    # """Where to read validation data from"""
+    # checkpoint_dir: Optional[Path] = None
+    # """Where to read weights and tokenizer data from"""
+    # out_dir: Path = Path("out/adapter/alpaca")
+    # """Where to save artifacts"""
+    log_interval: int = 1
+    log_dir: Optional[str] = None

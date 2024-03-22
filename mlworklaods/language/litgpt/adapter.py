@@ -15,10 +15,10 @@ import torch
 import torch.nn as nn
 from typing_extensions import Self
 
-from lit_gpt.config import Config as BaseConfig
-from lit_gpt.model import GPT as BaseModel
-from lit_gpt.model import Block as BaseBlock
-from lit_gpt.model import CausalSelfAttention as BaseCausalSelfAttention
+from litgpt.config import Config as BaseConfig
+from litgpt.model import GPT as BaseModel
+from litgpt.model import Block as BaseBlock
+from litgpt.model import CausalSelfAttention as BaseCausalSelfAttention
 
 
 @dataclass
