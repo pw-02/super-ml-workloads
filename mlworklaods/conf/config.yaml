@@ -1,13 +1,13 @@
 # defaults:
 #   - dataloader: s3_image_mapped
 #   - dataset: s3_cifar10
-#   - training: vision
+#   - training: resnet18
 #   - override hydra/job_logging: disabled
-# devices: 4
-# accelerator: 'cpu'
+# devices: 1
+# seed: 41
+# accelerator: 'gpu'
 # log_dir: mlworklaods/reports
-# print_freq: 1
-# log_freq: 1
+# log_interval: 1
 # run_training: true
 # run_evaluation: false
 
@@ -24,9 +24,6 @@ log_dir: mlworklaods/reports
 log_interval: 1
 run_training: true
 run_evaluation: false
-
-
-
 
 # hydra:
 #   mode: MULTIRUN

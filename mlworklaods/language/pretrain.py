@@ -54,7 +54,7 @@ class CycleIterator:
         return self
 
 
-@hydra.main(version_base=None, config_path="conf", config_name="config")
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
 def setup(config: DictConfig):
 
     start_time = time.perf_counter()
@@ -91,6 +91,9 @@ def setup(config: DictConfig):
     fabric.launch(main,config.seed, config, train,io, eval)
     fabric.print(f"Creating overall report for experiment")
     create_exp_summary_report(io.log_dir)
+    fabric.print(f"Experiement Ended. Total Duration {(time.perf_counter()-start_time):.2f}s")
+
+
 
 def main(fabric: Fabric, seed: int, config: DictConfig, train: TrainArgs, io: IOArgs,eval:EvalArgs) -> None:
     fabric.seed_everything(seed, workers=True)  # same seed for every process to init model (FSDP)
@@ -172,10 +175,9 @@ def fit(fabric: L.Fabric,model:nn.Module, optimizer,train_dataloader: DataLoader
 
     with ResourceMonitor() as monitor:
         end = time.perf_counter()
-        
         for input_ids, targets in train_iterator:
             data_time.update(time.perf_counter() - end)
-
+            
             #determine and set the learning rate for this iteration
             lr = get_lr(train.learning_rate, iter_num, 0, max_iters, train.min_lr)
             for param_group in optimizer.param_groups:
@@ -256,6 +258,8 @@ def fit(fabric: L.Fabric,model:nn.Module, optimizer,train_dataloader: DataLoader
             iter_num +=1
             if iter_num >= max_iters:
                 break
+            end = time.perf_counter()
+
 
 # FSDP has issues with `inference_mode`
 @torch.no_grad()

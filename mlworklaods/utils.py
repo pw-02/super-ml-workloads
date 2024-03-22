@@ -42,6 +42,7 @@ class ExperimentLogger():
         self.experiment_writer = ExperimentWriter(log_dir=log_dir, rank=self.fabric.local_rank)
         self.train_job_metrics = None
         self.eval_job_metrics = None
+        self.total_tokens = None
 
 
     def save_train_batch_metrics(self,epoch,step,global_step,num_sampels,total_time,data_time,compute_time,loss, avg_cpu, max_cpu, avg_gpu=0, max_gpu=0, num_tokens = None, acc1 = None, acc5 = None, ):
@@ -97,6 +98,7 @@ class ExperimentLogger():
 
         if num_tokens is not None:
             metrics['num_tokens'] = num_tokens
+            self.total_tokens = num_tokens
 
         if self.train_job_metrics == None:
             self.train_job_metrics = AggregatedEpochMetrics()
@@ -171,8 +173,11 @@ class ExperimentLogger():
                     "cpu_util" :  self.train_job_metrics.cpu_util.val,
                     "gpu_util" :  self.train_job_metrics.gpu_util.val,
                 })
+        if self.total_tokens is not None:
+            metrics_dict["total_tokens"] = self.total_tokens
+
         
-        print(f'Total_Batches: {metrics_dict["total_batches"]}\tTotal_Time:{metrics_dict["total_time"]}\tData_time: {metrics_dict["data_time"]}\tCompute_time: {metrics_dict["compute_time"]}\tbps: {metrics_dict["bps"]}')
+        self.fabric.print(f'Total_Batches: {metrics_dict["total_batches"]}|Total_Time:{metrics_dict["total_time"]}|Data_time: {metrics_dict["data_time"]}|Compute_time: {metrics_dict["compute_time"]}|bps: {metrics_dict["bps"]}')
 
         self.log_metrics(metrics=metrics_dict, step=1,prefix='train.job', force_save = True)
     
@@ -417,7 +422,11 @@ def summarize_across_all_devices(category_data):
             summary['acc5'].append(calculate_average(category_data[key][f'{key}.acc5']))
             summary['cpu_util'].append(calculate_average(category_data[key][f'{key}.cpu_util']))
             summary['gpu_util'].append(calculate_average(category_data[key][f'{key}.gpu_util']))
-    
+            if category_data[key][f'{key}.total_tokens']:
+                if 'total_tokens' not in summary.keys():
+                    summary['total_tokens'] = []  
+                summary['total_tokens'].append(sum(category_data[key][f'{key}.total_tokens']))
+
     return summary
 
 

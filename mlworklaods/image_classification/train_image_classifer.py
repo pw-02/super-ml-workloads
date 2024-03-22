@@ -65,7 +65,7 @@ class IOArgs:
 
 
 
-@hydra.main(version_base=None, config_path="conf", config_name="config")
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
 def setup(config: DictConfig):
     
     start_time = time.perf_counter()
