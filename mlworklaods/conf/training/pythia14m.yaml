@@ -1,6 +1,6 @@
 model_name: pythia-14m
 log_interval: 1
-global_batch_size: 5
+global_batch_size: 20
 micro_batch_size: 5
 #gradient accumulation every global_batch_size/micro_batch_size iterations
 lr_warmup_steps: 0

@@ -45,8 +45,9 @@ class TrainArgs:
     def gradient_accumulation_iters(self, devices: int) -> int:
         """Number of iterations between gradient synchronizations"""
         gradient_accumulation_iters = self.batch_size(devices) // self.micro_batch_size
-        assert gradient_accumulation_iters > 0
-        return gradient_accumulation_iters
+        return(max(1,gradient_accumulation_iters))
+        # assert gradient_accumulation_iters > 0
+        # return gradient_accumulation_iters
 
     def batch_size(self, devices: int) -> int:
         """Number of samples between optimizer steps per data-parallel rank"""
