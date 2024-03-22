@@ -383,7 +383,7 @@ def make_dataloader(dataloader_kind:str, date_dir:str,shuffle: bool, batch_size:
         dataloader = None
         if dataloader_kind == 's3_text_iterable':
             dataset =  S3TextIterableDataset(date_dir, tokenizer, block_size, shuffle)
-            dataloader = DataLoader(dataset, batch_size,num_workers)
+            dataloader = DataLoader(dataset=dataset, batch_size=batch_size,num_workers=num_workers)
         else:
             raise Exception(f"unknown dataloader_kind {dataloader_kind}")
         return dataloader
