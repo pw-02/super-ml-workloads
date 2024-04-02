@@ -1,7 +1,0 @@
-#env
-base_config_file: /workspaces/super-ml-workloads/configs/hpo-base-example-cfg.yaml
-search_space_file: /workspaces/super-ml-workloads/mlworklaods/hpo/hpo_search_space.json
-num_trials: 3
-gpus_per_trial: 1
-cpus_per_trial: 4
-max_concurrent_trials: 1

@@ -13,7 +13,7 @@ import hydra
 from omegaconf import DictConfig
 from lightning.fabric import Fabric
 import mlworklaods.utils as utils
-import mlworklaods.s3utils as s3utils
+import mlworklaods.super_dl.s3utils as s3utils
 # from mlworklaods.super_dl.datasets.s3_text_iterable import S3TextIterableDataset
 import tiktoken
 from  mlworklaods.utils import  AverageMeter, ProgressMeter, Summary, ExperimentLogger, ResourceMonitor, create_exp_summary_report

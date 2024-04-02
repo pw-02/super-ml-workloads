@@ -9,7 +9,7 @@ import time
 from torch import nn, optim, Tensor, no_grad, cuda
 from torch.utils.data import DataLoader
 import torchvision
-from mlworklaods.super_dl.datasets.s3_imgae_mapped_dataset import S3MappedImageDataset
+from mlworklaods.super_dl.datasets.s3_imgae_mapped import S3MappedImageDataset
 from torch.utils.data import SequentialSampler, RandomSampler  
 import  mlworklaods.utils as utils
 from  mlworklaods.utils import AverageMeter, ProgressMeter, Summary, ExperimentLogger
@@ -26,7 +26,6 @@ class TrainArgs:
     dataloader_kind: str
     shuffle: bool = False
     num_pytorch_workers:int = 0
-
     epochs: int = 1 #Number of epochs to run
     global_batch_size: int = 64
     global_epoch_max_iters: Optional[int] = None #Size of the epoch
@@ -301,7 +300,13 @@ def train_loop(fabric: Fabric, epoch:int,model:nn.Module, optimizer, train_datal
 
 def make_dataloader(dataloader_kind:str, data_dir:str, shuffle: bool, batch_size:int, num_workers:int):
     dataloader = None
+
     if dataloader_kind == 's3_image_mapped':
+        dataset =  S3MappedImageDataset(data_dir = data_dir, transform=transform())
+        sampler = RandomSampler(data_source=dataset) if shuffle else SequentialSampler(data_source=dataset)
+        dataloader = DataLoader(dataset=dataset, sampler=sampler, batch_size=batch_size, num_workers=num_workers)
+    
+    elif dataloader_kind == 'super_image_mapped':
         dataset =  S3MappedImageDataset(data_dir = data_dir, transform=transform())
         sampler = RandomSampler(data_source=dataset) if shuffle else SequentialSampler(data_source=dataset)
         dataloader = DataLoader(dataset=dataset, sampler=sampler, batch_size=batch_size, num_workers=num_workers)
