@@ -77,11 +77,12 @@ class SuperClient:
 
         except Exception as e:
             logger.error(f"Error in job_ended_notification request: {e}")
-
-    def __del__(self):
-        # Close the gRPC channel when the client is deleted
-        self.channel.close()
-
+    
+    # def __del__(self):
+    #     # Check if the channel is not None before trying to close it
+    #     if self.channel is not None:
+    #         # Close the gRPC channel when the client is deleted
+    #         self.channel.close()
 
 def test_connections():
     import multiprocessing
@@ -92,26 +93,28 @@ def test_connections():
         client = SuperClient(server_address)
         while True:     
             # Example: Call GetBatchStatus RPC
-            response = client.get_batch_status(process_id, 'example_dataset')
-            print(f"Process {process_id}: GetBatchStatus Response - {response}")
+
+            response = client.get_dataset_details('s3://sdl-cifar10/train/')
+            print(f"Process {process_id+1}: get_dataset_details Response")
             time.sleep(2)
 
     # Close the gRPC channel when the worker is done
     #del client
     
     # Example of using the CacheCoordinatorClient with multiple processes
-    server_address = 'localhost:50051'
-    num_processes = 4
+    # server_address = 'localhost:50051'
+    server_address = '172.17.0.2:50051'
+    num_processes = 11
 
     # Create a list to hold the process objects
     processes = []
 
-    # Create a super client for the main process
-    main_client  = SuperClient(server_address)
-    # Example: Call additional RPC with the super client
+    # # Create a super client for the main process
+    # main_client  = SuperClient(server_address)
+    # # Example: Call additional RPC with the super client
     
-    response = main_client.get_batch_status(123, 'example_dataset')
-    print(f"Process Main: GetBatchStatus Response - {response}")
+    # response = main_client.get_dataset_details('s3://sdl-cifar10/train/')
+    # print(f"Process Main: GetBatchStatus Response - {response}")
     
     # Fork child processes
     for i in range(0, num_processes):
