@@ -64,7 +64,7 @@ if __name__ == '__main__':
     simulate_delay = 0.01
 
     #dataloader settings 
-    epochs = 1
+    epochs = 2
     num_workers = 4
 
     dataset =  SUPERDataset(
@@ -78,6 +78,7 @@ if __name__ == '__main__':
     
     dataloader = SUPERDataLoader(dataset=dataset, num_workers=num_workers, batch_size=None, )
     
-    for batch_idx,(images, target, batch_id) in enumerate(dataloader):
-        print(f'epoch: {dataloader.current_epoch}, batch: {batch_idx+1}, Id:{batch_id}, Size: {images.size(0)}')
+    for epoch in range (0,epochs):
+        for batch_idx,(images, target, batch_id) in enumerate(dataloader):
+            print(f'epoch: {dataloader.current_epoch}, batch: {batch_idx+1}, Id:{batch_id}, Size: {images.size(0)}')
     
