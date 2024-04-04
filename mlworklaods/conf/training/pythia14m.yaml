@@ -1,4 +1,4 @@
-model_name: pythia-31m
+model_name: pythia-14m
 log_interval: 1
 global_batch_size: 16
 micro_batch_size: 2
@@ -18,7 +18,7 @@ max_tokens: 1000000 # 3000000 #999424
 
 
 
-# /* 'pythia-14m',
+# /*      'pythia-14m',
 #         'pythia-31m',
 #         'pythia-70m',
 #         'pythia-160m',
