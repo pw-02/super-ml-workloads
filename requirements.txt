@@ -12,6 +12,10 @@ xlsxwriter
 tiktoken
 transformers
 ray
+nltk
+hydra-core
+psutil
+pynvml
 #nlp workload
 #tiktoken
 #datasets
