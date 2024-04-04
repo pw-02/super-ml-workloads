@@ -1,4 +1,4 @@
 kind: s3_text_iterable
 sampler_kind: null #iterable datasets do use samplers
-model_name: pythia-1b
+num_pytorch_workers: 0
 shuffle: True
