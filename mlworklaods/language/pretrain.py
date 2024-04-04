@@ -14,7 +14,7 @@ from omegaconf import DictConfig
 from lightning.fabric import Fabric
 import mlworklaods.utils as utils
 import mlworklaods.super_dl.s3utils as s3utils
-# from mlworklaods.super_dl.datasets.s3_text_iterable import S3TextIterableDataset
+from mlworklaods.super_dl.dataset.s3_text_iterable import S3TextIterableDataset
 import tiktoken
 from  mlworklaods.utils import  AverageMeter, ProgressMeter, Summary, ExperimentLogger, ResourceMonitor, create_exp_summary_report
 
@@ -31,61 +31,61 @@ from torch.utils.data import SequentialSampler, IterableDataset, RandomSampler, 
 import torch.nn.functional as F
 import tiktoken
 
-class S3TextIterableDataset(IterableDataset):
-    def __init__(self,data_dir:str, tokenizer, block_size:int, shuffle = False):
-        super().__init__()
-        self.epoch = 0
-        self.block_size = block_size
-        self.shuffle_urls = shuffle
-        # if dataset_kind == 'image':
-        self.samples:List[str] = s3utils.load_unpaired_s3_object_keys(data_dir, False, True)
-        self.bucket_name = S3Url(data_dir).bucket
-        self.tokenizer = tokenizer
+# class S3TextIterableDataset(IterableDataset):
+#     def __init__(self,data_dir:str, tokenizer, block_size:int, shuffle = False):
+#         super().__init__()
+#         self.epoch = 0
+#         self.block_size = block_size
+#         self.shuffle_urls = shuffle
+#         # if dataset_kind == 'image':
+#         self.samples:List[str] = s3utils.load_unpaired_s3_object_keys(data_dir, False, True)
+#         self.bucket_name = S3Url(data_dir).bucket
+#         self.tokenizer = tokenizer
 
-    def __len__(self):
-        return len(self.samples)
+#     def __len__(self):
+#         return len(self.samples)
     
-    def tokenize(self, text):
-        ids = self.tokenizer.encode_ordinary(text) # encode_ordinary ignores any special tokens
-        #ids.append(self.tokenizer.eot_token) # add the end of text token, e.g. 50256 for gpt2 bpe
-        # print(f"tokens: {len(ids)}")
+#     def tokenize(self, text):
+#         ids = self.tokenizer.encode_ordinary(text) # encode_ordinary ignores any special tokens
+#         #ids.append(self.tokenizer.eot_token) # add the end of text token, e.g. 50256 for gpt2 bpe
+#         # print(f"tokens: {len(ids)}")
 
-        # Tokenize text into chunks of block_size
-        chunks = []
-        start_idx = 0
-        while start_idx < len(ids):
-            end_idx = min(start_idx + self.block_size, len(ids))
-            x = torch.tensor(ids[start_idx:end_idx], dtype=torch.long)
-            y = torch.tensor(ids[start_idx+1:end_idx+1], dtype=torch.long)
-            if len(x) < self.block_size:
-                # print(len(ids) + (self.block_size - len(x)))
-                x = F.pad(x, (0, self.block_size - len(x)))
-            if len(y) < self.block_size:
-                y = F.pad(y, (0, self.block_size - len(y)))
+#         # Tokenize text into chunks of block_size
+#         chunks = []
+#         start_idx = 0
+#         while start_idx < len(ids):
+#             end_idx = min(start_idx + self.block_size, len(ids))
+#             x = torch.tensor(ids[start_idx:end_idx], dtype=torch.long)
+#             y = torch.tensor(ids[start_idx+1:end_idx+1], dtype=torch.long)
+#             if len(x) < self.block_size:
+#                 # print(len(ids) + (self.block_size - len(x)))
+#                 x = F.pad(x, (0, self.block_size - len(x)))
+#             if len(y) < self.block_size:
+#                 y = F.pad(y, (0, self.block_size - len(y)))
          
-            chunks.append((x, y))
-            start_idx = end_idx
+#             chunks.append((x, y))
+#             start_idx = end_idx
 
-        return chunks
+#         return chunks
 
 
-    def __iter__(self):
+#     def __iter__(self):
 
-        if self.shuffle_urls:
-            sampler = RandomSampler(self)
-        else:
-            sampler = SequentialSampler(self)
+#         if self.shuffle_urls:
+#             sampler = RandomSampler(self)
+#         else:
+#             sampler = SequentialSampler(self)
         
-        for idx in sampler:
-            file_path = self.samples[idx]
-            sample_input = s3utils.get_s3_object(self.bucket_name, file_path)
-            tokenized_chunks = self.tokenize(sample_input)
-            for x, y in tokenized_chunks:
-                yield x, y
+#         for idx in sampler:
+#             file_path = self.samples[idx]
+#             sample_input = s3utils.get_s3_object(self.bucket_name, file_path)
+#             tokenized_chunks = self.tokenize(sample_input)
+#             for x, y in tokenized_chunks:
+#                 yield x, y
 
     
-    def set_epoch(self, epoch):
-        self.epoch = epoch
+#     def set_epoch(self, epoch):
+#         self.epoch = epoch
 
 
 

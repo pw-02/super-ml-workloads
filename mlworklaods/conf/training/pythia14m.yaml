@@ -1,4 +1,4 @@
-model_name: pythia-160m
+model_name: pythia-14m
 log_interval: 1
 global_batch_size: 4
 micro_batch_size: 4
@@ -14,7 +14,7 @@ max_norm: 1.0
 min_lr: 6e-5
 eval_iterval: 16
 max_eval_iters: 50
-max_tokens: 3000000 #999424
+max_tokens: 500000 # 3000000 #999424
 
 
 
