@@ -1,7 +1,6 @@
 model_name: resnet18
 epochs: 3
-iters_per_epoch: 2
-batch_size: 16
-shuffle: True
+iters_per_epoch: null
+batch_size: 1000
 learning_rate: 6e-4
 weight_decay: 1e-1

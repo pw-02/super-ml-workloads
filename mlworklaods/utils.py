@@ -279,6 +279,7 @@ class ResourceMonitor:
         self.sleep_time_s = sleep_time_s
         self.gpu_device = gpu_device
         self.chunk_size = chunk_size
+        self.monitor_gpu = monitor_gpu
 
     def _monitor(self):
         while not self.stop_event.is_set():
@@ -422,7 +423,9 @@ def summarize_across_all_devices(category_data):
             summary['acc5'].append(calculate_average(category_data[key][f'{key}.acc5']))
             summary['cpu_util'].append(calculate_average(category_data[key][f'{key}.cpu_util']))
             summary['gpu_util'].append(calculate_average(category_data[key][f'{key}.gpu_util']))
-            if category_data[key][f'{key}.total_tokens']:
+            
+            if f'{key}.total_tokens' in category_data[key]:
+            # if category_data[key][f'{key}.total_tokens']:
                 if 'total_tokens' not in summary.keys():
                     summary['total_tokens'] = []  
                 summary['total_tokens'].append(sum(category_data[key][f'{key}.total_tokens']))
@@ -573,7 +576,10 @@ def calculate_average(values):
     return sum(values) / len(values)
 
 def calc_throughput(count, time):
-        return count/time
+        if time >0 and count > 0:
+            return count/time
+        else:
+            return 0
 
 def get_next_exp_version(root_dir, name):
     from lightning.fabric.utilities.cloud_io import _is_dir, get_filesystem

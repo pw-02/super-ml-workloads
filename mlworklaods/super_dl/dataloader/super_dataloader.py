@@ -3,7 +3,7 @@ from itertools import cycle
 from typing import Any, Callable, Dict, List, Optional, Union
 from torch.utils.data._utils.collate import default_collate
 from torch.utils.data.dataloader import (DataLoader,)
-from mlworklaods.super_dl.datasets.super_dataset import SUPERDataset
+from mlworklaods.super_dl.dataset.super_dataset import SUPERDataset
 
 class SUPERDataLoader(DataLoader):
     __doc__ = DataLoader.__doc__
@@ -34,10 +34,14 @@ class SUPERDataLoader(DataLoader):
             self.current_epoch += 1
             # self._num_samples_yielded_combined = {}
             self._num_samples_yielded_streaming = 0    
-        for batch in super().__iter__():
+            self.dataset.index = 0
+            # del(self.dataset.super_client)
+        
+        for data, target, batch_id in super().__iter__():
             self._latest_worker_idx = next(self._worker_idx_iter)  # type: ignore
-            self._num_samples_yielded_streaming += batch[0].size(0)
-            yield batch
+            self._num_samples_yielded_streaming += data.size(0)
+            
+            yield data, target,
 
         self.restore = False
 
@@ -57,7 +61,7 @@ if __name__ == '__main__':
     del(super_client)
    
     #dataset settings
-    batch_size = 1000
+    batch_size = 128
     cache_address = None
     normalize = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(), normalize])
@@ -78,7 +82,7 @@ if __name__ == '__main__':
     
     dataloader = SUPERDataLoader(dataset=dataset, num_workers=num_workers, batch_size=None, )
     
-    for epoch in range (0,epochs):
-        for batch_idx,(images, target, batch_id) in enumerate(dataloader):
-            print(f'epoch: {dataloader.current_epoch}, batch: {batch_idx+1}, Id:{batch_id}, Size: {images.size(0)}')
+    for epoch in range (1,epochs+1):
+        for batch_idx,(images, target) in enumerate(dataloader):
+            print(f'epoch: {dataloader.current_epoch}, batch: {batch_idx+1}, Size: {images.size(0)}')
     

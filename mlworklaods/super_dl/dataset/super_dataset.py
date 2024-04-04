@@ -40,37 +40,40 @@ class SUPERDataset(IterableDataset):
                  simulate_delay = None ):
         
         super().__init__()
+
+        super_client:SuperClient = SuperClient(super_addresss=super_address)
+        dataset_info = super_client.get_dataset_details(data_dir)
+        self.dataset_size = dataset_info.num_files
+        self.dataset_chunked_size = dataset_info.num_chunks
+        # del(super_client)
         self.job_id = job_id
+        self.data_dir = data_dir
         self.s3_bucket_name = s3utils.S3Url(data_dir).bucket
         self.transform = transform
         self.super_address  = super_address
         self.batch_size = batch_size
         self.simulate_delay = simulate_delay
         self.index = 0
-        self.cache_address, self.cache_port = cache_address.split(":")
+        self.cache_address, self.cache_port = cache_address.split(":") if cache_address else None, None
         self.cache_client = None
-        self.dataset_size = None
-        self.dataset_chunked_size = None
         self.super_client = None
+
 
     def setup_cache_client(self):
         self.cache_client = redis.StrictRedis(host=self.cache_address, port=self.cache_port) if self.cache_address is not None else None
       
-    def setup_super_client(self):
-        self.super_client:SuperClient = SuperClient(super_addresss=self.super_address)
-        dataset_info = self.super_client.get_dataset_details('')
-        self.dataset_size = dataset_info.num_files
-        self.dataset_chunked_size = dataset_info.num_chunks
+    # def setup_super_client(self):
+    #     self.super_client:SuperClient = SuperClient(super_addresss=self.super_address)
+    #     # dataset_info = self.super_client.get_dataset_details( self.data_dir)
+    #     # self.dataset_size = dataset_info.num_files
+    #     # self.dataset_chunked_size = dataset_info.num_chunks
 
     def __len__(self) -> int:
-        if self.super_client is None:
-            self.setup_super_client() 
-        return self.dataset_chunked_size 
+        return self.dataset_chunked_size
 
     def __iter__(self) -> "SUPERDataset":
-        if self.super_client is None:
-            self.setup_super_client()
-            
+        # if self.super_client is None:
+        #     self.setup_super_client() 
         worker_info = get_worker_info()
         if worker_info is None:  # single-process data loading, return the full iterator
             return self.__iter_non_distributed__(self.dataset_chunked_size)
@@ -91,11 +94,12 @@ class SUPERDataset(IterableDataset):
     def __iter_non_distributed__(self, iter_len):
         # worker_size = self.dataset_chunked_size // self.num_workers #equals the number of calls to super for 1 epoch
         prepared_batches = []
+        super_client:SuperClient = SuperClient(super_addresss=self.super_address)
         while self.index < iter_len:
             if prepared_batches:
                 yield prepared_batches.pop(0)
             else:
-                next_batch = self._get_next_super_batch()
+                next_batch = self._get_next_super_batch(super_client)
                 next_batch_size = len(next_batch.indicies)
                 if next_batch_size == self.batch_size:
                     yield self.__getitem__(next_batch.batch_id, next_batch.indicies, next_batch.is_cached)
@@ -119,12 +123,12 @@ class SUPERDataset(IterableDataset):
                         torch_labels = torch.cat((torch_labels, labels), dim=0)
 
                     yield torch_imgs, torch_labels, batch_id 
-        self.index = 0
+        # self.index = 0
     
-    def _get_next_super_batch(self):
-        if self.super_client is None:
-            self.setup_super_client()           
-        next_batch = self.super_client.get_next_batch(self.job_id)
+    def _get_next_super_batch(self,super_client:SuperClient):
+        # if self.super_client is None:
+        #     self.setup_super_client()           
+        next_batch = super_client.get_next_batch(self.job_id)
         if not next_batch:
             raise ValueError("Empty batch returned by super_client.")
         self.index +=1

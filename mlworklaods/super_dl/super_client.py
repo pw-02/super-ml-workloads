@@ -78,11 +78,11 @@ class SuperClient:
         except Exception as e:
             logger.error(f"Error in job_ended_notification request: {e}")
     
-    # def __del__(self):
-    #     # Check if the channel is not None before trying to close it
-    #     if self.channel is not None:
-    #         # Close the gRPC channel when the client is deleted
-    #         self.channel.close()
+    def __del__(self):
+        # Check if the channel is not None before trying to close it
+        if self.channel is not None:
+            # Close the gRPC channel when the client is deleted
+            self.channel.close()
 
 def test_connections():
     import multiprocessing
