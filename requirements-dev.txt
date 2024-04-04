@@ -12,3 +12,6 @@ datasets
 tiktoken
 transformers
 ray
+re
+unicodedata
+nltk
