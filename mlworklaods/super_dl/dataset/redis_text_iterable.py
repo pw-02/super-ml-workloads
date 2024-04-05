@@ -77,7 +77,7 @@ class RedisTextIterableDataset(IterableDataset):
         self.samples:List[str] = s3utils.load_unpaired_s3_object_keys(data_dir, False, True)
         self.bucket_name = S3Url(data_dir).bucket
         self.tokenizer = tokenizer
-        self.cache_client = redis.StrictRedis(host='localhost', port='6379')
+        self.cache_client = redis.StrictRedis(host='clustercfg.demo.rdior4.usw2.cache.amazonaws.com', port='6379')
         self.sampler = iter(SequentialSampler(self))
         self.batch_size = batch_size
 
