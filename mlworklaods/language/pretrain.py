@@ -15,6 +15,8 @@ from lightning.fabric import Fabric
 import mlworklaods.utils as utils
 import mlworklaods.super_dl.s3utils as s3utils
 from mlworklaods.super_dl.dataset.s3_text_iterable import S3TextIterableDataset
+from mlworklaods.super_dl.dataset.redis_text_iterable import RedisTextIterableDataset
+
 import tiktoken
 from  mlworklaods.utils import  AverageMeter, ProgressMeter, Summary, ExperimentLogger, ResourceMonitor, create_exp_summary_report
 
@@ -325,8 +327,8 @@ def validate(fabric: L.Fabric, model: torch.nn.Module, val_dataloader: DataLoade
 def make_dataloader(dataloader_kind:str, date_dir:str,shuffle: bool, batch_size:int, num_workers:int, tokenizer, block_size):
         dataloader = None
         if dataloader_kind == 's3_text_iterable':
-            dataset =  S3TextIterableDataset(date_dir, tokenizer, block_size, shuffle)
-            dataloader = DataLoader(dataset=dataset, batch_size=batch_size,num_workers=num_workers)
+            dataset =  RedisTextIterableDataset(date_dir, tokenizer, block_size,batch_size, shuffle)
+            dataloader = DataLoader(dataset=dataset, batch_size=None,num_workers=num_workers)
         else:
             raise Exception(f"unknown dataloader_kind {dataloader_kind}")
         return dataloader

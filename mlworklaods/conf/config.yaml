@@ -16,7 +16,7 @@ defaults:
   - dataset: s3_openwebtext
   - training: pythia14m
   - override hydra/job_logging: disabled
-devices: 4
+devices: 1
 seed: 41
 accelerator: 'gpu'
 log_dir: mlworklaods/reports
