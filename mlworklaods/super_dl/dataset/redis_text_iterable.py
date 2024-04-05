@@ -343,12 +343,12 @@ class RedisTextIterableDataset(IterableDataset):
         batch_data = None
 
         try:
-            cached_data = self.cache_client.get(idx)
+            batch_data = self.cache_client.get(idx)
         except Exception as e:
-            cached_data = None
+            batch_data = None
 
         if batch_data is not None:
-            x_tensor, y_tensor = self.deserialize_torch_batch(cached_data)
+            x_tensor, y_tensor = self.deserialize_torch_batch(batch_data)
             return  x_tensor, y_tensor 
 
         else:
