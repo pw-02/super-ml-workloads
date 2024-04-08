@@ -1,7 +1,6 @@
 kind: super_image
 sampler_kind: null #iterable datasets dont use samplers
-num_pytorch_workers: 10
 cache_address: null
 super_address: '172.17.0.2:50051'
-simulate_data_delay: 0.1
+simulate_data_delay: null
 shuffle: True

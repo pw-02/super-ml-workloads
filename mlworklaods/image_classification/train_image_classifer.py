@@ -13,155 +13,109 @@ from mlworklaods.super_dl.dataset.s3_imgae_mapped import S3MappedImageDataset
 from mlworklaods.super_dl.dataset.super_dataset import SUPERDataset
 from mlworklaods.super_dl.dataloader.super_dataloader import SUPERDataLoader
 from mlworklaods.super_dl.super_client import SuperClient
-
+from mlworklaods.args import *
 from torch.utils.data import SequentialSampler, RandomSampler  
-import  mlworklaods.utils as utils
-from  mlworklaods.utils import AverageMeter, ProgressMeter, Summary, ExperimentLogger
-
+from mlworklaods.utils import ResourceMonitor, get_default_supported_precision, num_model_parameters
+from mlworklaods.log_utils import AverageMeter, ProgressMeter, Summary, ExperimentLogger, get_next_exp_version, create_exp_summary_report
 import os
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Optional
-from numpy import Infinity
-
-@dataclass
-class TrainArgs:
-    job_id: int
-    model_name: str
-    dataloader_kind: str
-    shuffle: bool = False
-    dataload_only: bool = False
-    num_pytorch_workers:int = 0
-    epochs: int = 1 #Number of epochs to run
-    global_batch_size: int = 64
-    global_epoch_max_iters: Optional[int] = None #Size of the epoch
-    super_address: Optional[str] = None
-    cache_address: Optional[str] = None
-    simulate_data_delay: Optional[float] = None #Size of the epoch
-
-    # Optimization args
-    learning_rate: float = 1e-3
-    weight_decay: float = 0.02
-
-    def epoch_max_iters(self, devices: int) -> int:
-        if self.global_epoch_max_iters:
-            epoch_max_iters = self.global_epoch_max_iters // devices
-            assert epoch_max_iters > 0
-            return epoch_max_iters
-        else:
-            return Infinity
-        
-    def batch_size(self, devices: int) -> int:
-        """Number of samples between optimizer steps per data-parallel rank"""
-        batch_size = self.global_batch_size // devices
-        assert batch_size > 0
-        return batch_size
-@dataclass
-class IOArgs:
-    """Inputs and outputs related arguments"""
-    # Optional because pretrain/tinyllama hardcodes the path
-    train_data_dir: Optional[Path] = Path("data/alpaca")
-    """Where to read training data from"""
-    val_data_dir: Optional[Path] = None
-    """Where to read validation data from"""
-    # checkpoint_dir: Optional[Path] = None
-    """Where to read weights and tokenizer data from"""
-    # out_dir: Path = Path("out/adapter/alpaca")
-    """Where to save artifacts"""
-    log_dir: Optional[Path] = None
-    log_interval: Optional[int] = 1
 
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def setup(config: DictConfig):
     
     start_time = time.perf_counter()
-    precision = utils.get_default_supported_precision(training=True)
+    precision = get_default_supported_precision(training=True)
     
     fabric = Fabric(accelerator=config.accelerator, devices=config.devices, strategy="auto", precision=precision)
 
-    exp_version = utils.get_next_exp_version(config.log_dir,config.dataset.name)
+    exp_version = get_next_exp_version(config.log_dir,config.dataset.name)
     config.log_dir = os.path.join(config.log_dir, config.dataset.name, str(exp_version))
 
-    train: TrainArgs = TrainArgs(
+    train_args: TrainArgs = TrainArgs(
         job_id=os.getpid(),
-        dataloader_kind= config.dataloader.kind,
         model_name = config.training.model_name,
         epochs = config.training.epochs,
         global_batch_size=config.training.batch_size,
         global_epoch_max_iters = config.training.iters_per_epoch,
         learning_rate = config.training.learning_rate,
         weight_decay = config.training.weight_decay,
-        num_pytorch_workers = config.dataloader.num_pytorch_workers,
+        num_pytorch_workers = config.training.num_pytorch_workers,
         shuffle= config.dataloader.shuffle,
-        super_address=config.dataloader.super_address,
-        cache_address=config.dataloader.cache_address,
+        run_training = config.run_training,
+        run_evaluation = config.run_evaluation,
         simulate_data_delay=config.dataloader.simulate_data_delay,
-        dataload_only = config.dataload_only)
+        dataload_only = config.dataload_only
+        )
      
-    io: IOArgs = IOArgs(
+    io_args: IOArgs = IOArgs(
+        dataloader_kind= config.dataloader.kind,
         train_data_dir=config.dataset.train_dir,
         val_data_dir=config.dataset.val_dir,
         log_dir = config.log_dir,
-        log_interval = config.log_interval)
+        log_interval = config.log_interval,
+        super_address=config.dataloader.super_address,
+        cache_address=config.dataloader.cache_address,
+        )
     
-    if 'super' in train.dataloader_kind:
-        super_client:SuperClient = SuperClient(super_addresss=train.super_address)     
-        super_client.register_job(job_id=train.job_id, data_dir=io.train_data_dir)
+    if 'super' in io_args.dataloader_kind:
+        super_client:SuperClient = SuperClient(super_addresss=io_args.super_address)     
+        super_client.register_job(job_id=train_args.job_id, data_dir=io_args.train_data_dir)
         del(super_client)
 
+    fabric.launch(main, config.seed, config, train_args,io_args)
 
-    # main(fabric, config.seed, config, train,io)
-
-    fabric.launch(main, config.seed, config, train,io)
-    
     fabric.print(f"Creating overall report for experiment")
-    utils.create_exp_summary_report(io.log_dir)
+    create_exp_summary_report(io_args.log_dir)
 
     fabric.print(f"Experiement Ended. Total Duration {(time.perf_counter()-start_time):.2f}s")
 
 
-def main(fabric: Fabric, seed: int, config: DictConfig, train: TrainArgs, io: IOArgs,) -> None:        
+def main(fabric: Fabric, seed: int, config: DictConfig, train_args: TrainArgs, io_args: IOArgs,) -> None:        
         fabric.seed_everything(seed)  # same seed for every process to init model (FSDP)
         #srtup model 
         t0 = time.perf_counter()
-        model:nn.Module = make_model(fabric, train.model_name) 
-        fabric.print(f"Time to instantiate {train.model_name} model: {time.perf_counter() - t0:.02f} seconds")
-        fabric.print(f"Total parameters in {train.model_name} model: {utils.num_model_parameters(model):,}")
-        optimizer = optim.Adam(model.parameters(), lr=train.learning_rate)
+        model:nn.Module = make_model(fabric, train_args.model_name) 
+        fabric.print(f"Time to instantiate {train_args.model_name} model: {time.perf_counter() - t0:.02f} seconds")
+        fabric.print(f"Total parameters in {train_args.model_name} model: {num_model_parameters(model):,}")
+        optimizer = optim.Adam(model.parameters(), lr=train_args.learning_rate)
+        #optimizer = optim.SGD(model.parameters(), lr=train_args.learning_rate)
+
         model, optimizer = fabric.setup(model,optimizer, move_to_device=True)
 
         train_dataloader, val_dataloader = None, None
-        if config.run_training:
-            train_dataloader = make_dataloader(train.job_id, 
-                                               train.dataloader_kind, 
-                                               io.train_data_dir, 
-                                               train.shuffle, 
-                                               train.global_batch_size, 
-                                               train.num_pytorch_workers, 
-                                               train.super_address,
-                                               train.cache_address,
-                                               train.simulate_data_delay)
-            train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True, use_distributed_sampler=False)
-        if config.run_evaluation:
+        if train_args.run_training:
+            train_dataloader = make_dataloader(train_args.job_id, 
+                                               io_args.dataloader_kind, 
+                                               io_args.train_data_dir, 
+                                               train_args.shuffle, 
+                                               train_args.global_batch_size, 
+                                               train_args.num_pytorch_workers,
+                                               fabric.world_size, 
+                                               io_args.super_address,
+                                               io_args.cache_address,
+                                               train_args.simulate_data_delay)
+            
+            train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True, use_distributed_sampler=True)
+        if train_args.run_evaluation:
             val_dataloader = make_dataloader(
-                train.job_id,
-                train.dataloader_kind,
-                io.val_data_dir, 
+                train_args.job_id,
+                io_args.dataloader_kind,
+                io_args.val_data_dir, 
                 False, 
-                train.global_batch_size, 
-                train.num_pytorch_workers,
-                train.super_address,
-                train.cache_address,
-                train.simulate_data_delay)
+                train_args.global_batch_size, 
+                train_args.num_pytorch_workers,
+                fabric.world_size(), 
+                io_args.super_address,
+                io_args.cache_address,
+                train_args.simulate_data_delay)
             val_dataloader = fabric.setup_dataloaders(val_dataloader, move_to_device=True, use_distributed_sampler=False)
         
         train_time = time.perf_counter()
-        logger = utils.ExperimentLogger(fabric, io.log_dir, io.log_interval)
+        logger = ExperimentLogger(fabric, io_args.log_dir, io_args.log_interval)
         if fabric.is_global_zero:
              logger.log_hyperparams(config)
 
-        fit(fabric, model, optimizer, train_dataloader, val_dataloader, logger, train)
+        fit(fabric, model, optimizer, train_dataloader, val_dataloader, logger, train_args)
         
         fabric.print(f"Training finished on device {fabric.global_rank} after {(time.perf_counter()-train_time):.2f}s")
         # if fabric.device.type == "cuda":
@@ -170,7 +124,14 @@ def main(fabric: Fabric, seed: int, config: DictConfig, train: TrainArgs, io: IO
         #fabric.print(f"Creating job report for device {fabric.global_rank}..")
         logger.create_job_report()
     
-def fit(fabric: Fabric, model:nn.Module, optmizer, train_dataloader:DataLoader, val_dataloader:DataLoader, logger:ExperimentLogger, train_args:TrainArgs):
+def fit(fabric: Fabric, 
+        model:nn.Module, 
+        optimizer, 
+        train_dataloader:DataLoader, 
+        val_dataloader:DataLoader, 
+        logger:ExperimentLogger, 
+        train_args:TrainArgs):
+     
     best_acc1_train = 0
     best_acc5_train = 0
     best_acc1_eval = 0
@@ -181,7 +142,7 @@ def fit(fabric: Fabric, model:nn.Module, optmizer, train_dataloader:DataLoader, 
             max_iters = min(len(train_dataloader), train_args.epoch_max_iters(fabric.world_size)) 
             fabric.print(f"Starting training loop for epoch {epoch}")
             model.train(mode=True)
-            loss_train, acc1_train, acc5_train = train_loop(fabric, epoch, model, optmizer, train_dataloader, max_iters, logger,train_args.dataload_only)
+            loss_train, acc1_train, acc5_train = train_loop(fabric, epoch, model, optimizer, train_dataloader, max_iters, logger,train_args.dataload_only)
               # remember best acc@1 and acc@5
             best_acc1_train = max(acc1_train, best_acc1_train)
             best_acc5_train = max(acc5_train, best_acc5_train)
@@ -195,7 +156,12 @@ def fit(fabric: Fabric, model:nn.Module, optmizer, train_dataloader:DataLoader, 
             best_acc1_eval = max(acc1_eval, best_acc1_eval)
             best_acc5_eval = max(acc5_eval, best_acc5_eval)
     
-def val_loop(fabric: Fabric,epoch:int,model:nn.Module, val_dataloader:DataLoader,max_iters:int,logger:ExperimentLogger):
+def val_loop(fabric: Fabric,
+             epoch:int,
+             model:nn.Module, 
+             val_dataloader:DataLoader,
+             max_iters:int,
+             logger:ExperimentLogger):
         total_samples  = 0
         batch_time = AverageMeter('Time', ':6.3f', Summary.NONE)
         losses = AverageMeter('Loss', ':6.2f')
@@ -249,7 +215,15 @@ def val_loop(fabric: Fabric,epoch:int,model:nn.Module, val_dataloader:DataLoader
         return top1.avg, top5.avg
 
 
-def train_loop(fabric: Fabric, epoch:int,model:nn.Module, optimizer, train_dataloader:DataLoader, max_iters:int, logger:ExperimentLogger, dataload_only:bool):
+def train_loop(fabric: Fabric,
+                epoch:int,
+                model:nn.Module, 
+                optimizer:optim.Optimizer, 
+                train_dataloader:DataLoader, 
+                max_iters:int, 
+                logger:ExperimentLogger, 
+                dataload_only:bool):
+        
         total_samples = 0
         batch_time = AverageMeter('Time', ':6.3f')
         data_time = AverageMeter('Data', ':6.3f')
@@ -261,7 +235,7 @@ def train_loop(fabric: Fabric, epoch:int,model:nn.Module, optimizer, train_datal
             [batch_time, data_time, compute_time, losses, top1, top5],
             prefix="Epoch: [{}]".format(epoch))
         
-        with utils.ResourceMonitor() as monitor:
+        with ResourceMonitor() as monitor:
             end = time.perf_counter()
             for batch_idx,(images, target) in enumerate(train_dataloader):
                 data_time.update(time.perf_counter() - end)
@@ -289,7 +263,8 @@ def train_loop(fabric: Fabric, epoch:int,model:nn.Module, optimizer, train_datal
                 total_samples += batch_size
                 
                 if batch_idx % logger.log_freq == 0:
-                    progress.display(batch_idx + 1, fabric)
+                    #progress.display(batch_idx + 1, fabric)
+                    progress.display(batch_idx + 1)
 
                     logger.save_train_batch_metrics(
                         epoch=epoch,
@@ -337,7 +312,8 @@ def make_dataloader(job_id:int,
                     data_dir:str, 
                     shuffle: bool, 
                     batch_size:int, 
-                    num_workers:int, 
+                    num_workers:int,
+                    world_size:int,
                     super_address:str = None, 
                     cache_address:str = None, 
                     simulate_data_delay = None):
@@ -355,6 +331,7 @@ def make_dataloader(job_id:int,
             data_dir=data_dir,
             batch_size=batch_size,
             transform=transform(),
+            world_size=world_size,
             super_address=super_address,
             cache_address=cache_address,
             simulate_delay=simulate_data_delay)   

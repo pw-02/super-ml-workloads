@@ -15,6 +15,8 @@ import logging
 import time
 import math
 
+# from lightning.fabric import Fabric
+
 def configure_logger():
     # Set the log levels for specific loggers to WARNING
     logging.getLogger("PIL").setLevel(logging.WARNING)
@@ -36,6 +38,7 @@ class SUPERDataset(IterableDataset):
                  batch_size:int,
                  transform,   
                  super_address:str,
+                 world_size:int,
                  cache_address:str = None,
                  simulate_delay = None ):
         
@@ -44,7 +47,8 @@ class SUPERDataset(IterableDataset):
         super_client:SuperClient = SuperClient(super_addresss=super_address)
         dataset_info = super_client.get_dataset_details(data_dir)
         self.dataset_size = dataset_info.num_files
-        self.dataset_chunked_size = dataset_info.num_chunks
+        self.dataset_chunked_size = dataset_info.num_chunks // world_size
+        self.samples: Dict[str, List[str]] = s3utils.load_paired_s3_object_keys(data_dir, True, True)
         # del(super_client)
         self.job_id = job_id
         self.data_dir = data_dir
@@ -57,6 +61,14 @@ class SUPERDataset(IterableDataset):
         self.cache_address, self.cache_port = cache_address.split(":") if cache_address else None, None
         self.cache_client = None
         self.super_client = None
+
+    
+    @functools.cached_property
+    def _classed_items(self) -> List[Tuple[str, int]]:
+        return [(blob, class_index)
+                for class_index, blob_class in enumerate(self.samples)
+                for blob in self.samples[blob_class]
+                ]
 
 
     def setup_cache_client(self):
@@ -147,16 +159,12 @@ class SUPERDataset(IterableDataset):
             if batch_data is not None:
                 torch_imgs, torch_labels = self.deserialize_torch_batch(batch_data)
             else:
-                imgs, labels = self.apply_transformations(self.fetch_from_s3(batch_indicies))
+                imgs, labels = self.fetch_from_s3(batch_indicies)
+                imgs, labels = self.apply_transformations(imgs, labels)
                 torch_imgs, torch_labels = torch.stack(imgs), torch.tensor(labels)
 
         return torch_imgs, torch_labels, batch_id
      
-    @functools.cached_property
-    def _classed_items(self) -> List[Tuple[str, int]]:
-        return [(blob, class_index)
-            for class_index, blob_class in enumerate(self.samples)
-            for blob in self.samples[blob_class]]
     
     def fetch_from_cache(self, batch_id, max_attempts = 1):     
         cached_data = None
