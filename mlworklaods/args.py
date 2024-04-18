@@ -14,7 +14,6 @@ class TrainArgs:
     epochs: int = 1 #Number of epochs to run
     global_batch_size: int = 64
     global_epoch_max_iters: Optional[int] = None #Size of the epoch
-  
     # Optimization args
     learning_rate: float = 1e-3
     weight_decay: float = 0.02
@@ -22,6 +21,9 @@ class TrainArgs:
     run_evaluation : bool = False
     simulate_data_delay: Optional[float] = None #Size of the epoch
     dataload_only : bool = False
+    devices: Optional[int] = 1
+    accelerator: Optional[str] = 'gpu'
+    seed: Optional[int] = 41
 
     def epoch_max_iters(self, devices: int) -> int:
         if self.global_epoch_max_iters:

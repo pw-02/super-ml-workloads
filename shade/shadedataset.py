@@ -153,7 +153,7 @@ class ShadeDataset(Dataset):
 		path, target = self.samples[index]
 		insertion_time = datetime.now()
 		insertion_time = insertion_time.strftime("%H:%M:%S")
-		# print("train_search_index: %d time: %s" %(index, insertion_time))
+		print("train_search_index: %d time: %s" %(index, insertion_time))
 
 		sample = self.cache_and_evict(path,target,index)
 

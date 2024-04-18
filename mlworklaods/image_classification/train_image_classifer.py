@@ -21,69 +21,34 @@ from shade.shadesampler import ShadeSampler
 import redis
 import heapdict
 
-#Initialization of local cache, PQ and ghost cache
-red_local = redis.Redis()
-PQ = heapdict.heapdict()
-ghost_cache = heapdict.heapdict()
-key_counter  = 0
+# #Initialization of local cache, PQ and ghost cache
+# red_local = redis.Redis()
+# PQ = heapdict.heapdict()
+# ghost_cache = heapdict.heapdict()
+# key_counter  = 0
 
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
-def setup(config: DictConfig):
-
+def launch_job(pid:int, config: DictConfig, train_args: TrainArgs, io_args: IOArgs):
     start_time = time.perf_counter()
     precision = get_default_supported_precision(training=True)
-    fabric = Fabric(accelerator=config.accelerator, devices=config.devices, strategy="auto", precision=precision)
-    exp_version = get_next_exp_version(config.log_dir,config.dataset.name)
+    fabric = Fabric(accelerator=train_args.accelerator, devices=train_args.devices, strategy="auto", precision=precision)
+    # exp_version = get_next_exp_version(config.log_dir,config.dataset.name)
 
-    train_args: TrainArgs = TrainArgs(
-        job_id=os.getpid(),
-        model_name = config.training.model_name,
-        epochs = config.training.epochs,
-        global_batch_size=config.training.batch_size,
-        global_epoch_max_iters = config.training.iters_per_epoch,
-        learning_rate = config.training.learning_rate,
-        weight_decay = config.training.weight_decay,
-        num_pytorch_workers = config.training.num_pytorch_workers,
-        shuffle= config.dataloader.shuffle,
-        run_training = config.run_training,
-        run_evaluation = config.run_evaluation,
-        dataload_only = config.dataload_only
-        )
-     
-    io_args: IOArgs = IOArgs(
-        dataloader_kind= config.dataloader.kind,
-        train_data_dir=config.dataset.train_dir,
-        val_data_dir=config.dataset.val_dir,
-        log_dir = os.path.join(config.log_dir, config.dataset.name, str(exp_version)),
-        log_interval = config.log_interval
-        )
-    
+
     if 'super' in io_args.dataloader_kind:
         super_client:SuperClient = SuperClient(super_addresss=io_args.super_address)     
         super_client.register_job(job_id=train_args.job_id, data_dir=io_args.train_data_dir)
         del(super_client)
-        io_args.super_address=config.dataloader.super_address,
-        io_args.cache_address=config.dataloader.cache_address,
-        train_args.simulate_data_delay = config.dataloader.simulate_data_delay,
+      
 
-    elif 'shade' in io_args.dataloader_kind:
-        # #Initialization of local cache, PQ and ghost cache
-        # red_local = redis.Redis()
-        # PQ = heapdict.heapdict()
-        # ghost_cache = heapdict.heapdict()
-        # key_counter  = 0
-        io_args.working_set_size = config.dataloader.working_set_size
-        io_args.replication_factor =config.dataloader.replication_factor
-        io_args.cache_address=config.dataloader.cache_address
-    fabric.launch(main, config.seed, config, train_args,io_args)
+    fabric.launch(train_model, train_args.seed, config, train_args, io_args)
 
     fabric.print(f"Creating overall report for experiment")
+    
     create_exp_summary_report(io_args.log_dir)
 
-    fabric.print(f"Experiement Ended. Total Duration {(time.perf_counter()-start_time):.2f}s")
+    fabric.print(f"Job Ended. Total Duration {(time.perf_counter()-start_time):.2f}s")
 
-
-def main(fabric: Fabric, seed: int, config: DictConfig, train_args: TrainArgs, io_args: IOArgs,) -> None:        
+def train_model(fabric: Fabric, seed: int, config: DictConfig, train_args: TrainArgs, io_args: IOArgs,) -> None:        
         fabric.seed_everything(seed)  # same seed for every process to init model (FSDP)
         #setup model 
         t0 = time.perf_counter()
@@ -451,4 +416,4 @@ def accuracy(output: Tensor, target:Tensor, topk=(1,))-> List[Tensor]:
 
 
 if __name__ == "__main__":
-    setup()
+    launch_job()
