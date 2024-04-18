@@ -1,9 +1,9 @@
 import functools
 import torch
-import mlworklaods.super_dl.s3utils as s3utils
+import super_dl.s3utils as s3utils
 from typing import List, Tuple, Dict
 from PIL import Image
-from mlworklaods.super_dl.super_client import SuperClient
+from super_dl.super_client import SuperClient
 from typing import Any, Dict, List, Optional, Tuple, Union
 from torch.utils.data import SequentialSampler, IterableDataset, RandomSampler, DataLoader, get_worker_info
 import redis

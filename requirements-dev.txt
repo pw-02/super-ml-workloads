@@ -7,7 +7,7 @@ pandas
 xlsxwriter
 redis
 grpcio-tools
-super-client
+# super-client
 datasets
 tiktoken
 transformers
@@ -15,3 +15,4 @@ ray
 re
 unicodedata
 nltk
+redis-py-cluster

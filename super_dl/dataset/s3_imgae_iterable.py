@@ -1,6 +1,6 @@
 import functools
-import mlworklaods.super_dl.s3utils as s3utils
-from  mlworklaods.super_dl.s3utils import S3Url
+import super_dl.s3utils as s3utils
+from  super_dl.s3utils import S3Url
 from typing import List, Tuple, Dict
 from PIL import Image
 import io

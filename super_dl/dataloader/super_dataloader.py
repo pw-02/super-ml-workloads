@@ -3,7 +3,7 @@ from itertools import cycle
 from typing import Any, Callable, Dict, List, Optional, Union
 from torch.utils.data._utils.collate import default_collate
 from torch.utils.data.dataloader import (DataLoader,)
-from mlworklaods.super_dl.dataset.super_dataset import SUPERDataset
+from super_dl.dataset.super_dataset import SUPERDataset
 
 class SUPERDataLoader(DataLoader):
     __doc__ = DataLoader.__doc__
@@ -48,7 +48,7 @@ class SUPERDataLoader(DataLoader):
 if __name__ == '__main__':
     import os
     import torchvision
-    from mlworklaods.super_dl.super_client import SuperClient
+    from super_dl.super_client import SuperClient
     
     super_address = '172.17.0.2:50051'
     data_dir = 's3://sdl-cifar10/train/'

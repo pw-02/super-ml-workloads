@@ -1,0 +1,5 @@
+kind: vanilla_pytorch
+sampler_kind: vanilla_pytorch
+num_pytorch_workers: 2
+shuffle: True
+simulate_data_delay: null

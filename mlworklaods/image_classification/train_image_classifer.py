@@ -1,35 +1,29 @@
-#  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-#  // SPDX-License-Identifier: BSD
-
 from typing import List
 import hydra
 from omegaconf import DictConfig
 from lightning.fabric import Fabric
 import time
-from torch import nn, optim, Tensor, no_grad, cuda
+from torch import nn, optim, Tensor, no_grad
 from torch.utils.data import DataLoader
 import torchvision
-from mlworklaods.super_dl.dataset.s3_imgae_mapped import S3MappedImageDataset
-from mlworklaods.super_dl.dataset.super_dataset import SUPERDataset
-from mlworklaods.super_dl.dataloader.super_dataloader import SUPERDataLoader
-from mlworklaods.super_dl.super_client import SuperClient
+from super_dl.dataset.s3_imgae_mapped import S3MappedImageDataset
+from super_dl.dataset.super_dataset import SUPERDataset
+from super_dl.dataloader.super_dataloader import SUPERDataLoader
+from super_dl.super_client import SuperClient
 from mlworklaods.args import *
 from torch.utils.data import SequentialSampler, RandomSampler  
 from mlworklaods.utils import ResourceMonitor, get_default_supported_precision, num_model_parameters
 from mlworklaods.log_utils import AverageMeter, ProgressMeter, Summary, ExperimentLogger, get_next_exp_version, create_exp_summary_report
 import os
-
+from torch_datasets.vanilla_image_dataset import VanillaTorchImageDataset
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def setup(config: DictConfig):
-    
+
     start_time = time.perf_counter()
     precision = get_default_supported_precision(training=True)
-    
     fabric = Fabric(accelerator=config.accelerator, devices=config.devices, strategy="auto", precision=precision)
-
     exp_version = get_next_exp_version(config.log_dir,config.dataset.name)
-    config.log_dir = os.path.join(config.log_dir, config.dataset.name, str(exp_version))
 
     train_args: TrainArgs = TrainArgs(
         job_id=os.getpid(),
@@ -51,16 +45,19 @@ def setup(config: DictConfig):
         dataloader_kind= config.dataloader.kind,
         train_data_dir=config.dataset.train_dir,
         val_data_dir=config.dataset.val_dir,
-        log_dir = config.log_dir,
-        log_interval = config.log_interval,
-        super_address=config.dataloader.super_address,
-        cache_address=config.dataloader.cache_address,
+        log_dir = os.path.join(config.log_dir, config.dataset.name, str(exp_version)),
+        log_interval = config.log_interval
         )
     
     if 'super' in io_args.dataloader_kind:
         super_client:SuperClient = SuperClient(super_addresss=io_args.super_address)     
         super_client.register_job(job_id=train_args.job_id, data_dir=io_args.train_data_dir)
         del(super_client)
+        io_args.super_address=config.dataloader.super_address,
+        io_args.cache_address=config.dataloader.cache_address,
+    
+    if 'shade' in io_args.dataloader_kind:
+        io_args.cache_address=config.dataloader.cache_address,
 
     fabric.launch(main, config.seed, config, train_args,io_args)
 
@@ -320,11 +317,11 @@ def make_dataloader(job_id:int,
     
     dataloader = None
 
-    if dataloader_kind == 's3_image_mapped':
-        dataset =  S3MappedImageDataset(data_dir = data_dir, transform=transform())
+    if dataloader_kind == 'vanilla_pytorch':
+        dataset =  VanillaTorchImageDataset(data_dir = data_dir, transform=transform())
         sampler = RandomSampler(data_source=dataset) if shuffle else SequentialSampler(data_source=dataset)
         dataloader = DataLoader(dataset=dataset, sampler=sampler, batch_size=batch_size, num_workers=num_workers)
-    
+
     elif dataloader_kind == 'super_image':
         dataset =  SUPERDataset(
             job_id=job_id,

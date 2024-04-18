@@ -13,9 +13,9 @@ import hydra
 from omegaconf import DictConfig
 from lightning.fabric import Fabric
 import mlworklaods.utils as utils
-import mlworklaods.super_dl.s3utils as s3utils
-from mlworklaods.super_dl.dataset.s3_text_iterable import S3TextIterableDataset
-from mlworklaods.super_dl.dataset.redis_text_iterable import RedisTextIterableDataset
+import super_dl.s3utils as s3utils
+from super_dl.dataset.s3_text_iterable import S3TextIterableDataset
+from super_dl.dataset.redis_text_iterable import RedisTextIterableDataset
 
 import tiktoken
 from  mlworklaods.utils import  AverageMeter, ProgressMeter, Summary, ExperimentLogger, ResourceMonitor, create_exp_summary_report
@@ -25,8 +25,8 @@ from litgpt.args import EvalArgs, IOArgs, TrainArgs
 from litgpt.model import GPT, Block
 from litgpt.utils import chunked_cross_entropy
 import functools
-import mlworklaods.super_dl.s3utils as s3utils
-from  mlworklaods.super_dl.s3utils import S3Url
+import super_dl.s3utils as s3utils
+from super_dl.s3utils import S3Url
 import functools
 from typing import List, Tuple, Dict
 from torch.utils.data import SequentialSampler, IterableDataset, RandomSampler, DataLoader
