@@ -2,7 +2,7 @@ import math
 from typing import TypeVar, Optional, Iterator
 
 import torch
-from . import Sampler, Dataset
+from torch.utils.data import Sampler, Dataset  
 import torch.distributed as dist
 
 import numpy as np 
@@ -112,7 +112,8 @@ class ShadeSampler(Sampler[T_co]):
 			self.key_id_map = redis.Redis()
 		else:
 			self.startup_nodes = [{"host": host_ip, "port": port_num}]
-			self.key_id_map = RedisCluster(startup_nodes=self.startup_nodes)
+			# self.key_id_map = RedisCluster(startup_nodes=self.startup_nodes)
+			self.key_id_map = redis.Redis()
 
 		
 		# If the dataset length is evenly divisible by # of replicas, then there

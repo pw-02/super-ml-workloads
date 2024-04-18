@@ -16,6 +16,16 @@ from mlworklaods.utils import ResourceMonitor, get_default_supported_precision, 
 from mlworklaods.log_utils import AverageMeter, ProgressMeter, Summary, ExperimentLogger, get_next_exp_version, create_exp_summary_report
 import os
 from torch_datasets.vanilla_image_dataset import VanillaTorchImageDataset
+from shade.shadedataset import ShadeDataset
+from shade.shadesampler import ShadeSampler
+import redis
+import heapdict
+
+#Initialization of local cache, PQ and ghost cache
+red_local = redis.Redis()
+PQ = heapdict.heapdict()
+ghost_cache = heapdict.heapdict()
+key_counter  = 0
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def setup(config: DictConfig):
@@ -37,7 +47,6 @@ def setup(config: DictConfig):
         shuffle= config.dataloader.shuffle,
         run_training = config.run_training,
         run_evaluation = config.run_evaluation,
-        simulate_data_delay=config.dataloader.simulate_data_delay,
         dataload_only = config.dataload_only
         )
      
@@ -55,10 +64,17 @@ def setup(config: DictConfig):
         del(super_client)
         io_args.super_address=config.dataloader.super_address,
         io_args.cache_address=config.dataloader.cache_address,
-    
-    if 'shade' in io_args.dataloader_kind:
-        io_args.cache_address=config.dataloader.cache_address,
+        train_args.simulate_data_delay = config.dataloader.simulate_data_delay,
 
+    elif 'shade' in io_args.dataloader_kind:
+        # #Initialization of local cache, PQ and ghost cache
+        # red_local = redis.Redis()
+        # PQ = heapdict.heapdict()
+        # ghost_cache = heapdict.heapdict()
+        # key_counter  = 0
+        io_args.working_set_size = config.dataloader.working_set_size
+        io_args.replication_factor =config.dataloader.replication_factor
+        io_args.cache_address=config.dataloader.cache_address
     fabric.launch(main, config.seed, config, train_args,io_args)
 
     fabric.print(f"Creating overall report for experiment")
@@ -69,7 +85,7 @@ def setup(config: DictConfig):
 
 def main(fabric: Fabric, seed: int, config: DictConfig, train_args: TrainArgs, io_args: IOArgs,) -> None:        
         fabric.seed_everything(seed)  # same seed for every process to init model (FSDP)
-        #srtup model 
+        #setup model 
         t0 = time.perf_counter()
         model:nn.Module = make_model(fabric, train_args.model_name) 
         fabric.print(f"Time to instantiate {train_args.model_name} model: {time.perf_counter() - t0:.02f} seconds")
@@ -78,19 +94,21 @@ def main(fabric: Fabric, seed: int, config: DictConfig, train_args: TrainArgs, i
         #optimizer = optim.SGD(model.parameters(), lr=train_args.learning_rate)
 
         model, optimizer = fabric.setup(model,optimizer, move_to_device=True)
-
         train_dataloader, val_dataloader = None, None
         if train_args.run_training:
-            train_dataloader = make_dataloader(train_args.job_id, 
-                                               io_args.dataloader_kind, 
-                                               io_args.train_data_dir, 
-                                               train_args.shuffle, 
-                                               train_args.global_batch_size, 
-                                               train_args.num_pytorch_workers,
-                                               fabric.world_size, 
-                                               io_args.super_address,
-                                               io_args.cache_address,
-                                               train_args.simulate_data_delay)
+            train_dataloader = make_dataloader(
+                fabric,
+                train_args.job_id, 
+                io_args.dataloader_kind, 
+                io_args.train_data_dir, 
+                train_args.shuffle, 
+                train_args.global_batch_size, 
+                train_args.num_pytorch_workers,
+                io_args.super_address,
+                io_args.cache_address,
+                train_args.simulate_data_delay,
+                io_args.working_set_size,
+                io_args.replication_factor)
             
             train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True, use_distributed_sampler=True)
         if train_args.run_evaluation:
@@ -304,22 +322,62 @@ def train_loop(fabric: Fabric,
             return losses.avg, top1.avg, top5.avg
     
 
-def make_dataloader(job_id:int, 
-                    dataloader_kind:str, 
-                    data_dir:str, 
-                    shuffle: bool, 
-                    batch_size:int, 
-                    num_workers:int,
-                    world_size:int,
-                    super_address:str = None, 
-                    cache_address:str = None, 
-                    simulate_data_delay = None):
+def make_dataloader(
+        fabric:Fabric,
+        job_id:int, 
+        dataloader_kind:str, 
+        data_dir:str, 
+        shuffle: bool, 
+        batch_size:int, 
+        num_workers:int,
+        super_address:str = None, 
+        cache_address:str = None, 
+        simulate_data_delay = None,
+        working_set_size = None,
+        replication_factor = None):
     
     dataloader = None
 
     if dataloader_kind == 'vanilla_pytorch':
         dataset =  VanillaTorchImageDataset(data_dir = data_dir, transform=transform())
         sampler = RandomSampler(data_source=dataset) if shuffle else SequentialSampler(data_source=dataset)
+        dataloader = DataLoader(dataset=dataset, sampler=sampler, batch_size=batch_size, num_workers=num_workers)
+    
+    elif dataloader_kind == 'shade':
+        import torchvision.datasets as datasets
+        global PQ
+        global key_id_map
+        global key_counter
+        global red_local
+        global ghost_cache
+        key_id_map = redis.Redis()
+        train_imagefolder = datasets.ImageFolder(data_dir)
+        train_imagefolder_list = []
+        train_imagefolder_list.append(train_imagefolder)
+        cache_host, cache_port = None,None
+        if cache_address:
+            cache_host, cache_port = cache_address.split(":")
+
+        dataset =  ShadeDataset(imagefolders = train_imagefolder_list, 
+                                transform=transform(),
+                                target_transform=None,
+                                cache_data=True if cache_host is not None else False,
+                                PQ=PQ,
+                                ghost_cache=ghost_cache,
+                                key_counter=key_counter,
+                                wss=working_set_size,
+                                host_ip=cache_host,
+                                port_num  = cache_port
+                                )
+        sampler = ShadeSampler(dataset,
+                               num_replicas=fabric.world_size,
+                               rank=fabric.node_rank, 
+                               batch_size=batch_size, 
+                               seed = 41, 
+                               host_ip = cache_address, 
+                               port_num = cache_port, 
+                               rep_factor = replication_factor)
+        
         dataloader = DataLoader(dataset=dataset, sampler=sampler, batch_size=batch_size, num_workers=num_workers)
 
     elif dataloader_kind == 'super_image':
@@ -328,7 +386,7 @@ def make_dataloader(job_id:int,
             data_dir=data_dir,
             batch_size=batch_size,
             transform=transform(),
-            world_size=world_size,
+            world_size=fabric.world_size,
             super_address=super_address,
             cache_address=cache_address,
             simulate_delay=simulate_data_delay)   

@@ -67,11 +67,12 @@ class ShadeDataset(Dataset):
 		self.cache_portion = self.wss * len(self.samples)
 		self.cache_portion = int(self.cache_portion // 1)
 
-		if host_ip == '0.0.0.0':
+		if host_ip == '0.0.0.0' or host_ip is None:
 			self.key_id_map = redis.Redis()
 		else:
 			self.startup_nodes = [{"host": host_ip, "port": port_num}]
-			self.key_id_map = RedisCluster(startup_nodes=self.startup_nodes)
+			# self.key_id_map = RedisCluster(startup_nodes=self.startup_nodes)
+			self.key_id_map = redis.Redis()
 
 		self.PQ = PQ
 		self.ghost_cache = ghost_cache
@@ -152,7 +153,7 @@ class ShadeDataset(Dataset):
 		path, target = self.samples[index]
 		insertion_time = datetime.now()
 		insertion_time = insertion_time.strftime("%H:%M:%S")
-		print("train_search_index: %d time: %s" %(index, insertion_time))
+		# print("train_search_index: %d time: %s" %(index, insertion_time))
 
 		sample = self.cache_and_evict(path,target,index)
 
@@ -161,7 +162,7 @@ class ShadeDataset(Dataset):
 		if self.target_transform is not None:
 			target = self.target_transform(target)
 
-		return sample, target, index
+		return sample, target
 
 	def __len__(self) -> int:
 		return len(self.samples)

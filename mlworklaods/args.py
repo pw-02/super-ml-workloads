@@ -46,3 +46,5 @@ class IOArgs:
     log_interval: Optional[int] = 1
     super_address: Optional[str] = None
     cache_address: Optional[str] = None
+    working_set_size: Optional[str] = None
+    replication_factor: Optional[str] = None
