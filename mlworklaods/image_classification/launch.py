@@ -95,7 +95,7 @@ def spawn_jobs(job_id, config:DictConfig, train_args:TrainArgs, io_args:IOArgs, 
     if train_args.accelerator == 'cpu':
         train_args.devices = config.num_devices_per_job 
     else:
-        train_args.devices = start_id 
+        train_args.devices = start_id
     #[start_id, end_id]
     # master_port = args.master_port + job_id
     print("Spawn a {} GPU job starting at GPU#{}".format(config.num_devices_per_job, start_id))
