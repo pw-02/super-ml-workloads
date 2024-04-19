@@ -314,3 +314,5 @@ class ShadeSampler(Sampler[T_co]):
 			random.shuffle(art_miss_list)
 
 		return art_hit_list,art_miss_list,miss_samps
+	
+	
