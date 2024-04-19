@@ -21,6 +21,7 @@ hydra:
   mode: MULTIRUN
   sweeper:
     params:
-      training: resnet18, resnet50, shufflenet, vgg16
+      training: resnet18
+      #training: resnet18, resnet50, shufflenet, vgg16
       # training: resnet50, shufflenet, vgg16
 
