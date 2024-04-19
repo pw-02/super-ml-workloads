@@ -44,7 +44,7 @@ def launch_job(pid:int, config: DictConfig, train_args: TrainArgs, io_args: IOAr
 
     fabric.print(f"Creating overall report for experiment")
     
-    create_exp_summary_report(io_args.log_dir)
+    # output_file_path = create_exp_summary_report(io_args.log_dir)
 
     fabric.print(f"Job Ended. Total Duration {(time.perf_counter()-start_time):.2f}s")
 

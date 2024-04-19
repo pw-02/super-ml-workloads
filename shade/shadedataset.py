@@ -36,7 +36,8 @@ import heapdict
 import PIL
 from rediscluster import RedisCluster
 from collections import OrderedDict
-
+import super_dl.s3utils as s3utils
+from super_dl.s3utils import S3Url
 
 T_co = TypeVar('T_co', covariant=True)
 T = TypeVar('T')
