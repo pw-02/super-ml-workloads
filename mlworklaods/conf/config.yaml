@@ -7,11 +7,11 @@ defaults:
   - override hydra/job_logging: disabled
 
 num_jobs: 1
-num_devices_per_job: 4
+num_devices_per_job: 1
 seed: 41
 accelerator: 'gpu'
 log_dir: mlworklaods/reports
-log_interval: 25
+log_interval: 1
 run_training: true
 run_evaluation: false
 dataload_only: false
@@ -21,4 +21,6 @@ hydra:
   mode: MULTIRUN
   sweeper:
     params:
-      training: resnet18, resnet50, shufflenet, vgg16
+      #training: resnet18, resnet50, shufflenet, vgg16
+      training: resnet18
+
