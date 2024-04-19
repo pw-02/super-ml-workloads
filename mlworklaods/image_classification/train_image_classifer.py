@@ -22,10 +22,10 @@ import redis
 import heapdict
 import torchvision.transforms as transforms
 # #Initialization of local cache, PQ and ghost cache
-# red_local = redis.Redis()
-# PQ = heapdict.heapdict()
-# ghost_cache = heapdict.heapdict()
-# key_counter  = 0
+red_local = redis.Redis()
+PQ = heapdict.heapdict()
+ghost_cache = heapdict.heapdict()
+key_counter  = 0
 
 def launch_job(pid:int, config: DictConfig, train_args: TrainArgs, io_args: IOArgs):
     start_time = time.perf_counter()

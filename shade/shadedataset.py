@@ -71,8 +71,8 @@ class ShadeDataset(Dataset):
 			self.key_id_map = redis.Redis()
 		else:
 			self.startup_nodes = [{"host": host_ip, "port": port_num}]
-			# self.key_id_map = RedisCluster(startup_nodes=self.startup_nodes)
-			self.key_id_map = redis.Redis()
+			self.key_id_map = RedisCluster(startup_nodes=self.startup_nodes)
+			#self.key_id_map = redis.Redis()
 
 		self.PQ = PQ
 		self.ghost_cache = ghost_cache

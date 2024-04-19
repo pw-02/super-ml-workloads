@@ -112,8 +112,8 @@ class ShadeSampler(Sampler[T_co]):
 			self.key_id_map = redis.Redis()
 		else:
 			self.startup_nodes = [{"host": host_ip, "port": port_num}]
-			# self.key_id_map = RedisCluster(startup_nodes=self.startup_nodes)
-			self.key_id_map = redis.Redis()
+			self.key_id_map = RedisCluster(startup_nodes=self.startup_nodes)
+			#self.key_id_map = redis.Redis()
 
 		
 		# If the dataset length is evenly divisible by # of replicas, then there
