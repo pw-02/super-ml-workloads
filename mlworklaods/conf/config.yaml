@@ -18,7 +18,7 @@ dataload_only: false
 
 
 hydra:
-  mode: MULTIRUN
+  mode: RUN
   sweeper:
     params:
       training: resnet18
