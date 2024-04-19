@@ -3,11 +3,11 @@ defaults:
   - _self_
   - dataloader: shade
   - dataset: cifar10
-  - training: resnet18
+  - training: ???
   - override hydra/job_logging: disabled
 
 num_jobs: 1
-num_devices_per_job: 4
+num_devices_per_job: 1
 seed: 41
 accelerator: 'gpu'
 log_dir: mlworklaods/reports
@@ -17,11 +17,11 @@ run_evaluation: false
 dataload_only: false
 
 
-# hydra:
-#   mode: RUN
-#   sweeper:
-#     params:
-#       training: resnet18
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      training: resnet18
       #training: resnet18, resnet50, shufflenet, vgg16
       # training: resnet50, shufflenet, vgg16
 
