@@ -1,0 +1,56 @@
+# defaults:
+#   - dataloader: s3_image_mapped
+#   - dataset: s3_cifar10
+#   - training: resnet18
+#   - override hydra/job_logging: disabled
+# devices: 1
+# seed: 41
+# accelerator: 'gpu'
+# log_dir: mlworklaods/reports
+# log_interval: 1
+# run_training: true
+# run_evaluation: false
+
+# defaults:
+#   - dataloader: s3_text_iterable
+#   - dataset: s3_openwebtext
+#   - training: pythia14m
+#   - override hydra/job_logging: disabled
+# devices: 1
+# seed: 41
+# accelerator: 'gpu'
+# log_dir: mlworklaods/reports
+# log_interval: 1
+# run_training: true
+# run_evaluation: false
+
+defaults:
+  - dataloader: pytorch
+  - dataset: imagenet
+  - training: resnet50
+  - override hydra/job_logging: disabled
+
+num_jobs: 1
+num_devices_per_job: 1
+seed: 41
+accelerator: 'gpu'
+log_dir: mlworklaods/reports
+log_interval: 1
+run_training: true
+run_evaluation: false
+dataload_only: false
+
+#hpo settings
+search_space_file:
+num_trials: 3
+gpus_per_trial: 1
+cpus_per_trial: 4
+max_concurrent_trials: 1
+
+
+# hydra:
+#   mode: MULTIRUN
+#   sweeper:
+#     params:
+#       dataloader: s3iterabledataset, fsspec
+#       dataloader.num_workers: 2,4,8,16

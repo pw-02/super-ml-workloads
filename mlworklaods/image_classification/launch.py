@@ -10,7 +10,7 @@ from torch.multiprocessing import Pool, Process, set_start_method
 from typing import List
 import torch
 
-@hydra.main(version_base=None, config_path="../conf", config_name="config_multi")
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(config: DictConfig):
     config.log_dir = f"{config.log_dir}/{config.dataset.name}/{config.training.model_name}"
     exp_version = get_next_exp_version(config.log_dir,config.dataloader.kind)

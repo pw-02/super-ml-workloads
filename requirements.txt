@@ -15,6 +15,7 @@ nltk
 hydra-core
 psutil
 pynvml
+redis-py-cluster
 #nlp workload
 #tiktoken
 #datasets
