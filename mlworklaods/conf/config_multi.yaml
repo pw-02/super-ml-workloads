@@ -5,6 +5,7 @@ defaults:
   - dataset: imagenet
   - training: ???
   - override hydra/job_logging: disabled
+
 num_jobs: 1
 num_devices_per_job: 1
 seed: 41
@@ -20,4 +21,4 @@ hydra:
   mode: MULTIRUN
   sweeper:
     params:
-      training: vgg16, resnet18, resnet50, shufflenet
+      training: resnet18, resnet50, shufflenet, vgg16
