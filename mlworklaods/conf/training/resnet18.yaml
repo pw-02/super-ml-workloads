@@ -1,7 +1,7 @@
 model_name: resnet18
 epochs: 3
 iters_per_epoch: null
-batch_size: 64
+batch_size: 128
 learning_rate: 6e-4
 weight_decay: 1e-1
 num_pytorch_workers: 4
