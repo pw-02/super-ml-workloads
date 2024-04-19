@@ -1,8 +1,8 @@
 
 defaults:
-  # - _self_
+  - _self_
   - dataloader: pytorch
-  - dataset: imagenet
+  - dataset: cifar10
   - training: ???
   - override hydra/job_logging: disabled
 
