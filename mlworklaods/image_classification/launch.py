@@ -10,11 +10,11 @@ from torch.multiprocessing import Pool, Process, set_start_method
 from typing import List
 import torch
 
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
+@hydra.main(version_base=None, config_path="../conf", config_name="config_multi")
 def main(config: DictConfig):
-    
-    exp_version = get_next_exp_version(config.log_dir,config.dataset.name)
-
+    config.log_dir = f"{config.log_dir}/{config.dataset.name}/{config.training.model_name}"
+    exp_version = get_next_exp_version(config.log_dir,config.dataloader.kind)
+    config.log_dir = os.path.join(config.log_dir, config.dataloader.kind, str(exp_version))
     train_args: TrainArgs = TrainArgs(
         job_id=os.getpid(),
         model_name = config.training.model_name,
@@ -37,7 +37,7 @@ def main(config: DictConfig):
         dataloader_kind= config.dataloader.kind,
         train_data_dir=config.dataset.train_dir,
         val_data_dir=config.dataset.val_dir,
-        log_dir = os.path.join(config.log_dir, config.dataset.name, str(exp_version)),
+        log_dir = config.log_dir,
         log_interval = config.log_interval
         )
     
@@ -59,7 +59,7 @@ def main(config: DictConfig):
     if config.num_jobs == 1:
         train_args.devices = config.num_devices_per_job
         print(f"Running single job on {train_args.devices} GPUS")
-        launch_job(config, train_args, io_args)
+        launch_job(1,config, train_args, io_args)
     else:
         print(f"Running HP with {config.num_jobs} jobs each on {train_args.devices} GPUS")
         processes:List[Process] = []

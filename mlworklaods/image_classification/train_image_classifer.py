@@ -20,7 +20,7 @@ from shade.shadedataset import ShadeDataset
 from shade.shadesampler import ShadeSampler
 import redis
 import heapdict
-
+import torchvision.transforms as transforms
 # #Initialization of local cache, PQ and ghost cache
 # red_local = redis.Redis()
 # PQ = heapdict.heapdict()
@@ -368,8 +368,15 @@ def make_model(fabric:Fabric, model_name:str):
         raise Exception(f"unknown model {model_name}")
     
 def transform():
-    normalize = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    transformations = torchvision.transforms.Compose([torchvision.transforms.ToTensor(), normalize])
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    # transformations = transforms.Compose([torchvision.transforms.ToTensor(), normalize])
+    transformations = transforms.Compose([
+                transforms.RandomResizedCrop(224),
+                # transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                normalize,
+            ])
+
     return transformations
 
 def accuracy(output: Tensor, target:Tensor, topk=(1,))-> List[Tensor]:
