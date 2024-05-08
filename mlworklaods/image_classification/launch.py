@@ -38,12 +38,12 @@ def main(config: DictConfig):
         train_data_dir=config.dataset.train_dir,
         val_data_dir=config.dataset.val_dir,
         log_dir = config.log_dir,
-        log_interval = config.log_interval
+        log_interval = config.log_interval,
+        cache_address=config.dataloader.cache_address
         )
     
     if 'super' in io_args.dataloader_kind:
         io_args.super_address=config.dataloader.super_address
-        io_args.cache_address=config.dataloader.cache_address
         train_args.simulate_data_delay = config.dataloader.simulate_data_delay
 
     elif 'shade' in io_args.dataloader_kind:
@@ -54,8 +54,10 @@ def main(config: DictConfig):
         # key_counter  = 0
         io_args.working_set_size = config.dataloader.working_set_size
         io_args.replication_factor =config.dataloader.replication_factor
-        io_args.cache_address=config.dataloader.cache_address
-
+        cache_granularity=config.dataloader.cache_granularity
+    elif 'torch_lru' in  io_args.dataloader_kind:
+        cache_granularity=config.dataloader.cache_granularity
+        
     if config.num_jobs == 1:
         train_args.devices = config.num_devices_per_job
         print(f"Running single job on {train_args.devices} GPUS")

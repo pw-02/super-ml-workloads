@@ -33,8 +33,7 @@ class ShadeDataset(Dataset):
         ghost_cache=None,
         key_counter=None,
         wss=0.1,
-        host_ip='0.0.0.0',
-        port_num='6379'
+        cache_address = None
     ):
         self.transform = transform
         self.target_transform = target_transform
@@ -50,10 +49,14 @@ class ShadeDataset(Dataset):
 
         self.cache_portion = int(self.wss * len(self))
 
-        if host_ip == '0.0.0.0' or host_ip is None:
+        self.cache_host, self.cache_port = None,None
+        if cache_address:
+            self.cache_host, self.cache_port = cache_address.split(":")
+
+        if self.cache_host == '0.0.0.0' or self.cache_host is None:
             self.key_id_map = redis.Redis()
         else:
-            self.startup_nodes = [{"host": host_ip, "port": port_num}]
+            self.startup_nodes = [{"host": self.cache_host, "port": self.cache_port}]
             # self.key_id_map = RedisCluster(startup_nodes=self.startup_nodes)
             self.key_id_map = redis.Redis()
 

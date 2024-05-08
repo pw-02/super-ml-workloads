@@ -15,12 +15,14 @@ from torch.utils.data import SequentialSampler, RandomSampler
 from mlworklaods.utils import ResourceMonitor, get_default_supported_precision, num_model_parameters
 from mlworklaods.log_utils import AverageMeter, ProgressMeter, Summary, ExperimentLogger, get_next_exp_version, create_exp_summary_report
 import os
-from torch_datasets.torch_lru_image_dataset import TorchLRUImageDataset
+from torch_lru.torch_lru_dataset import TorchLRUDataset
 from shade.shadedataset import ShadeDataset
 from shade.shadesampler import ShadeSampler
 import redis
 import heapdict
 import torchvision.transforms as transforms
+from torch_lru.batch_sampler_with_id import BatchSamplerWithID
+
 # #Initialization of local cache, PQ and ghost cache
 red_local = redis.Redis()
 PQ = heapdict.heapdict()
@@ -37,7 +39,6 @@ def launch_job(pid:int, config: DictConfig, train_args: TrainArgs, io_args: IOAr
         super_client:SuperClient = SuperClient(super_addresss=io_args.super_address)     
         super_client.register_job(job_id=train_args.job_id, data_dir=io_args.train_data_dir)
         del(super_client)
-      
 
     fabric.launch(train_model, train_args.seed, config, train_args, io_args)
 
@@ -220,11 +221,13 @@ def train_loop(fabric: Fabric,
         losses = AverageMeter('Loss', ':6.2f')
         top1 = AverageMeter('Acc1', ':6.2f')
         top5 = AverageMeter('Acc5', ':6.2f')
-        hits = AverageMeter('hits', ':6.0f')
-        misses = AverageMeter('misses', ':6.0f')
+        # hits = AverageMeter('hits', ':6.0f')
+        # misses = AverageMeter('misses', ':6.0f')
+        cache_hit_ratio = AverageMeter('hit%', ':6.2f')
+        # misses = AverageMeter('misses', ':6.0f')
 
         progress = ProgressMeter(max_iters,
-            [batch_time, data_time, compute_time, losses, hits, misses],
+            [batch_time, data_time, compute_time, losses, cache_hit_ratio],
             prefix="Epoch: [{}]".format(epoch))
         
         with ResourceMonitor() as monitor:
@@ -233,9 +236,9 @@ def train_loop(fabric: Fabric,
                 data_time.update(time.perf_counter() - end)
                 # batchid.update(batch_id)
                 if cache_hit:
-                    hits.update(1)
+                    cache_hit_ratio.update(1)
                 else:
-                    misses.update(1)
+                    cache_hit_ratio.update(0)
 
                 batch_size = images.size(0)
                 if not dataload_only:
@@ -262,8 +265,8 @@ def train_loop(fabric: Fabric,
                 
                 if batch_idx % logger.log_freq == 0:
                     #progress.display(batch_idx + 1, fabric)
-                    progress.display(batch_idx + 1, batch_id)
-
+                    progress.display(batch_idx + 1)
+                    print(cache_hit_ratio.avg)
                     logger.save_train_batch_metrics(
                         epoch=epoch,
                         step=batch_idx+1,
@@ -315,16 +318,18 @@ def make_dataloader(
         num_workers:int,
         super_address:str = None, 
         cache_address:str = None, 
+        cache_granularity:str = None, 
         simulate_data_delay = None,
         working_set_size = None,
         replication_factor = None):
     
     dataloader = None
 
-    if dataloader_kind == 'vanilla_pytorch':
-        dataset =  TorchLRUImageDataset(data_dir = data_dir, transform=transform())
+    if dataloader_kind == 'torch_lru':  
+        dataset =  TorchLRUDataset(data_dir = data_dir, transform=transform(), cache_address=cache_address, cache_granularity=cache_granularity)
         sampler = RandomSampler(data_source=dataset) if shuffle else SequentialSampler(data_source=dataset)
-        dataloader = DataLoader(dataset=dataset, sampler=sampler, batch_size=batch_size, num_workers=num_workers)
+        batch_sampler = BatchSamplerWithID(sampler=sampler, batch_size=batch_size, drop_last=False)
+        dataloader = DataLoader(dataset=dataset, sampler=batch_sampler, batch_size=None, num_workers=num_workers)
     
     elif dataloader_kind == 'shade':
         import torchvision.datasets as datasets

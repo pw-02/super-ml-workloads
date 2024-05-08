@@ -1,7 +1,7 @@
 
 defaults:
   - _self_
-  - dataloader: super
+  - dataloader: torch_lru
   - dataset: cifar10
   - training: ???
   # - override hydra/job_logging: disabled
@@ -16,7 +16,7 @@ log_dir: mlworklaods/reports
 log_interval: 1
 run_training: true
 run_evaluation: false
-dataload_only: True
+dataload_only: false
 
 hydra:
   mode: MULTIRUN

@@ -346,10 +346,10 @@ class ProgressMeter(object):
         self.meters = meters
         self.prefix = prefix
 
-    def display(self, batch, batch_id, fabric:Fabric = None):
+    def display(self, batch, fabric:Fabric = None):
         entries = [self.prefix + self.batch_fmtstr.format(batch)]
         entries += [str(meter) for meter in self.meters]
-        entries += [batch_id]
+        # entries += [batch_id]
         if fabric:
             fabric.print('\t'.join(entries))
         else:
