@@ -2,15 +2,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Data for PyTorch
-pytorch_batches = [100, 95, 80, 75, 68, 33, 55 ]  # Replace these values with your actual data
+shade_batches = [100, 95, 80, 75, 68, 33]  # Replace these values with your actual data
 
 # Data for Shade
-shade_batches = [90, 85, 70, 65, 23, 87, 81]  # Replace these values with your actual data
+pytorch_batches = [90, 85, 70, 65, 50, 20]  # Replace these values with your actual data
 
 # Data for Super
-super_batches = [110, 105, 90, 85, 99, 60, 75]  # Replace these values with your actual data
+super_batches = [210, 150, 190, 185, 170, 163]  # Replace these values with your actual data
 
-models = ['ShuffleNet', 'AlexNet', 'ResNet18', 'SqueezeNet', 'ResNet50', 'Pythia70m', 'Pythia160m']
+models = ['ResNet18', 'Shufflenetv2', 'ResNet50', 'VGG11', 'Pythia70m', 'Pythia160m']
 
 # Define bar width and positions
 bar_width = 0.25
@@ -18,7 +18,7 @@ r1 = np.arange(len(models))
 r2 = [x + bar_width for x in r1]
 r3 = [x + bar_width for x in r2]
 
-# Custom color choices
+# # Custom color choices
 pytorch_color ='#C8620E'  
 shade_color = '#005A9B'   
 super_color = '#b30000'    # Maroon

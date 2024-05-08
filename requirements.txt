@@ -11,11 +11,12 @@ awscli
 xlsxwriter
 tiktoken
 transformers
-nltk
 hydra-core
 psutil
 pynvml
-redis-py-cluster
+
+# nltk
+# redis-py-cluster
 #nlp workload
 #tiktoken
 #datasets

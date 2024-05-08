@@ -16,7 +16,6 @@ class S3IterableDataset(IterableDataset):
         self.bucket_name = S3Url(data_dir).bucket
         self.transform = transform
  
-    
     @functools.cached_property
     def _classed_items(self) -> List[Tuple[str, int]]:
         return [(blob, class_index)

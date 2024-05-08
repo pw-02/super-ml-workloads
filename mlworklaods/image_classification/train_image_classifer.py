@@ -15,7 +15,7 @@ from torch.utils.data import SequentialSampler, RandomSampler
 from mlworklaods.utils import ResourceMonitor, get_default_supported_precision, num_model_parameters
 from mlworklaods.log_utils import AverageMeter, ProgressMeter, Summary, ExperimentLogger, get_next_exp_version, create_exp_summary_report
 import os
-from torch_datasets.vanilla_image_dataset import VanillaTorchImageDataset
+from torch_datasets.torch_lru_image_dataset import TorchLRUImageDataset
 from shade.shadedataset import ShadeDataset
 from shade.shadesampler import ShadeSampler
 import redis
@@ -33,7 +33,6 @@ def launch_job(pid:int, config: DictConfig, train_args: TrainArgs, io_args: IOAr
     fabric = Fabric(accelerator=train_args.accelerator, devices=train_args.devices, strategy="auto", precision=precision)
     # exp_version = get_next_exp_version(config.log_dir,config.dataset.name)
 
-
     if 'super' in io_args.dataloader_kind:
         super_client:SuperClient = SuperClient(super_addresss=io_args.super_address)     
         super_client.register_job(job_id=train_args.job_id, data_dir=io_args.train_data_dir)
@@ -46,6 +45,16 @@ def launch_job(pid:int, config: DictConfig, train_args: TrainArgs, io_args: IOAr
     
     output_file_path = create_exp_summary_report(io_args.log_dir)
     
+    # if fabric.is_global_zero:
+    #     fabric.print(f"creating experiment report..")
+    #     file_loaction = create_job_report(hparams.exp_name, log_dir)
+    #     split_path = file_loaction.split('/reports/', 1)
+    #     if len(split_path) > 1:
+    #         trimmed_path = split_path[1]
+    #         S3Helper().upload_to_s3(file_loaction, 'superreports23',trimmed_path)
+    #     else:
+    #         S3Helper().upload_to_s3(file_loaction, 'superreports23',file_loaction)
+
     fabric.print(f"Job Ended. Total Duration {(time.perf_counter()-start_time):.2f}s")
 
 def train_model(fabric: Fabric, seed: int, config: DictConfig, train_args: TrainArgs, io_args: IOArgs,) -> None:        
@@ -211,14 +220,23 @@ def train_loop(fabric: Fabric,
         losses = AverageMeter('Loss', ':6.2f')
         top1 = AverageMeter('Acc1', ':6.2f')
         top5 = AverageMeter('Acc5', ':6.2f')
+        hits = AverageMeter('hits', ':6.0f')
+        misses = AverageMeter('misses', ':6.0f')
+
         progress = ProgressMeter(max_iters,
-            [batch_time, data_time, compute_time, losses, top1, top5],
+            [batch_time, data_time, compute_time, losses, hits, misses],
             prefix="Epoch: [{}]".format(epoch))
         
         with ResourceMonitor() as monitor:
             end = time.perf_counter()
-            for batch_idx,(images, target) in enumerate(train_dataloader):
+            for batch_idx,(images, target, cache_hit, batch_id) in enumerate(train_dataloader):
                 data_time.update(time.perf_counter() - end)
+                # batchid.update(batch_id)
+                if cache_hit:
+                    hits.update(1)
+                else:
+                    misses.update(1)
+
                 batch_size = images.size(0)
                 if not dataload_only:
                     is_accumulating = False
@@ -244,7 +262,7 @@ def train_loop(fabric: Fabric,
                 
                 if batch_idx % logger.log_freq == 0:
                     #progress.display(batch_idx + 1, fabric)
-                    progress.display(batch_idx + 1)
+                    progress.display(batch_idx + 1, batch_id)
 
                     logger.save_train_batch_metrics(
                         epoch=epoch,
@@ -304,7 +322,7 @@ def make_dataloader(
     dataloader = None
 
     if dataloader_kind == 'vanilla_pytorch':
-        dataset =  VanillaTorchImageDataset(data_dir = data_dir, transform=transform())
+        dataset =  TorchLRUImageDataset(data_dir = data_dir, transform=transform())
         sampler = RandomSampler(data_source=dataset) if shuffle else SequentialSampler(data_source=dataset)
         dataloader = DataLoader(dataset=dataset, sampler=sampler, batch_size=batch_size, num_workers=num_workers)
     
@@ -316,14 +334,12 @@ def make_dataloader(
         global red_local
         global ghost_cache
         key_id_map = redis.Redis()
-        train_imagefolder = datasets.ImageFolder(data_dir)
-        train_imagefolder_list = []
-        train_imagefolder_list.append(train_imagefolder)
+
         cache_host, cache_port = None,None
         if cache_address:
             cache_host, cache_port = cache_address.split(":")
 
-        dataset =  ShadeDataset(imagefolders = train_imagefolder_list, 
+        dataset =  ShadeDataset(data_dir = data_dir, 
                                 transform=transform(),
                                 target_transform=None,
                                 cache_data=True if cache_host is not None else False,

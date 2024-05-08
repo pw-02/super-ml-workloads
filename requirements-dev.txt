@@ -7,12 +7,12 @@ pandas
 xlsxwriter
 redis
 grpcio-tools
-# super-client
 datasets
 tiktoken
 transformers
-# ray
-re
-unicodedata
 nltk
 redis-py-cluster
+hydra-core
+psutil
+pynvml
+heapdict

@@ -42,9 +42,9 @@ def main(config: DictConfig):
         )
     
     if 'super' in io_args.dataloader_kind:
-        io_args.super_address=config.dataloader.super_address,
-        io_args.cache_address=config.dataloader.cache_address,
-        train_args.simulate_data_delay = config.dataloader.simulate_data_delay,
+        io_args.super_address=config.dataloader.super_address
+        io_args.cache_address=config.dataloader.cache_address
+        train_args.simulate_data_delay = config.dataloader.simulate_data_delay
 
     elif 'shade' in io_args.dataloader_kind:
         # #Initialization of local cache, PQ and ghost cache

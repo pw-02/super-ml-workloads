@@ -8,9 +8,11 @@ import io
 from pathlib import Path
 import json
 import os
+import redis
 
-class VanillaTorchImageDataset(torch.utils.data.Dataset):
-    def __init__(self,data_dir:str, transform):
+class TorchLRUImageDataset(torch.utils.data.Dataset):
+    def __init__(self,data_dir:str, transform, cache_host = None, cache_port = None):
+
         self.is_s3: bool = data_dir.startswith("s3://")
 
         if self.is_s3:
@@ -18,8 +20,15 @@ class VanillaTorchImageDataset(torch.utils.data.Dataset):
             self.bucket_name = S3Url(data_dir).bucket
         else:
             self.samples: Dict[str, List[str]] = self.load_local_sample_idxs(data_dir)
-
         self.transform = transform
+
+        if cache_host is not None:
+            self.cache_client = redis.StrictRedis(host=cache_host, port=cache_port)
+            self.use_cache = True
+        else:
+            self.cache_client = None
+            self.use_cache = False
+    
 
     @functools.cached_property
     def _classed_items(self) -> List[Tuple[str, int]]:
@@ -31,22 +40,26 @@ class VanillaTorchImageDataset(torch.utils.data.Dataset):
         return sum(len(class_items) for class_items in self.samples.values())
     
     def __getitem__(self, idx):
+        sample_data = None
+        sample_path, sample_label = self._classed_items[idx]
 
-        file_path, sample_label = self._classed_items[idx]
-        if self.is_s3:
-            sample_input = s3utils.get_s3_object(self.bucket_name, file_path)
-            sample_input = Image.open(io.BytesIO(sample_input))
-        else:
-            sample_input = self.get_local_sample(file_path)
+        if self.use_cache:
+            sample_data = self.get_from_cache(idx)
 
-        
-        if sample_input.mode == "L":
-                sample_input = sample_input.convert("RGB")
+        if sample_data is None:  #data not retrieved from cache, so get it from primary storage
+            if self.is_s3:
+                sample_data = s3utils.get_s3_object(self.bucket_name, sample_path)
+                sample_data = Image.open(io.BytesIO(sample_data))
+            else:
+                sample_data = self.get_local_sample(sample_data)
+
+        if sample_data.mode == "L":
+            sample_data = sample_data.convert("RGB")
         
         if self.transform is not None:
-            sample_input = self.transform(sample_input)
-        return sample_input, sample_label
-    
+            sample_data = self.transform(sample_data)
+       
+        return sample_data, sample_label
 
     def is_image_file(self, path: str):
         return any(path.endswith(extension) for extension in ['.jpg', '.JPG', '.jpeg', '.JPEG', '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP'])
@@ -74,3 +87,12 @@ class VanillaTorchImageDataset(torch.utils.data.Dataset):
                 with open(index_file, "w") as outfile:
                     outfile.write(json_object)
             return classed_samples
+    
+    def get_from_cache(self, key):
+        try:
+            sample_data = self.cache_client.get(key)
+            byte_img_io = io.BytesIO(sample_data)
+            sample_data = Image.open(byte_img_io).convert('RGB')
+            return sample_data
+        except:
+             return None

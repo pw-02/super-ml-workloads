@@ -129,15 +129,15 @@ class SUPERDataset(IterableDataset):
                     
                     yield prepared_batches.pop(0)
                 else:
-                    yield self.__getitem__(next_batch.batch_id, next_batch.indicies, next_batch.is_cached)
+                    torch_imgs, torch_labels, batch_id, cache_hit = self.__getitem__(next_batch.batch_id, next_batch.indicies, next_batch.is_cached)
 
-                    # while torch_imgs.size(0) != self.batch_size and self.index < iter_len:
-                    #     new_batch = self._get_next_super_batch(super_client)
-                    #     imgs, labels, batch_id = self.__getitem__(new_batch.batch_id, new_batch.indicies, new_batch.is_cached)
-                    #     torch_imgs = torch.cat((torch_imgs, imgs), dim=0)
-                    #     torch_labels = torch.cat((torch_labels, labels), dim=0)
+                    while torch_imgs.size(0) != self.batch_size and self.index < iter_len:
+                        new_batch = self._get_next_super_batch(super_client)
+                        imgs, labels, batch_id = self.__getitem__(new_batch.batch_id, new_batch.indicies, new_batch.is_cached)
+                        torch_imgs = torch.cat((torch_imgs, imgs), dim=0)
+                        torch_labels = torch.cat((torch_labels, labels), dim=0)
 
-                    # yield torch_imgs, torch_labels, batch_id, cache_hit
+                    yield torch_imgs, torch_labels, batch_id, cache_hit
         # self.index = 0
     
     def _get_next_super_batch(self,super_client:SuperClient):       

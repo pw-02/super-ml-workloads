@@ -48,13 +48,14 @@ class ShadeDataset(Dataset):
         else:
             self.samples: Dict[str, List[str]] = self.load_local_sample_idxs(data_dir)
 
-        self.cache_portion = int(self.wss * len(self.samples))
+        self.cache_portion = int(self.wss * len(self))
 
         if host_ip == '0.0.0.0' or host_ip is None:
             self.key_id_map = redis.Redis()
         else:
             self.startup_nodes = [{"host": host_ip, "port": port_num}]
-            self.key_id_map = RedisCluster(startup_nodes=self.startup_nodes)
+            # self.key_id_map = RedisCluster(startup_nodes=self.startup_nodes)
+            self.key_id_map = redis.Redis()
 
         self.PQ = PQ
         self.ghost_cache = ghost_cache
@@ -156,7 +157,7 @@ class ShadeDataset(Dataset):
         return sample, target
 
     def __len__(self) -> int:
-        return len(self.samples)
+        return sum(len(class_items) for class_items in self.samples.values())
 
     def load_local_sample_idxs(self, data_dir) -> Dict[str, List[str]]:
         data_dir = str(Path(data_dir))
