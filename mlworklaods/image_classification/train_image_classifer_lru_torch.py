@@ -29,7 +29,9 @@ def run_lru_torch_job(pid:int, config: DictConfig, train_args: TrainArgs, data_a
 
 
 def train_model(fabric: Fabric, seed: int, config: DictConfig, train_args: TrainArgs, data_args: DataArgs, lru_torch_args:LRUTorchArgs) -> None:
-    fabric.seed_everything(seed)
+    
+    if seed:
+        fabric.seed_everything(seed)
     
     t0 = time.perf_counter()
     model:nn.Module = make_model(fabric, train_args.model_name)
@@ -97,7 +99,7 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
     with ResourceMonitor() as monitor:
         end = time.perf_counter()
 
-        for batch_idx, (images, target, cache_hits) in enumerate(train_dataloader):
+        for batch_idx, (images, target, cache_hits, batch_id) in enumerate(train_dataloader):
             data_time.update(time.perf_counter() - end)
             batch_size = images.size(0)
             toal_cahce_hits += cache_hits
@@ -125,7 +127,8 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
             total_samples += batch_size
 
             if batch_idx % logger.log_freq == 0:
-                progress.display(batch_idx + 1)
+                fabric.print(f'{progress.display(batch_idx + 1)}\t{batch_id}')
+                # progress.display(batch_idx + 1)
 
                 logger.save_train_batch_metrics(
                     epoch=epoch,

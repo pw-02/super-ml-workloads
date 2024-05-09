@@ -8,9 +8,9 @@ defaults:
   - override hydra/hydra_logging: disabled  
 
 
-num_jobs: 1
+num_jobs: 4
 num_devices_per_job: 1
-seed: 41
+seed: null
 accelerator: 'cpu'
 log_dir: mlworklaods/reports
 log_interval: 1

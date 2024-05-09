@@ -356,10 +356,11 @@ class ProgressMeter(object):
         entries = [self.prefix + self.batch_fmtstr.format(batch)]
         entries += [str(meter) for meter in self.meters]
         # entries += [batch_id]
-        if fabric:
-            fabric.print('\t'.join(entries))
-        else:
-            print('\t'.join(entries))
+        return '\t'.join(entries)
+        # if fabric:
+        #     fabric.print('\t'.join(entries))
+        # else:
+        #     print('\t'.join(entries))
         
     def display_summary(self):
         entries = [" *"]
