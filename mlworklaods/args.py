@@ -1,53 +1,68 @@
-
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Optional, Union
 from pathlib import Path
-from typing import Optional
 from numpy import Infinity
 
 @dataclass
 class TrainArgs:
     job_id: int
     model_name: str
-    shuffle: bool = False
     dataload_only: bool = False
-    num_pytorch_workers:int = 0
-    epochs: int = 1 #Number of epochs to run
-    global_batch_size: int = 64
-    global_epoch_max_iters: Optional[int] = None #Size of the epoch
-    # Optimization args
+    num_pytorch_workers: int = 0
+    epochs: int = 1
+    batch_size: int = 64  # Global batch size for all devices
+    epoch_max_iters: Optional[int] = None
+    # Optimization parameters
     learning_rate: float = 1e-3
     weight_decay: float = 0.02
     run_training: bool = True
-    run_evaluation : bool = False
-    simulate_data_delay: Optional[float] = None #Size of the epoch
-    dataload_only : bool = False
+    run_evaluation: bool = False
     devices: Optional[int] = 1
     accelerator: Optional[str] = 'gpu'
-    seed: Optional[int] = 41
+    seed: int = 41
+    log_dir: Optional[Path] = None
+    log_interval: int = 1
+    dataloader_kind: str
 
-    def epoch_max_iters(self, devices: int) -> int:
-        if self.global_epoch_max_iters:
-            epoch_max_iters = self.global_epoch_max_iters // devices
-            assert epoch_max_iters > 0
-            return epoch_max_iters
-        else:
-            return Infinity
-        
-    def batch_size(self, devices: int) -> int:
-        """Number of samples between optimizer steps per data-parallel rank"""
-        batch_size = self.global_batch_size // devices
-        assert batch_size > 0
-        return batch_size
+    def get_epoch_max_iters(self, devices: int) -> int:
+        """Calculate max iterations per epoch per device."""
+        if self.epoch_max_iters:
+            epoch_iters = self.epoch_max_iters // devices
+            if epoch_iters <= 0:
+                raise ValueError("Epoch max iterations must be greater than zero.")
+            return epoch_iters
+        return int(Infinity)
+
+    def get_batch_size(self, devices: int) -> int:
+        """Calculate batch size per device."""
+        batch_size_per_device = self.batch_size // devices
+        if batch_size_per_device <= 0:
+            raise ValueError("Batch size per device must be greater than zero.")
+        return batch_size_per_device
+
 
 @dataclass
-class IOArgs:
-    dataloader_kind: str
-    train_data_dir: Optional[Path] = Path("data/alpaca")
+class DataArgs:
+    train_data_dir: Path = Path("data/alpaca")
     val_data_dir: Optional[Path] = None
-    log_dir: Optional[Path] = None
-    log_interval: Optional[int] = 1
+
+
+@dataclass
+class SUPERArgs:
     super_address: Optional[str] = None
     cache_address: Optional[str] = None
-    cache_granularity: Optional[str] = None
+    simulate_data_delay: Optional[str] = None
+
+
+@dataclass
+class SHADEArgs:
+    cache_address: Optional[str] = None
     working_set_size: Optional[str] = None
     replication_factor: Optional[str] = None
+
+
+@dataclass
+class LRUTorchArgs:
+    cache_address: Optional[str] = None
+    cache_granularity: Optional[str] = None
+    shuffle: bool = False

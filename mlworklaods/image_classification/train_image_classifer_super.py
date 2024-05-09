@@ -1,36 +1,35 @@
 import time
+import os
 from torch import nn, optim, Tensor, no_grad
 import torchvision
 from typing import List, Dict
+import hydra
 from omegaconf import DictConfig
 from lightning.fabric import Fabric
 
-from torch.utils.data import DataLoader
 
 # Additional imports
-from mlworklaods.args import TrainArgs, DataArgs, SHADEArgs
+from mlworklaods.args import TrainArgs, DataArgs, SUPERArgs
 from mlworklaods.utils import ResourceMonitor, get_default_supported_precision, num_model_parameters
 from mlworklaods.log_utils import ExperimentLogger, AverageMeter, ProgressMeter, create_exp_summary_report
 import torchvision.transforms as transforms
-from shade.shadedataset import ShadeDataset
-from shade.shadesampler import ShadeSampler
-from torch_lru.batch_sampler_with_id import BatchSamplerWithID
+from super_dl.dataloader.super_dataloader import SUPERDataLoader
+from super_dl.dataset.super_dataset import SUPERDataset
 
-import redis
-import heapdict
-import math
+# from super_dl.sampler.super_sampler import SUPERBacthSampler
 
-# red_local = redis.StrictRedis(host='172.17.0.2', port='6379')
-PQ = heapdict.heapdict()
-ghost_cache = heapdict.heapdict()
-key_counter  = 0
+from super_dl.super_client import SuperClient
 
-def run_shade_job(pid:int, config: DictConfig, train_args: TrainArgs, data_args: DataArgs, shade_args:SHADEArgs):
+def run_super_job(pid:int, config: DictConfig, train_args: TrainArgs, data_args: DataArgs, super_args:SUPERArgs):
     start_time = time.perf_counter()
     precision = get_default_supported_precision(training=True)
     fabric = Fabric(accelerator=train_args.accelerator, devices=train_args.devices, strategy="auto", precision=precision)
 
-    fabric.launch(train_model, train_args.seed, config, train_args, data_args, shade_args)
+    super_client:SuperClient = SuperClient(super_addresss=super_args.super_address)     
+    super_client.register_job(job_id=train_args.job_id, data_dir=data_args.train_data_dir)
+    del(super_client)
+
+    fabric.launch(train_model, train_args.seed, config, train_args, data_args, super_args)
 
     # Create report at the end
     fabric.print("Creating overall report for experiment")
@@ -38,7 +37,7 @@ def run_shade_job(pid:int, config: DictConfig, train_args: TrainArgs, data_args:
     fabric.print(f"Job Ended. Total Duration: {(time.perf_counter() - start_time):.2f}s. Report: {output_file_path}")
 
 
-def train_model(fabric: Fabric, seed: int, config: DictConfig, train_args: TrainArgs, data_args: DataArgs, shade_args:SHADEArgs) -> None:
+def train_model(fabric: Fabric, seed: int, config: DictConfig, train_args: TrainArgs, data_args: DataArgs, super_args:SUPERArgs) -> None:
     fabric.seed_everything(seed)
     
     t0 = time.perf_counter()
@@ -53,7 +52,7 @@ def train_model(fabric: Fabric, seed: int, config: DictConfig, train_args: Train
     model, optimizer = fabric.setup(model, optimizer, move_to_device=True)
 
     # Set up train and validation dataloaders
-    train_dataloader, val_dataloader = make_dataloaders(fabric, train_args, data_args,shade_args)
+    train_dataloader, val_dataloader = make_dataloaders(fabric, train_args, data_args ,super_args)
 
     # Create and set up logger
     logger = ExperimentLogger(fabric, train_args.log_dir, train_args.log_interval)
@@ -66,16 +65,12 @@ def train_model(fabric: Fabric, seed: int, config: DictConfig, train_args: Train
     best_acc1_eval = 0
     best_acc5_eval = 0
 
-    batch_wts = []
-    for j in range(train_args.global_batch_size):
-        batch_wts.append(math.log(j+10))
-
     for epoch in range(1, train_args.epochs + 1):
         if train_dataloader:
             max_iters = min(len(train_dataloader), train_args.epoch_max_iters(fabric.world_size))
             fabric.print(f"Starting training loop for epoch {epoch}")
             model.train(True)
-            loss_train, acc1_train, acc5_train = train_loop(fabric, epoch, model, optimizer, train_dataloader, max_iters, logger, train_args.dataload_only, shade_args, batch_wts)
+            loss_train, acc1_train, acc5_train = train_loop(fabric, epoch, model, optimizer, train_dataloader, max_iters, logger, train_args.dataload_only)
             best_acc1_train = max(acc1_train, best_acc1_train)
             best_acc5_train = max(acc5_train, best_acc5_train)
 
@@ -83,7 +78,7 @@ def train_model(fabric: Fabric, seed: int, config: DictConfig, train_args: Train
             max_iters = min(len(val_dataloader), train_args.epoch_max_iters(fabric.world_size))
             fabric.print(f"Starting validation loop for epoch {epoch}")
             model.eval()
-            loss_eval, acc1_eval, acc5_eval = train_loop(fabric, epoch, model, optimizer, val_dataloader, max_iters, logger, train_args.dataload_only, shade_args, batch_wts)
+            loss_eval, acc1_eval, acc5_eval = val_loop(fabric, epoch, model, val_dataloader, max_iters, logger)
             best_acc1_eval = max(acc1_eval, best_acc1_eval)
             best_acc5_eval = max(acc5_eval, best_acc5_eval)
     
@@ -94,16 +89,8 @@ def train_model(fabric: Fabric, seed: int, config: DictConfig, train_args: Train
   
 
 # Train loop
-def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Optimizer, train_dataloader: DataLoader, max_iters: int, logger: ExperimentLogger, dataload_only: bool, shade_args:SHADEArgs,batch_wts:List):
-    global PQ
-    global key_id_map
-    global key_counter
-    # global red_local
-    global ghost_cache
-    cache_host,cache_port = shade_args.cache_address.split(":")
-    # key_id_map = redis.StrictRedis(host='172.17.0.2', port='6379')
-    key_id_map = redis.StrictRedis(host=cache_host, port=cache_port)
-
+def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Optimizer, train_dataloader: SUPERDataLoader, max_iters: int, logger: ExperimentLogger, dataload_only: bool):
+    
     toal_cahce_hits = 0
     total_samples = 0
     batch_time = AverageMeter("Time", ":6.3f")
@@ -129,11 +116,8 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
                 is_accumulating = False
                 with fabric.no_backward_sync(model, enabled=is_accumulating):
                     output = model(images)
-                    item_loss = nn.functional.cross_entropy(output, target, reduce=False)
-                    loss = item_loss.mean()
+                    loss = nn.functional.cross_entropy(output, target)
                     fabric.backward(loss)
-                    
-                    train_dataloader.sampler.sampler.pass_batch_important_scores(item_loss)
 
                     if not is_accumulating:
                         optimizer.step()
@@ -145,38 +129,6 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
                     top5.update(acc5.item(), batch_size)
 
                 compute_time.update(time.perf_counter() - end - data_time.val)
-            
-            key_counter = key_id_map.dbsize()
-            sorted_img_indices = train_dataloader.sampler.sampler.get_sorted_index_list()
-            track_batch_indx = 0
-            # Updating PQ and ghost cache during training.
-            if epoch > 1:
-                PQ = train_dataloader.dataset.get_PQ()
-                ghost_cache = train_dataloader.dataset.get_ghost_cache()
-            
-            for indx in sorted_img_indices:
-                    if key_id_map.exists(indx.item()):
-                        if indx.item() in PQ:
-                            #print("Train_index: %d Importance_Score: %f Frequency: %d Time: %s N%dG%d" %(indx.item(),batch_loss,PQ[indx.item()][1]+1,insertion_time,args.nr+1,gpu+1))
-                            PQ[indx.item()] = (batch_wts[track_batch_indx],PQ[indx.item()][1]+1)
-                            ghost_cache[indx.item()] = (batch_wts[track_batch_indx],ghost_cache[indx.item()][1]+1)
-                            track_batch_indx+=1
-                        else:
-                            #print("Train_index: %d Importance_Score: %f Time: %s N%dG%d" %(indx.item(),batch_loss,insertion_time,args.nr+1,gpu+1))
-                            PQ[indx.item()] = (batch_wts[track_batch_indx],1)
-                            ghost_cache[indx.item()] = (batch_wts[track_batch_indx],1)
-                            track_batch_indx+=1
-                    else:
-                        if indx.item() in ghost_cache:
-                            ghost_cache[indx.item()] = (batch_wts[track_batch_indx],ghost_cache[indx.item()][1]+1)
-                            track_batch_indx+=1
-                        else:
-                            ghost_cache[indx.item()] = (batch_wts[track_batch_indx],1)
-                            track_batch_indx+=1
-
-            train_dataloader.dataset.set_PQ(PQ)
-            train_dataloader.dataset.set_ghost_cache(ghost_cache)
-            train_dataloader.dataset.set_num_local_samples(key_counter)
 
             batch_time.update(time.perf_counter() - end)
             total_samples += batch_size
@@ -222,77 +174,95 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
             avg_gpu=monitor.resource_data["gpu_util"].summarize()["mean"],
             max_gpu=monitor.resource_data["gpu_util"].summarize()["max"],
         )
-        train_dataloader.sampler.sampler.on_epoch_end(losses.avg)
 
     return losses.avg, top1.avg, top5.avg
 
+# Validation loop
+def val_loop(fabric: Fabric, epoch: int, model: nn.Module, val_dataloader: SUPERDataLoader, max_iters: int, logger: ExperimentLogger):
+    batch_time = AverageMeter("Time", ":6.3f")
+    losses = AverageMeter("Loss", ":6.2f")
+    top1 = AverageMeter("Acc1", ":6.2f")
+    top5 = AverageMeter("Acc5", ":6.2f")
 
+    progress = ProgressMeter(max_iters, [batch_time, losses, top1, top5], prefix=f"Test (Epoch {epoch}):")
+
+    with no_grad():
+        total_samples = 0
+        end = time.perf_counter()
+
+        for batch_idx, (images, target,cache_hits) in enumerate(val_dataloader):
+            batch_size = images.size(0)
+            output = model(images)
+            loss = nn.functional.cross_entropy(output, target)
+            acc1, acc5 = accuracy(output, target, topk=(1, 5))
+
+            losses.update(loss.item(), batch_size)
+            top1.update(acc1[0], batch_size)
+            top5.update(acc5[0], batch_size)
+            batch_time.update(time.perf_counter() - end)
+
+            total_samples += batch_size
+
+            if batch_idx % logger.log_freq == 0:
+                progress.display(batch_idx + 1)
+
+                logger.save_eval_batch_metrics(
+                    epoch=epoch,
+                    step=batch_idx + 1,
+                    global_step=(epoch * max_iters) + batch_idx + 1,
+                    num_samples=batch_size,
+                    batch_time=batch_time.val,
+                    loss=losses.avg,
+                    top1=top1.avg,
+                    top5=top5.avg,
+                )
+
+            if batch_idx >= max_iters:
+                break
+
+            end = time.perf_counter()
+
+    logger.save_eval_epoch_metrics(
+        epoch=epoch,
+        num_samples=total_samples,
+        total_time=batch_time.sum,
+        loss=losses.avg,
+        top1=top1.avg,
+        top5=top5.avg,
+    )
+
+    return top1.avg, top5.avg
 
 # Dataloader creation function
-def make_dataloaders(fabric: Fabric, train_args: TrainArgs, data_args: DataArgs, shade_args:SHADEArgs):
+def make_dataloaders(fabric: Fabric, train_args: TrainArgs, data_args: DataArgs, super_args:SUPERArgs):
     train_dataloader = None
     val_dataloader = None
-    if train_args.run_training:
-        tarin_dataset = ShadeDataset(
-            data_dir = data_args.train_data_dir,
+    if train_args.run_training:  
+        dataset = SUPERDataset(
+            job_id=train_args.job_id,
+            data_dir=data_args.train_data_dir,
+            batch_size=train_args.batch_size,
             transform=transform(),
-            target_transform=None,
-            cache_data=True if shade_args.cache_address is not None else False,
-            PQ=PQ,
-            ghost_cache=ghost_cache,
-            key_counter=key_counter,
-            wss=shade_args.working_set_size,
-            cache_address=shade_args.cache_address
-            )
+            world_size=fabric.world_size(),
+            super_address=super_args.super_address,
+            cache_address=super_args.cache_address,
+            simulate_delay=super_args.simulate_data_delay)
         
-        train_sampler = ShadeSampler(
-            dataset = tarin_dataset,
-            num_replicas=fabric.world_size,
-            rank=fabric.node_rank, 
-            batch_size=train_args.batch_size, 
-            seed = train_args.seed,
-            drop_last= False,
-            replacement=True,
-            cache_address=shade_args.cache_address,
-            rep_factor=shade_args.replication_factor,
-            init_fac=1,
-            ls_init_fac = 0.01
-            )
-        
-        train_batch_sampler = BatchSamplerWithID(sampler=train_sampler, batch_size=train_args.batch_size, drop_last=False)
-        train_dataloader = DataLoader(dataset=tarin_dataset, sampler=train_batch_sampler, batch_size=None, num_workers=train_args.num_pytorch_workers)
+        train_dataloader = SUPERDataLoader(dataset=dataset, batch_size=None, num_workers=train_args.num_pytorch_workers)
         train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True, use_distributed_sampler=True)
 
     if train_args.run_evaluation:
-        val_dataset = ShadeDataset(
-            data_dir = data_args.val_data_dir,
+         dataset = SUPERDataset(
+            job_id=train_args.job_id,
+            data_dir=data_args.val_data_dir,
+            batch_size=train_args.batch_size,
             transform=transform(),
-            target_transform=None,
-            cache_data=True if shade_args.cache_address is not None else False,
-            PQ=PQ,
-            ghost_cache=ghost_cache,
-            key_counter=key_counter,
-            wss=shade_args.working_set_size,
-            cache_address=shade_args.cache_address
-            )
-        
-        val_sampler = ShadeSampler(
-            dataset = val_dataset,
-            num_replicas=fabric.world_size,
-            rank=fabric.node_rank, 
-            batch_size=train_args.batch_size, 
-            seed = train_args.seed,
-            drop_last= False,
-            replacement=True,
-            cache_address=shade_args.cache_address,
-            rep_factor=shade_args.replication_factor,
-            init_fac=1,
-            ls_init_fac = 0.01
-            )
-        val_batch_sampler = BatchSamplerWithID(sampler=val_sampler, batch_size=train_args.batch_size, drop_last=False)
-        val_dataloader = DataLoader(dataset=val_dataset, sampler=val_batch_sampler, batch_size=None, num_workers=train_args.num_pytorch_workers)
-        val_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True, use_distributed_sampler=True)
-
+            world_size=fabric.world_size(),
+            super_address=super_args.super_address,
+            cache_address=super_args.cache_address,
+            simulate_delay=super_args.simulate_data_delay)
+         val_dataloader = fabric.setup_dataloaders(val_dataloader, move_to_device=True, use_distributed_sampler=False)
+    
     return train_dataloader, val_dataloader
 
 

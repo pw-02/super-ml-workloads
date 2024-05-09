@@ -48,7 +48,6 @@ class ShadeDataset(Dataset):
             self.bucket_name = S3Url(data_dir).bucket
         else:
             self.samples: Dict[str, List[str]] = self.load_local_sample_idxs(data_dir)
-
         self.cache_portion = int(self.wss * len(self))
 
         self.cache_host, self.cache_port = None,None
