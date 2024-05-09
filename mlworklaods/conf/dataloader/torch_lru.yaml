@@ -1,5 +1,5 @@
 kind: torch_lru
 sampler_kind: vanilla_pytorch
 cache_address: '172.17.0.2:6379' #null #test-0001-001.rdior4.0001.usw2.cache.amazonaws.com:6379  #127.0.0.1:6379
-cache_granularity: sample  #sample or batch
+cache_granularity: batch  #sample or batch
 shuffle: True

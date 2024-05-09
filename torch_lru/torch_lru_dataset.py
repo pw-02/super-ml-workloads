@@ -60,7 +60,7 @@ class TorchLRUDataset(torch.utils.data.Dataset):
             
         if batch_data:
             # Convert JSON batch to torch format
-            torch_imgs, torch_labels, transform_time = self.deserialize_torch_batch(batch_data)
+            torch_imgs, torch_labels = self.deserialize_torch_batch(batch_data)
             # print('data returned') 
             cache_hits = len(batch_indices)
             return torch_imgs, torch_labels, cache_hits, batch_id
@@ -70,6 +70,15 @@ class TorchLRUDataset(torch.utils.data.Dataset):
         if self.transform is not None:
             for i in range(len(data_samples)):
                 data_samples[i] = self.transform(data_samples[i])
+        
+        if self.use_cache and self.cache_granularity == 'batch':
+            minibatch = torch.stack(data_samples), torch.tensor(labels)
+            #Serialize the PyTorch tensor
+            buffer = io.BytesIO()
+            torch.save(minibatch, buffer)
+            minibatch = zlib.compress(buffer.getvalue()) #use_compression:
+            minibatch = base64.b64encode(minibatch).decode('utf-8')
+            self.cache_client.set(batch_id, minibatch)
 
         return torch.stack(data_samples), torch.tensor(labels), cache_hits, batch_id
     
