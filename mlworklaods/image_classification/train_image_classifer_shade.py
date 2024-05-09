@@ -1,44 +1,33 @@
 from typing import List
-import hydra
 from omegaconf import DictConfig
 from lightning.fabric import Fabric
 import time
 from torch import nn, optim, Tensor, no_grad
 from torch.utils.data import DataLoader
 import torchvision
-from super_dl.dataset.s3_imgae_mapped import S3MappedImageDataset
-from super_dl.dataset.super_dataset import SUPERDataset
-from super_dl.dataloader.super_dataloader import SUPERDataLoader
-from super_dl.super_client import SuperClient
 from mlworklaods.args import *
-from torch.utils.data import SequentialSampler, RandomSampler  
 from mlworklaods.utils import ResourceMonitor, get_default_supported_precision, num_model_parameters
 from mlworklaods.log_utils import AverageMeter, ProgressMeter, Summary, ExperimentLogger, get_next_exp_version, create_exp_summary_report
-import os
-from torch_lru.torch_lru_dataset import TorchLRUDataset
 from shade.shadedataset import ShadeDataset
 from shade.shadesampler import ShadeSampler
 import redis
 import heapdict
 import torchvision.transforms as transforms
 from torch_lru.batch_sampler_with_id import BatchSamplerWithID
+import math
 
 # #Initialization of local cache, PQ and ghost cache
-red_local = redis.Redis()
+#Initialization of local cache, PQ and ghost cache
+red_local = redis.StrictRedis(host='172.17.0.2', port='6379')
 PQ = heapdict.heapdict()
 ghost_cache = heapdict.heapdict()
 key_counter  = 0
 
-def launch_job(pid:int, config: DictConfig, train_args: TrainArgs, io_args: IOArgs):
+
+def launch_shade_job(pid:int, config: DictConfig, train_args: TrainArgs, io_args: IOArgs):
     start_time = time.perf_counter()
     precision = get_default_supported_precision(training=True)
     fabric = Fabric(accelerator=train_args.accelerator, devices=train_args.devices, strategy="auto", precision=precision)
-    # exp_version = get_next_exp_version(config.log_dir,config.dataset.name)
-
-    if 'super' in io_args.dataloader_kind:
-        super_client:SuperClient = SuperClient(super_addresss=io_args.super_address)     
-        super_client.register_job(job_id=train_args.job_id, data_dir=io_args.train_data_dir)
-        del(super_client)
 
     fabric.launch(train_model, train_args.seed, config, train_args, io_args)
 
@@ -49,61 +38,50 @@ def launch_job(pid:int, config: DictConfig, train_args: TrainArgs, io_args: IOAr
     fabric.print(f"Job Ended. Total Duration {(time.perf_counter()-start_time):.2f}s")
 
 def train_model(fabric: Fabric, seed: int, config: DictConfig, train_args: TrainArgs, io_args: IOArgs,) -> None:        
-        fabric.seed_everything(seed)  # same seed for every process to init model (FSDP)
-        #setup model 
-        t0 = time.perf_counter()
-        model:nn.Module = make_model(fabric, train_args.model_name) 
-        fabric.print(f"Time to instantiate {train_args.model_name} model: {time.perf_counter() - t0:.02f} seconds")
-        fabric.print(f"Total parameters in {train_args.model_name} model: {num_model_parameters(model):,}")
-        optimizer = optim.Adam(model.parameters(), lr=train_args.learning_rate)
-        #optimizer = optim.SGD(model.parameters(), lr=train_args.learning_rate)
+    fabric.seed_everything(seed)  # same seed for every process to init model (FSDP)
+    #setup model 
+    t0 = time.perf_counter()
+    model:nn.Module = make_model(fabric, train_args.model_name) 
+    fabric.print(f"Time to instantiate {train_args.model_name} model: {time.perf_counter() - t0:.02f} seconds")
+    fabric.print(f"Total parameters in {train_args.model_name} model: {num_model_parameters(model):,}")
+    optimizer = optim.Adam(model.parameters(), lr=train_args.learning_rate)
 
-        model, optimizer = fabric.setup(model,optimizer, move_to_device=True)
-        train_dataloader, val_dataloader = None, None
-        if train_args.run_training:
-            train_dataloader = make_dataloader(
-                fabric,
-                train_args.job_id, 
-                io_args.dataloader_kind, 
-                io_args.train_data_dir, 
-                train_args.shuffle, 
-                train_args.global_batch_size, 
-                train_args.num_pytorch_workers,
-                io_args.super_address,
-                io_args.cache_address,
-                io_args.cache_granularity,
-                train_args.simulate_data_delay,
-                io_args.working_set_size,
-                io_args.replication_factor)
-            
-            train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True, use_distributed_sampler=True)
-        if train_args.run_evaluation:
-            val_dataloader = make_dataloader(
-                train_args.job_id,
-                io_args.dataloader_kind,
-                io_args.val_data_dir, 
-                False, 
-                train_args.global_batch_size, 
-                train_args.num_pytorch_workers,
-                fabric.world_size(), 
-                io_args.super_address,
-                io_args.cache_address,
-                train_args.simulate_data_delay)
-            val_dataloader = fabric.setup_dataloaders(val_dataloader, move_to_device=True, use_distributed_sampler=False)
+    model, optimizer = fabric.setup(model,optimizer, move_to_device=True)
+    train_dataloader, val_dataloader = None, None
+    if train_args.run_training:
+        train_dataloader = make_dataloader(
+            fabric,
+            io_args.train_data_dir, 
+            train_args.global_batch_size, 
+            train_args.num_pytorch_workers,
+            io_args.cache_address,
+            io_args.working_set_size,
+            io_args.replication_factor)
         
-        train_time = time.perf_counter()
-        logger = ExperimentLogger(fabric, io_args.log_dir, io_args.log_interval)
-        if fabric.is_global_zero:
-             logger.log_hyperparams(config)
+        train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True, use_distributed_sampler=True)
+    if train_args.run_evaluation:
+        val_dataloader = make_dataloader(
+            train_args.job_id,
+            io_args.val_data_dir, 
+            train_args.global_batch_size, 
+            train_args.num_pytorch_workers,
+            io_args.cache_address,
+            io_args.replication_factor)
+        val_dataloader = fabric.setup_dataloaders(val_dataloader, move_to_device=True, use_distributed_sampler=False)
+    
+    train_time = time.perf_counter()
+    logger = ExperimentLogger(fabric, io_args.log_dir, io_args.log_interval)
+    if fabric.is_global_zero:
+            logger.log_hyperparams(config)
 
-        fit(fabric, model, optimizer, train_dataloader, val_dataloader, logger, train_args)
-        
-        fabric.print(f"Training finished on device {fabric.global_rank} after {(time.perf_counter()-train_time):.2f}s")
-        # if fabric.device.type == "cuda":
-        #     fabric.print(f"Memory used: {cuda.max_memory_allocated() / 1e9:.02f} GB")
-        
-        #fabric.print(f"Creating job report for device {fabric.global_rank}..")
-        logger.create_job_report()
+    fit(fabric, model, optimizer, train_dataloader, val_dataloader, logger, train_args)
+    
+    fabric.print(f"Training finished on device {fabric.global_rank} after {(time.perf_counter()-train_time):.2f}s")
+    # if fabric.device.type == "cuda":
+    #     fabric.print(f"Memory used: {cuda.max_memory_allocated() / 1e9:.02f} GB")
+    
+    #fabric.print(f"Creating job report for device {fabric.global_rank}..")
+    logger.create_job_report()
     
 def fit(fabric: Fabric, 
         model:nn.Module, 
@@ -117,13 +95,17 @@ def fit(fabric: Fabric,
     best_acc5_train = 0
     best_acc1_eval = 0
     best_acc5_eval = 0
+    
+    batch_wts = []
+    for j in range(train_args.global_batch_size):
+        batch_wts.append(math.log(j+10))
 
     for epoch in range(1, train_args.epochs +1):
         if train_dataloader:
             max_iters = min(len(train_dataloader), train_args.epoch_max_iters(fabric.world_size)) 
             fabric.print(f"Starting training loop for epoch {epoch}")
             model.train(mode=True)
-            loss_train, acc1_train, acc5_train = train_loop(fabric, epoch, model, optimizer, train_dataloader, max_iters, logger,train_args.dataload_only)
+            loss_train, acc1_train, acc5_train = train_loop(fabric, epoch, model, optimizer, train_dataloader, max_iters, logger,train_args.dataload_only,batch_wts)
               # remember best acc@1 and acc@5
             best_acc1_train = max(acc1_train, best_acc1_train)
             best_acc5_train = max(acc5_train, best_acc5_train)
@@ -203,8 +185,15 @@ def train_loop(fabric: Fabric,
                 train_dataloader:DataLoader, 
                 max_iters:int, 
                 logger:ExperimentLogger, 
-                dataload_only:bool):
+                dataload_only:bool,
+                batch_wts):
+        global PQ
         
+        global key_id_map
+        global key_counter
+        global red_local
+        global ghost_cache
+        key_id_map = redis.StrictRedis(host='172.17.0.2', port='6379')
         epoch_cache_hits_count = 0
         total_samples = 0
         batch_time = AverageMeter('Time', ':6.3f')
@@ -223,9 +212,7 @@ def train_loop(fabric: Fabric,
         with ResourceMonitor() as monitor:
             end = time.perf_counter()
             for batch_idx,(images, target, cache_hit_count, batch_id) in enumerate(train_dataloader):
-                print(batch_id)
                 data_time.update(time.perf_counter() - end)
-                # batchid.update(batch_id)
                 epoch_cache_hits_count +=cache_hit_count
                 cache_hit_ratio.update(cache_hit_count/images.size(0), 1)
                
@@ -235,13 +222,20 @@ def train_loop(fabric: Fabric,
                     # Forward pass and loss calculation
                     with fabric.no_backward_sync(model, enabled=is_accumulating):
                         output:Tensor = model(images)
-                        loss = nn.functional.cross_entropy(output, target)
+                        criterion = nn.CrossEntropyLoss(reduce = False).cuda(0)
+                        item_loss = criterion(output,target)
+                        # item_loss = nn.functional.cross_entropy(input=output, target=target, reduce = False).cpu()
+                        
+                        loss = item_loss.mean()
                         fabric.backward(loss) # .backward() accumulates when .zero_grad() wasn't called
-                    
+                        
+                        train_dataloader.sampler.sampler.pass_batch_important_scores(item_loss)
+
                     if not is_accumulating:
                         # Step the optimizer after accumulation phase is over
                         optimizer.step()
                         optimizer.zero_grad()
+                    
                     # measure computation time
                     compute_time.update(time.perf_counter() - end - data_time.val)
                     
@@ -249,9 +243,40 @@ def train_loop(fabric: Fabric,
                     losses.update(loss.item(), batch_size)
                     top1.update(acc1.item(), batch_size)
                     top5.update(acc5.item(), batch_size)
+
+                key_counter = red_local.dbsize()
+                sorted_img_indices = train_dataloader.sampler.sampler.get_sorted_index_list()
+                track_batch_indx = 0
+                # Updating PQ and ghost cache during training.
+                if epoch > 1:
+                    PQ = train_dataloader.dataset.get_PQ()
+                    ghost_cache = train_dataloader.dataset.get_ghost_cache()
+
+                for indx in sorted_img_indices:
+                    if key_id_map.exists(indx.item()):
+                        if indx.item() in PQ:
+                            #print("Train_index: %d Importance_Score: %f Frequency: %d Time: %s N%dG%d" %(indx.item(),batch_loss,PQ[indx.item()][1]+1,insertion_time,args.nr+1,gpu+1))
+                            PQ[indx.item()] = (batch_wts[track_batch_indx],PQ[indx.item()][1]+1)
+                            ghost_cache[indx.item()] = (batch_wts[track_batch_indx],ghost_cache[indx.item()][1]+1)
+                            track_batch_indx+=1
+                        else:
+                            #print("Train_index: %d Importance_Score: %f Time: %s N%dG%d" %(indx.item(),batch_loss,insertion_time,args.nr+1,gpu+1))
+                            PQ[indx.item()] = (batch_wts[track_batch_indx],1)
+                            ghost_cache[indx.item()] = (batch_wts[track_batch_indx],1)
+                            track_batch_indx+=1
+                    else:
+                        if indx.item() in ghost_cache:
+                            ghost_cache[indx.item()] = (batch_wts[track_batch_indx],ghost_cache[indx.item()][1]+1)
+                            track_batch_indx+=1
+                        else:
+                            ghost_cache[indx.item()] = (batch_wts[track_batch_indx],1)
+                            track_batch_indx+=1
                 batch_time.update(time.perf_counter() - end)
                 total_samples += batch_size
-                
+                train_dataloader.dataset.set_PQ(PQ)
+                train_dataloader.dataset.set_ghost_cache(ghost_cache)
+                train_dataloader.dataset.set_num_local_samples(key_counter)
+
                 if batch_idx % logger.log_freq == 0:
                     #progress.display(batch_idx + 1, fabric)
                     progress.display(batch_idx + 1)
@@ -272,6 +297,7 @@ def train_loop(fabric: Fabric,
                         avg_gpu=monitor.resource_data['gpu_util'].summarize()['mean'] if monitor.monitor_gpu else 0,
                         max_gpu=monitor.resource_data['gpu_util'].summarize()['max'] if monitor.monitor_gpu else 0,
                         )
+                    
 
                 if batch_idx+1 >= max_iters:
                     # end loop early as max number of minibatches have been processed 
@@ -295,49 +321,32 @@ def train_loop(fabric: Fabric,
                 avg_gpu= monitor.resource_data['gpu_util'].summarize()['mean'] if monitor.monitor_gpu else 0,
                 max_gpu= monitor.resource_data['gpu_util'].summarize()['max'] if monitor.monitor_gpu else 0,
             )
+            train_dataloader.sampler.sampler.on_epoch_end(losses.avg)
+            # indices_for_process = train_dataloader.sampler.get_indices_for_process()
+            # indices_for_process_per_epoch = indices_for_process_per_epoch.append({
+            #      'epoch': epoch,
+            #      'indices': indices_for_process,
+            #      }
+            #      , ignore_index=True
+            #      )
             return losses.avg, top1.avg, top5.avg
     
 
 def make_dataloader(
         fabric:Fabric,
-        job_id:int, 
-        dataloader_kind:str, 
         data_dir:str, 
-        shuffle: bool, 
         batch_size:int, 
         num_workers:int,
-        super_address:str = None, 
         cache_address:str = None, 
-        cache_granularity:str = None, 
-        simulate_data_delay = None,
         working_set_size = None,
         replication_factor = None):
-    
-    dataloader = None
 
-    if dataloader_kind == 'torch_lru':  
-        dataset =  TorchLRUDataset(data_dir = data_dir, transform=transform(), cache_address=cache_address, cache_granularity=cache_granularity)
-        sampler = RandomSampler(data_source=dataset) if shuffle else SequentialSampler(data_source=dataset)
-        batch_sampler = BatchSamplerWithID(sampler=sampler, batch_size=batch_size, drop_last=False)
-        dataloader = DataLoader(dataset=dataset, sampler=batch_sampler, batch_size=None, num_workers=num_workers)
-    
-    elif dataloader_kind == 'shade':
-        import torchvision.datasets as datasets
-        global PQ
-        global key_id_map
-        global key_counter
-        global red_local
-        global ghost_cache
-        key_id_map = redis.Redis()
-
-        cache_host, cache_port = None,None
-        if cache_address:
-            cache_host, cache_port = cache_address.split(":")
+        dataloader = None
 
         dataset =  ShadeDataset(data_dir = data_dir, 
                                 transform=transform(),
                                 target_transform=None,
-                                cache_data=True if cache_host is not None else False,
+                                cache_data=True if cache_address is not None else False,
                                 PQ=PQ,
                                 ghost_cache=ghost_cache,
                                 key_counter=key_counter,
@@ -350,26 +359,14 @@ def make_dataloader(
                                batch_size=batch_size, 
                                seed = 41, 
                                cache_address = cache_address, 
+                               rep_factor=replication_factor
                                )
         
         batch_sampler = BatchSamplerWithID(sampler=sampler, batch_size=batch_size, drop_last=False)
 
         dataloader = DataLoader(dataset=dataset, sampler=batch_sampler, batch_size=None, num_workers=num_workers)
 
-    elif dataloader_kind == 'super_image':
-        dataset =  SUPERDataset(
-            job_id=job_id,
-            data_dir=data_dir,
-            batch_size=batch_size,
-            transform=transform(),
-            world_size=fabric.world_size,
-            super_address=super_address,
-            cache_address=cache_address,
-            simulate_delay=simulate_data_delay)   
-        dataloader = SUPERDataLoader(dataset=dataset, num_workers=num_workers, batch_size=None)
-    else:
-        raise Exception(f"unknown dataloader_kind {dataloader_kind}")
-    return dataloader
+        return dataloader
    
 def make_model(fabric:Fabric, model_name:str):
     if model_name in torchvision.models.list_models():

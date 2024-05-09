@@ -1,5 +1,5 @@
 name: cifar10
-train_dir: data/cifar-10   #s3://sdl-cifar10/train/
-val_dir: s3://sdl-cifar10/test/
+train_dir: data/cifar-10/train   #s3://sdl-cifar10/train/
+val_dir: s3://sdl-cifar10/test
 # train_dir: data/cifar-10/train
 # val_dir: data/cifar-10/val

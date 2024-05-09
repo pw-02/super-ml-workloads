@@ -21,7 +21,7 @@ class ExperimentLogger():
         self.eval_job_metrics = None
         self.total_tokens = None
 
-    def save_train_batch_metrics(self,epoch,step,global_step,num_sampels,total_time,data_time,compute_time,loss, avg_cpu, max_cpu, avg_gpu=0, max_gpu=0, num_tokens = None, acc1 = None, acc5 = None, ):
+    def save_train_batch_metrics(self,epoch,step,global_step,num_sampels,total_time,data_time,compute_time,loss, avg_cpu, max_cpu,cache_hits, avg_gpu=0, max_gpu=0, num_tokens = None, acc1 = None, acc5 = None, ):
         metrics = OrderedDict({
                 "device": self.fabric.local_rank,
                 "epoch": epoch,
@@ -31,11 +31,12 @@ class ExperimentLogger():
                 "total_time": total_time,
                 "data_time": data_time,
                 "compute_time": compute_time,
+                "cache_hits": cache_hits,
                 "loss": loss,
                 "avg_cpu": avg_cpu,
                 "max_cpu": max_cpu,
                 "avg_gpu": avg_gpu,
-                "max_gpu": max_gpu   
+                "max_gpu": max_gpu,   
             })
         
         if acc1 is not None:
@@ -50,7 +51,7 @@ class ExperimentLogger():
         self.log_metrics(metrics = metrics,prefix='train.iteration',step=global_step,force_save=True)
     
     def save_train_epoch_metrics(self,epoch,num_samples,global_step,num_batches,total_time,data_time,compute_time,loss, 
-                                 avg_cpu, max_cpu, avg_gpu=0, max_gpu=0, num_tokens = None,acc1 = None, acc5=None,):
+                                 avg_cpu, max_cpu, cache_hits, avg_gpu=0, max_gpu=0, num_tokens = None,acc1 = None, acc5=None,):
         metrics = OrderedDict({
                 "device": self.fabric.local_rank,
                 "epoch": epoch,
@@ -59,11 +60,13 @@ class ExperimentLogger():
                 "total_time": total_time,
                 "data_time": data_time,
                 "compute_time": compute_time,
+                "cache_hits": cache_hits,
                 "loss": loss,
                 "avg_cpu": avg_cpu,
                 "max_cpu": max_cpu,
                 "avg_gpu": avg_gpu,
                 "max_gpu": max_gpu
+
             }) 
         
         if acc1 is not None:
@@ -79,7 +82,7 @@ class ExperimentLogger():
         if self.train_job_metrics == None:
             self.train_job_metrics = AggregatedEpochMetrics()
             
-        self.train_job_metrics.cache_hits +=0
+        self.train_job_metrics.cache_hits += cache_hits
         self.train_job_metrics.epoch_compute_times.update(compute_time)
         self.train_job_metrics.epoch_dataload_times.update(data_time)
         self.train_job_metrics.epoch_times.update(total_time)
@@ -143,6 +146,7 @@ class ExperimentLogger():
                     "compute_time": self.train_job_metrics.epoch_compute_times.sum,
                     "bps": calc_throughput(self.train_job_metrics.total_batches, self.train_job_metrics.epoch_times.sum),
                     "compute_bps": calc_throughput(self.train_job_metrics.total_batches,self.train_job_metrics.epoch_compute_times.sum),
+                    "cache_hits": self.train_job_metrics.cache_hits,
                     "loss": self.train_job_metrics.epoch_losses.val,
                     "acc1" : self.train_job_metrics.epoch_acc1.val,
                     "acc5" :  self.train_job_metrics.epoch_acc5.val,
@@ -273,6 +277,7 @@ def summarize_across_all_devices(category_data):
         "total_batches": [],
         "batches/sec": [],
         "total_epochs": [],
+        "total_cache_hits": [],
         "loss": [],
         "acc1": [],
         "acc5": []
@@ -289,6 +294,7 @@ def summarize_across_all_devices(category_data):
             summary['compute_time'].append(calculate_average(category_data[key][f'{key}.compute_time']))
             summary['total_samples'].append(sum(category_data[key][f'{key}.total_samples']))
             summary['total_batches'].append(sum(category_data[key][f'{key}.total_batches']))
+            summary['total_cache_hits'].append(sum(category_data[key][f'{key}.cache_hits']))
             # summary['samples/sec'].append(calculate_average(category_data[key][f'{key}.total_ips']))                
             summary['batches/sec'].append(calculate_average(category_data[key][f'{key}.bps']))
             summary['total_epochs'].append(max(category_data[key][f'{key}.total_epochs']))

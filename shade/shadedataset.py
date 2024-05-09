@@ -18,6 +18,7 @@ import json
 from pathlib import Path
 import functools
 from typing import Dict, List
+import torch
 
 T_co = TypeVar('T_co', covariant=True)
 T = TypeVar('T')
@@ -33,7 +34,8 @@ class ShadeDataset(Dataset):
         ghost_cache=None,
         key_counter=None,
         wss=0.1,
-        cache_address = None
+        cache_address = None,
+        cache_granularity:str = 'sample'
     ):
         self.transform = transform
         self.target_transform = target_transform
@@ -53,12 +55,14 @@ class ShadeDataset(Dataset):
         if cache_address:
             self.cache_host, self.cache_port = cache_address.split(":")
 
-        if self.cache_host == '0.0.0.0' or self.cache_host is None:
-            self.key_id_map = redis.Redis()
-        else:
-            self.startup_nodes = [{"host": self.cache_host, "port": self.cache_port}]
-            # self.key_id_map = RedisCluster(startup_nodes=self.startup_nodes)
-            self.key_id_map = redis.Redis()
+        self.key_id_map = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
+        self.cache_granularity = cache_granularity
+        # if self.cache_host == '0.0.0.0' or self.cache_host is None:
+        #     self.key_id_map = redis.Redis()
+        # else:
+        #     self.startup_nodes = [{"host": self.cache_host, "port": self.cache_port}]
+        #     # self.key_id_map = RedisCluster(startup_nodes=self.startup_nodes)
+        #     self.key_id_map = redis.Redis()
 
         self.PQ = PQ
         self.ghost_cache = ghost_cache
@@ -89,31 +93,34 @@ class ShadeDataset(Dataset):
 
     def get_ghost_cache(self):
         return self.ghost_cache
-
-    def cache_and_evict(self, path, target, index):
+    
+    def fetch_from_cache(self, key):
+        try:
+            return self.key_id_map.get(key)
+        except:
+             return None
+        
+    def cache_and_evict(self, data_path, index):
+        data = None
+        cache_hit  = False
         if self.cache_data and self.key_id_map.exists(index):
-            try:
-                print(f'Hitting {index}')
-                byte_image = self.key_id_map.get(index)
-                byte_img_io = io.BytesIO(byte_image)
-                sample = Image.open(byte_img_io).convert('RGB')
-            except PIL.UnidentifiedImageError:
-                try:
-                    print(f"Could not open image from byteIO at path: {path}")
-                    sample = Image.open(path).convert('RGB')
-                    print("Successfully opened file from path using open.")
-                except Exception:
-                    print("Could not open image even from path. The image file is corrupted.")
-        else:
-            if index in self.ghost_cache:
-                print(f'Miss {index}')
-                
+            # print(f'Hitting {index}')
+            byte_data = self.fetch_from_cache(index)
+            if byte_data:
+                byte_img_io = io.BytesIO(byte_data)
+                data = Image.open(byte_img_io)
+                cache_hit = True
+        if data is None:  #data not retrieved from cache, so get it from primary storage
+            # print(f'Miss {index}')
             if self.is_s3:
-                image = s3utils.get_s3_object(self.bucket_name, path)
-                image = Image.open(io.BytesIO(image)).convert('RGB')
+                data = s3utils.get_s3_object(self.bucket_name, data_path)
+                data = Image.open(io.BytesIO(data))
             else:
-                image = Image.open(path).convert('RGB')
-
+                data = Image.open(data_path) #get_local_sample
+            
+            if data.mode == "L":
+                data = data.convert("RGB")
+            
             keys_cnt = self.key_counter + 50
 
             if keys_cnt >= self.cache_portion:
@@ -131,37 +138,56 @@ class ShadeDataset(Dataset):
 
             if self.cache_data and keys_cnt < self.cache_portion:
                 byte_stream = io.BytesIO()
-                image.save(byte_stream, format=image.format)
+                data.save(byte_stream, format=data.format)
                 byte_stream.seek(0)
-                byte_image = byte_stream.read()
-                self.key_id_map.set(index, byte_image)
-                print(f"Index: {index}")
+                self.key_id_map.set(index, byte_stream.read())
+                # print(f"Index: {index}")
 
-        return image.convert('RGB')
+        return data,cache_hit
 
+
+    def fetch_batch_data(self, batch_indices):
+        data_samples = []
+        labels = []
+        cache_hit_count = 0
+        
+        for idx in batch_indices: 
+            data = None
+            data_path, label = self._classed_items[idx] 
+            # insertion_time = datetime.now().strftime("%H:%M:%S")
+            # print(f"train_search_index: {idx} time: {insertion_time}")
+            data, cache_hit = self.cache_and_evict(data_path, idx)
+            data_samples.append(data)
+            labels.append(label)
+            if cache_hit:
+                cache_hit_count +=1
+        return data_samples, labels, cache_hit_count
+    
     def __getitem__(self, index: int):
-        """
-        Args:
-            index (int): Index
-        Returns:
-            tuple: (sample, target) where target is class_index of the target class.
-        """
-        path, target = self._classed_items[index]
-        insertion_time = datetime.now().strftime("%H:%M:%S")
-        print(f"train_search_index: {index} time: {insertion_time}")
 
-        sample = self.cache_and_evict(path, target, index)
+        batch_id, batch_indices = index
+
+        batch_data = None
+        if self.cache_granularity == 'batch':
+            pass
+            #batch_data = self.fetch_from_cache(batch_id)
+
+        if batch_data:
+            pass 
+        
+        data_samples, labels, cache_hit_count = self.fetch_batch_data(batch_indices)
 
         if self.transform is not None:
-            sample = self.transform(sample)
-        if self.target_transform is not None:
-            target = self.target_transform(target)
+            for i in range(len(data_samples)):
+                data_samples[i] = self.transform(data_samples[i])
+        
+        return torch.stack(data_samples), torch.tensor(labels), cache_hit_count, batch_id
 
-        return sample, target
 
     def __len__(self) -> int:
         return sum(len(class_items) for class_items in self.samples.values())
 
+    
     def load_local_sample_idxs(self, data_dir) -> Dict[str, List[str]]:
         data_dir = str(Path(data_dir))
         classed_samples: Dict[str, List[str]] = {}

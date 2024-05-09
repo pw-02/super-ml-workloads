@@ -82,11 +82,14 @@ class TorchLRUDataset(torch.utils.data.Dataset):
         for idx in batch_indices: 
             data = None
             data_path, label = self._classed_items[idx] 
+            
             if self.use_cache and self.cache_granularity == 'sample':
                 byte_data = self.fetch_from_cache(data_path)
-                byte_img_io = io.BytesIO(byte_data)
-                data = Image.open(byte_img_io).convert('RGB')
-
+                if byte_data:
+                    byte_img_io = io.BytesIO(byte_data)
+                    data = Image.open(byte_img_io)
+                    
+                
             if data is None:  #data not retrieved from cache, so get it from primary storage
                 if self.is_s3:
                     data = s3utils.get_s3_object(self.bucket_name, data_path)

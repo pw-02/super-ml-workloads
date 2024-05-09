@@ -4,6 +4,7 @@ import hydra
 from mlworklaods.args import *
 import os
 from train_image_classifer import launch_job
+from train_image_classifer_shade import launch_shade_job
 from mlworklaods.log_utils import  get_next_exp_version
 import torch.multiprocessing as mp 
 from torch.multiprocessing import Pool, Process, set_start_method 
@@ -54,14 +55,17 @@ def main(config: DictConfig):
         # key_counter  = 0
         io_args.working_set_size = config.dataloader.working_set_size
         io_args.replication_factor =config.dataloader.replication_factor
-        cache_granularity=config.dataloader.cache_granularity
+        io_args.cache_granularity=config.dataloader.cache_granularity
     elif 'torch_lru' in  io_args.dataloader_kind:
-        cache_granularity=config.dataloader.cache_granularity
+        io_args.cache_granularity=config.dataloader.cache_granularity
         
     if config.num_jobs == 1:
         train_args.devices = config.num_devices_per_job
         print(f"Running single job on {train_args.devices} GPUS")
-        launch_job(1,config, train_args, io_args)
+        if 'shade' in io_args.dataloader_kind:
+            launch_shade_job(1,config, train_args, io_args)
+        else:
+            launch_job(1,config, train_args, io_args)
     else:
         print(f"Running HP with {config.num_jobs} jobs each on {train_args.devices} GPUS")
         processes:List[Process] = []
