@@ -21,7 +21,7 @@ from typing import  Optional
 
 monitor_gpu = False
 if torch.cuda.is_available():
-    monitor_gpu = False
+    monitor_gpu = True
     nvmlInit()
 
 

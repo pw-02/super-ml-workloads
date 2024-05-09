@@ -166,8 +166,12 @@ class SUPERDataset(IterableDataset):
                 imgs, labels = self.fetch_from_s3(batch_indicies)
                 imgs, labels = self.apply_transformations(imgs, labels)
                 torch_imgs, torch_labels = torch.stack(imgs), torch.tensor(labels)
+        if cache_hit:
+            cache_hit_count = len(batch_indicies)
+        else:
+            cache_hit_count = 0
 
-        return torch_imgs, torch_labels, batch_id, cache_hit
+        return torch_imgs, torch_labels, cache_hit_count
      
     
     def fetch_from_cache(self, batch_id, max_attempts = 5):

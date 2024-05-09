@@ -21,13 +21,13 @@ class ExperimentLogger():
         self.eval_job_metrics = None
         self.total_tokens = None
 
-    def save_train_batch_metrics(self,epoch,step,global_step,num_sampels,total_time,data_time,compute_time,loss, avg_cpu, max_cpu,cache_hits, avg_gpu=0, max_gpu=0, num_tokens = None, acc1 = None, acc5 = None, ):
+    def save_train_batch_metrics(self,epoch,step,global_step,num_samples,total_time,data_time,compute_time,loss, avg_cpu, max_cpu,cache_hits, avg_gpu=0, max_gpu=0, num_tokens = None, acc1 = None, acc5 = None, ):
         metrics = OrderedDict({
                 "device": self.fabric.local_rank,
                 "epoch": epoch,
                 "epoch_step": step,
                 "global_step": global_step,
-                "num_samples": num_sampels,
+                "num_samples": num_samples,
                 "total_time": total_time,
                 "data_time": data_time,
                 "compute_time": compute_time,

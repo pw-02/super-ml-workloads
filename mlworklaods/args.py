@@ -7,6 +7,7 @@ from numpy import Infinity
 class TrainArgs:
     job_id: int
     model_name: str
+    dataloader_kind: str
     dataload_only: bool = False
     num_pytorch_workers: int = 0
     epochs: int = 1
@@ -22,7 +23,6 @@ class TrainArgs:
     seed: int = 41
     log_dir: Optional[Path] = None
     log_interval: int = 1
-    dataloader_kind: str
 
     def get_epoch_max_iters(self, devices: int) -> int:
         """Calculate max iterations per epoch per device."""
@@ -31,7 +31,7 @@ class TrainArgs:
             if epoch_iters <= 0:
                 raise ValueError("Epoch max iterations must be greater than zero.")
             return epoch_iters
-        return int(Infinity)
+        return Infinity
 
     def get_batch_size(self, devices: int) -> int:
         """Calculate batch size per device."""

@@ -1,10 +1,12 @@
 {
+    "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: File",
-            "type": "python",
+            "name": "Python Debugger: Specific File",
+            "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
+            "program": "${workspaceFolder}/mlworklaods/image_classification/launch.py",
+            "console": "integratedTerminal",
             "justMyCode": true
         }
     ]

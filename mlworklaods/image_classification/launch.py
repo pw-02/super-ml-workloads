@@ -50,7 +50,7 @@ def prepare_args(config: DictConfig):
             simulate_data_delay=config.dataloader.simulate_data_delay)
         return train_args, data_args, super_args
 
-    elif 'shade' in train_args.dataloader.kind:
+    elif 'shade' in train_args.dataloader_kind:
         shade_args = SHADEArgs(
             cache_address=config.dataloader.cache_address,
             working_set_size=config.dataloader.working_set_size,

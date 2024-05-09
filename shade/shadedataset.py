@@ -127,13 +127,14 @@ class ShadeDataset(Dataset):
                     peek_item = self.PQ.peekitem()
                     if self.ghost_cache[index] > peek_item[1]:
                         evicted_item = self.PQ.popitem()
-                        print(f"Evicting index: {evicted_item[0]} Weight: {evicted_item[1][0]} Frequency: {evicted_item[1][1]}")
+                        # print(f"Evicting index: {evicted_item[0]} Weight: {evicted_item[1][0]} Frequency: {evicted_item[1][1]}")
                         
                         if self.key_id_map.exists(evicted_item[0]):
                             self.key_id_map.delete(evicted_item[0])
                         keys_cnt -= 1
                 except Exception:
-                    print("Could not evict item or PQ was empty.")
+                    # print("Could not evict item or PQ was empty.")
+                    pass
 
             if self.cache_data and keys_cnt < self.cache_portion:
                 byte_stream = io.BytesIO()
@@ -180,7 +181,7 @@ class ShadeDataset(Dataset):
             for i in range(len(data_samples)):
                 data_samples[i] = self.transform(data_samples[i])
         
-        return torch.stack(data_samples), torch.tensor(labels), cache_hit_count, batch_id
+        return torch.stack(data_samples), torch.tensor(labels), cache_hit_count
 
 
     def __len__(self) -> int:

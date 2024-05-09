@@ -58,7 +58,7 @@ def train_model(fabric: Fabric, seed: int, config: DictConfig, train_args: Train
 
     for epoch in range(1, train_args.epochs + 1):
         if train_dataloader:
-            max_iters = min(len(train_dataloader), train_args.epoch_max_iters(fabric.world_size))
+            max_iters = min(len(train_dataloader), train_args.get_epoch_max_iters(fabric.world_size))
             fabric.print(f"Starting training loop for epoch {epoch}")
             model.train(True)
             loss_train, acc1_train, acc5_train = train_loop(fabric, epoch, model, optimizer, train_dataloader, max_iters, logger, train_args.dataload_only)
@@ -66,7 +66,7 @@ def train_model(fabric: Fabric, seed: int, config: DictConfig, train_args: Train
             best_acc5_train = max(acc5_train, best_acc5_train)
 
         if val_dataloader:
-            max_iters = min(len(val_dataloader), train_args.epoch_max_iters(fabric.world_size))
+            max_iters = min(len(val_dataloader), train_args.get_epoch_max_iters(fabric.world_size))
             fabric.print(f"Starting validation loop for epoch {epoch}")
             model.eval()
             loss_eval, acc1_eval, acc5_eval = val_loop(fabric, epoch, model, val_dataloader, max_iters, logger)
@@ -236,7 +236,7 @@ def make_dataloaders(fabric: Fabric, train_args: TrainArgs, data_args: DataArgs,
             cache_granularity=lru_torch_args.cache_granularity)
         
         train_base_sampler = RandomSampler(data_source=train_dataset) if lru_torch_args.shuffle else SequentialSampler(data_source=train_dataset)
-        train_batch_sampler = BatchSamplerWithID(sampler=train_base_sampler, batch_size=train_args.batch_size, drop_last=False)
+        train_batch_sampler = BatchSamplerWithID(sampler=train_base_sampler, batch_size=train_args.get_batch_size(fabric.world_size), drop_last=False)
         
         train_dataloader = DataLoader(dataset=train_dataset, sampler=train_batch_sampler, batch_size=None, num_workers=train_args.num_pytorch_workers)
         train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True, use_distributed_sampler=True)
@@ -249,7 +249,7 @@ def make_dataloaders(fabric: Fabric, train_args: TrainArgs, data_args: DataArgs,
             cache_granularity=lru_torch_args.cache_granularity)
         
         val_base_sampler = RandomSampler(data_source=val_dataset) if lru_torch_args.shuffle else SequentialSampler(data_source=val_dataset)
-        val_batch_sampler = BatchSamplerWithID(sampler=val_base_sampler, batch_size=train_args.batch_size, drop_last=False)
+        val_batch_sampler = BatchSamplerWithID(sampler=val_base_sampler, batch_size=train_args.get_batch_size(fabric.world_size), drop_last=False)
         
         val_dataloader = DataLoader(dataset=val_dataset, sampler=val_batch_sampler, batch_size=None, num_workers=train_args.num_pytorch_workers)
         val_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True, use_distributed_sampler=True)

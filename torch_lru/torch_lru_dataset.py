@@ -62,7 +62,7 @@ class TorchLRUDataset(torch.utils.data.Dataset):
             # Convert JSON batch to torch format
             torch_imgs, torch_labels, transform_time = self.deserialize_torch_batch(batch_data)
             # print('data returned') 
-            return torch_imgs, torch_labels, True, batch_id
+            return torch_imgs, torch_labels, True
          
         data_samples, labels = self.fetch_batch_data(batch_indices)
 
@@ -70,7 +70,7 @@ class TorchLRUDataset(torch.utils.data.Dataset):
             for i in range(len(data_samples)):
                 data_samples[i] = self.transform(data_samples[i])
 
-        return torch.stack(data_samples), torch.tensor(labels), False, batch_id
+        return torch.stack(data_samples), torch.tensor(labels), False
     
     def random_true_or_false(self) -> bool:
         import random
