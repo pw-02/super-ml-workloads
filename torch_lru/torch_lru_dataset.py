@@ -62,15 +62,16 @@ class TorchLRUDataset(torch.utils.data.Dataset):
             # Convert JSON batch to torch format
             torch_imgs, torch_labels, transform_time = self.deserialize_torch_batch(batch_data)
             # print('data returned') 
-            return torch_imgs, torch_labels, True
+            cache_hits = len(batch_indices)
+            return torch_imgs, torch_labels, cache_hits
          
-        data_samples, labels = self.fetch_batch_data(batch_indices)
+        data_samples, labels, cache_hits = self.fetch_batch_data(batch_indices)
 
         if self.transform is not None:
             for i in range(len(data_samples)):
                 data_samples[i] = self.transform(data_samples[i])
 
-        return torch.stack(data_samples), torch.tensor(labels), False
+        return torch.stack(data_samples), torch.tensor(labels), cache_hits
     
     def random_true_or_false(self) -> bool:
         import random
@@ -79,6 +80,7 @@ class TorchLRUDataset(torch.utils.data.Dataset):
     def fetch_batch_data(self,batch_indices):
         data_samples = []
         labels = []
+        cache_hits = 0
         for idx in batch_indices: 
             data = None
             data_path, label = self._classed_items[idx] 
@@ -88,7 +90,7 @@ class TorchLRUDataset(torch.utils.data.Dataset):
                 if byte_data:
                     byte_img_io = io.BytesIO(byte_data)
                     data = Image.open(byte_img_io)
-                    
+                    cache_hits +=1
                 
             if data is None:  #data not retrieved from cache, so get it from primary storage
                 if self.is_s3:
@@ -109,7 +111,7 @@ class TorchLRUDataset(torch.utils.data.Dataset):
             data_samples.append(data)
             labels.append(label)
 
-        return data_samples, labels
+        return data_samples, labels, cache_hits
         
 
     def is_image_file(self, path: str):

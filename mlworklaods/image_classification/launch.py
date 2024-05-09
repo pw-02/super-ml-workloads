@@ -80,6 +80,7 @@ def spawn_multiple_jobs(config, train_args, data_args, dataloader_args):
         
         # Create a dictionary of process-specific arguments
         process_args = {
+            "job_id": job,
             "config": config,
             "train_args": train_args,
             "data_args": data_args,
