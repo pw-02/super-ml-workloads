@@ -1,18 +1,18 @@
 import time
 import os
 from torch import nn, optim, Tensor, no_grad
-import torchvision
 from typing import List, Dict
 import hydra
 from omegaconf import DictConfig
 from lightning.fabric import Fabric
 
+from common import make_model, transform, accuracy
 
 # Additional imports
 from mlworklaods.args import TrainArgs, DataArgs, SUPERArgs
 from mlworklaods.utils import ResourceMonitor, get_default_supported_precision, num_model_parameters
 from mlworklaods.log_utils import ExperimentLogger, AverageMeter, ProgressMeter, create_exp_summary_report
-import torchvision.transforms as transforms
+
 from super_dl.dataloader.super_dataloader import SUPERDataLoader
 from super_dl.dataset.super_dataset import SUPERDataset
 
@@ -95,6 +95,8 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
     total_samples = 0
     batch_time = AverageMeter("Time", ":6.3f")
     data_time = AverageMeter("Data", ":6.3f")
+    fetch_time = AverageMeter("Fetch", ":6.3f")
+    transform_time = AverageMeter("Transform", ":6.3f")
     compute_time = AverageMeter("Compute", ":6.3f")
     losses = AverageMeter("Loss", ":6.2f")
     top1 = AverageMeter("Acc1", ":6.2f")
@@ -106,8 +108,11 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
     with ResourceMonitor() as monitor:
         end = time.perf_counter()
 
-        for batch_idx, (images, target, cache_hits) in enumerate(train_dataloader):
+        for batch_idx, (images, target, cache_hits, data_transform_time) in enumerate(train_dataloader):
             data_time.update(time.perf_counter() - end)
+            fetch_time.update(data_time.val -data_transform_time)
+
+            transform_time.update(data_transform_time)            
             batch_size = images.size(0)
             toal_cahce_hits += cache_hits
             cache_hit_ratio.update(cache_hits / batch_size, 1)
@@ -266,42 +271,6 @@ def make_dataloaders(fabric: Fabric, train_args: TrainArgs, data_args: DataArgs,
     return train_dataloader, val_dataloader
 
 
-# Make a model given the name
-def make_model(fabric: Fabric, model_name: str):
-    if model_name in torchvision.models.list_models():
-        with fabric.init_module(empty_init=True):
-            return torchvision.models.get_model(model_name)
-    raise Exception(f"Unknown model: {model_name}")
-
-# Transformation function for data augmentation
-def transform():
-    normalize = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406], 
-        std=[0.229, 0.224, 0.225],
-    )
-    return transforms.Compose([
-        transforms.ToTensor(),
-        normalize,
-    ])
-
-# Calculate accuracy for top-k predictions
-def accuracy(output: Tensor, target: Tensor, topk=(1,)):
-    """Compute the accuracy over the k top predictions for the specified values of k."""
-    with no_grad():
-        maxk = max(topk)
-        batch_size = target.size(0)
-
-        _, pred = output.topk(maxk, 1, True, True)
-        pred = pred.t()
-        correct = pred.eq(target.view(1, -1).expand_as(pred))
-
-        res = []
-        for k in topk:
-            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
-            res.append(correct_k.mul_(100.0 / batch_size))
-
-        return res
-   
 
 # @hydra.tmain(version_base=None, config_path="conf", config_name="config")
 # def run_experiment(config: DictConfig):

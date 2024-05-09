@@ -11,6 +11,8 @@ import os
 import redis
 import base64
 import zlib
+from mlworklaods.utils import timer_decorator
+import time
 
 class TorchLRUDataset(torch.utils.data.Dataset):
     def __init__(self,data_dir:str, transform, cache_address:str = None, cache_granularity:str = 'sample'):
@@ -52,6 +54,8 @@ class TorchLRUDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         batch_id, batch_indices,  = idx
+        
+        fetch_start_time = time.perf_counter()
 
         batch_data = None
 
@@ -60,17 +64,22 @@ class TorchLRUDataset(torch.utils.data.Dataset):
             
         if batch_data:
             # Convert JSON batch to torch format
+            tranform_start_time = time.perf_counter()
             torch_imgs, torch_labels = self.deserialize_torch_batch(batch_data)
+            transform_duration =  time.perf_counter() - tranform_start_time
             # print('data returned') 
             cache_hits = len(batch_indices)
-            return torch_imgs, torch_labels, cache_hits, batch_id
+            fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
+            return torch_imgs, torch_labels, cache_hits, fetch_duration, transform_duration, 
          
         data_samples, labels, cache_hits = self.fetch_batch_data(batch_indices)
 
+        tranform_start_time = time.perf_counter()
         if self.transform is not None:
             for i in range(len(data_samples)):
                 data_samples[i] = self.transform(data_samples[i])
-        
+        transform_duration =  time.perf_counter() - tranform_start_time
+
         if self.use_cache and self.cache_granularity == 'batch':
             minibatch = torch.stack(data_samples), torch.tensor(labels)
             #Serialize the PyTorch tensor
@@ -79,8 +88,9 @@ class TorchLRUDataset(torch.utils.data.Dataset):
             minibatch = zlib.compress(buffer.getvalue()) #use_compression:
             minibatch = base64.b64encode(minibatch).decode('utf-8')
             self.cache_client.set(batch_id, minibatch)
-
-        return torch.stack(data_samples), torch.tensor(labels), cache_hits, batch_id
+        
+        fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
+        return torch.stack(data_samples), torch.tensor(labels), cache_hits, fetch_duration, transform_duration
     
     def random_true_or_false(self) -> bool:
         import random

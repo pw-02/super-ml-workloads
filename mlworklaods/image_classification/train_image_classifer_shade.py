@@ -4,6 +4,7 @@ import torchvision
 from typing import List, Dict
 from omegaconf import DictConfig
 from lightning.fabric import Fabric
+from common import make_model, transform, accuracy
 
 from torch.utils.data import DataLoader
 
@@ -11,7 +12,6 @@ from torch.utils.data import DataLoader
 from mlworklaods.args import TrainArgs, DataArgs, SHADEArgs
 from mlworklaods.utils import ResourceMonitor, get_default_supported_precision, num_model_parameters
 from mlworklaods.log_utils import ExperimentLogger, AverageMeter, ProgressMeter, create_exp_summary_report
-import torchvision.transforms as transforms
 from shade.shadedataset import ShadeDataset
 from shade.shadesampler import ShadeSampler
 from torch_lru.batch_sampler_with_id import BatchSamplerWithID
@@ -294,66 +294,3 @@ def make_dataloaders(fabric: Fabric, train_args: TrainArgs, data_args: DataArgs,
         val_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True, use_distributed_sampler=True)
 
     return train_dataloader, val_dataloader
-
-
-# Make a model given the name
-def make_model(fabric: Fabric, model_name: str):
-    if model_name in torchvision.models.list_models():
-        with fabric.init_module(empty_init=True):
-            return torchvision.models.get_model(model_name)
-    raise Exception(f"Unknown model: {model_name}")
-
-# Transformation function for data augmentation
-def transform():
-    normalize = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406], 
-        std=[0.229, 0.224, 0.225],
-    )
-    return transforms.Compose([
-        transforms.ToTensor(),
-        normalize,
-    ])
-
-# Calculate accuracy for top-k predictions
-def accuracy(output: Tensor, target: Tensor, topk=(1,)):
-    """Compute the accuracy over the k top predictions for the specified values of k."""
-    with no_grad():
-        maxk = max(topk)
-        batch_size = target.size(0)
-
-        _, pred = output.topk(maxk, 1, True, True)
-        pred = pred.t()
-        correct = pred.eq(target.view(1, -1).expand_as(pred))
-
-        res = []
-        for k in topk:
-            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
-            res.append(correct_k.mul_(100.0 / batch_size))
-
-        return res
-   
-
-# @hydra.tmain(version_base=None, config_path="conf", config_name="config")
-# def run_experiment(config: DictConfig):
-   
-#     start_time = time.perf_counter()
-
-#     precision = get_default_supported_precision(training=True)
-#     fabric = Fabric(accelerator=config.accelerator, devices=config.devices, strategy="auto", precision=precision)
-#     exp_version = get_next_exp_version(config.log_dir,config.dataset.name)
-#     config.log_dir = os.path.join(config.log_dir, config.dataset.name, str(exp_version))
-
-#     if not config.training.max_minibatches_per_epoch:
-#          config.training.max_minibatches_per_epoch = Infinity
-   
-#     result = fabric.launch(main, config=config)
-    
-#     fabric.print(f"Creating overall report for experiment")
-
-#     create_exp_summary_report(config.log_dir)
-
-#     fabric.print(f"Exeperiment completed. Total Duration: {time.perf_counter() - start_time}")
-
-
-# if __name__ == "__main__":
-#     launch_job()

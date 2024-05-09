@@ -24,6 +24,19 @@ if torch.cuda.is_available():
     monitor_gpu = True
     nvmlInit()
 
+def timer_decorator(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        execution_time = end_time - start_time
+        # Unpack result if it's a tuple
+        if isinstance(result, tuple):
+            return (*result, execution_time)
+        else:
+            return (result, execution_time)
+    return wrapper
+
 
 class Distribution:
     def __init__(self, initial_capacity: int, precision: int = 4):

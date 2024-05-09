@@ -21,7 +21,7 @@ class ExperimentLogger():
         self.eval_job_metrics = None
         self.total_tokens = None
 
-    def save_train_batch_metrics(self,epoch,step,global_step,num_samples,total_time,data_time,compute_time,loss, avg_cpu, max_cpu,cache_hits, avg_gpu=0, max_gpu=0, num_tokens = None, acc1 = None, acc5 = None, ):
+    def save_train_batch_metrics(self,epoch,step,global_step,num_samples,total_time,data_time, fetch_time, transform_time,compute_time,loss, avg_cpu, max_cpu,cache_hits, avg_gpu=0, max_gpu=0, num_tokens = None, acc1 = None, acc5 = None, ):
         metrics = OrderedDict({
                 "device": self.fabric.local_rank,
                 "epoch": epoch,
@@ -30,6 +30,8 @@ class ExperimentLogger():
                 "num_samples": num_samples,
                 "total_time": total_time,
                 "data_time": data_time,
+                "fetch_time": fetch_time,
+                "transform_time": transform_time,
                 "compute_time": compute_time,
                 "cache_hits": cache_hits,
                 "loss": loss,
@@ -50,7 +52,7 @@ class ExperimentLogger():
 
         self.log_metrics(metrics = metrics,prefix='train.iteration',step=global_step,force_save=True)
     
-    def save_train_epoch_metrics(self,epoch,num_samples,global_step,num_batches,total_time,data_time,compute_time,loss, 
+    def save_train_epoch_metrics(self,epoch,num_samples,global_step,num_batches,total_time,data_time,fetch_time, transform_time,compute_time,loss, 
                                  avg_cpu, max_cpu, cache_hits, avg_gpu=0, max_gpu=0, num_tokens = None,acc1 = None, acc5=None,):
         metrics = OrderedDict({
                 "device": self.fabric.local_rank,
@@ -59,6 +61,8 @@ class ExperimentLogger():
                 "num_batches": num_batches,
                 "total_time": total_time,
                 "data_time": data_time,
+                "fetch_time": fetch_time,
+                "transform_time": transform_time,
                 "compute_time": compute_time,
                 "cache_hits": cache_hits,
                 "loss": loss,
@@ -85,6 +89,8 @@ class ExperimentLogger():
         self.train_job_metrics.cache_hits += cache_hits
         self.train_job_metrics.epoch_compute_times.update(compute_time)
         self.train_job_metrics.epoch_dataload_times.update(data_time)
+        self.train_job_metrics.epoch_fetch_times.update(fetch_time)
+        self.train_job_metrics.epoch_transform_times.update(transform_time)
         self.train_job_metrics.epoch_times.update(total_time)
         self.train_job_metrics.total_batches += num_batches
         self.train_job_metrics.total_samples +=num_samples
@@ -143,6 +149,8 @@ class ExperimentLogger():
                     "total_samples": self.train_job_metrics.total_samples,
                     "total_time": self.train_job_metrics.epoch_times.sum,
                     "data_time": self.train_job_metrics.epoch_dataload_times.sum,
+                    "fetch_time": self.train_job_metrics.epoch_fetch_times.sum,
+                    "transform_time": self.train_job_metrics.epoch_transform_times.sum,
                     "compute_time": self.train_job_metrics.epoch_compute_times.sum,
                     "bps": calc_throughput(self.train_job_metrics.total_batches, self.train_job_metrics.epoch_times.sum),
                     "compute_bps": calc_throughput(self.train_job_metrics.total_batches,self.train_job_metrics.epoch_compute_times.sum),
@@ -270,6 +278,8 @@ def summarize_across_all_devices(category_data):
         "num_devices": [],
         "total_time": [],
         "data_time": [],
+        "fetch_time": [],
+        "transform_time": [],
         "compute_time": [],
         "cpu_util": [],   
         "gpu_util": [],     
@@ -291,6 +301,8 @@ def summarize_across_all_devices(category_data):
             summary['num_devices'].append(len(category_data[key][f'{key}.device']))
             summary['total_time'].append(calculate_average(category_data[key][f'{key}.total_time']))                
             summary['data_time'].append(calculate_average(category_data[key][f'{key}.data_time']))
+            summary['fetch_time'].append(calculate_average(category_data[key][f'{key}.fetch_time']))
+            summary['transform_time'].append(calculate_average(category_data[key][f'{key}.transform_time']))
             summary['compute_time'].append(calculate_average(category_data[key][f'{key}.compute_time']))
             summary['total_samples'].append(sum(category_data[key][f'{key}.total_samples']))
             summary['total_batches'].append(sum(category_data[key][f'{key}.total_batches']))
@@ -443,6 +455,8 @@ class AggregatedEpochMetrics():
         self.epoch_times = AverageMeter("epoch_times", ":6.3f")
         self.cache_hits = 0
         self.epoch_dataload_times = AverageMeter("data_times", ":6.3f")
+        self.epoch_fetch_times = AverageMeter("data_times", ":6.3f")
+        self.epoch_transform_times = AverageMeter("data_times", ":6.3f")
         self.epoch_compute_times = AverageMeter("compute_times", ":6.3f")
         self.epoch_losses = AverageMeter('Loss', ':.4e')
         self.epoch_acc1 = AverageMeter('Acc@1', ':6.2f')
