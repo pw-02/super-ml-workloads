@@ -70,7 +70,7 @@ class TorchLRUDataset(torch.utils.data.Dataset):
             # print('data returned') 
             cache_hits = len(batch_indices)
             fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
-            return torch_imgs, torch_labels, cache_hits, fetch_duration, transform_duration, 
+            return torch_imgs, torch_labels, cache_hits, fetch_duration, transform_duration
          
         data_samples, labels, cache_hits = self.fetch_batch_data(batch_indices)
 

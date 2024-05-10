@@ -150,7 +150,7 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
                     avg_cpu=monitor.resource_data["cpu_util"].summarize()["mean"],
                     max_cpu=monitor.resource_data["cpu_util"].summarize()["max"],
                     avg_gpu=monitor.resource_data["gpu_util"].summarize()["mean"],
-                    max_gpu=monitor.resource_data["gpu_util"].summarize()["max"],
+                    max_gpu=monitor.resource_data["gpu_util"].summarize()["max"]
                 )
 
             if batch_idx >= max_iters:
@@ -175,7 +175,7 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
             avg_cpu=monitor.resource_data["cpu_util"].summarize()["mean"],
             max_cpu=monitor.resource_data["cpu_util"].summarize()["max"],
             avg_gpu=monitor.resource_data["gpu_util"].summarize()["mean"],
-            max_gpu=monitor.resource_data["gpu_util"].summarize()["max"],
+            max_gpu=monitor.resource_data["gpu_util"].summarize()["max"]
         )
 
     return losses.avg, top1.avg, top5.avg

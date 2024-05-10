@@ -19,6 +19,7 @@ from pathlib import Path
 import functools
 from typing import Dict, List
 import torch
+import time
 
 T_co = TypeVar('T_co', covariant=True)
 T = TypeVar('T')
@@ -164,6 +165,8 @@ class ShadeDataset(Dataset):
         return data_samples, labels, cache_hit_count
     
     def __getitem__(self, index: int):
+    
+        fetch_start_time = time.perf_counter()
 
         batch_id, batch_indices = index
 
@@ -177,11 +180,14 @@ class ShadeDataset(Dataset):
         
         data_samples, labels, cache_hit_count = self.fetch_batch_data(batch_indices)
 
+        tranform_start_time = time.perf_counter()
         if self.transform is not None:
             for i in range(len(data_samples)):
                 data_samples[i] = self.transform(data_samples[i])
+        transform_duration =  time.perf_counter() - tranform_start_time
+        fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
         
-        return torch.stack(data_samples), torch.tensor(labels), cache_hit_count
+        return torch.stack(data_samples), torch.tensor(labels), cache_hit_count, fetch_duration, transform_duration
 
 
     def __len__(self) -> int:

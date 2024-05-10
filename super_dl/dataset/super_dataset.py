@@ -148,10 +148,14 @@ class SUPERDataset(IterableDataset):
         return next_batch[0]
 
     def __getitem__(self, batch_id: str, batch_indicies:List[int], is_cached:bool) -> Tuple[Any, Any]:
+        
+        fetch_start_time = time.perf_counter()
+
         if self.simulate_delay:
             time.sleep(self.simulate_delay)
             torch_imgs = torch.empty(len(batch_indicies), 3, 32, 32)
             torch_labels = torch.empty(len(batch_indicies))
+            transform_duration = 0
             cache_hit = True
         else:
             cache_hit = False
@@ -160,18 +164,25 @@ class SUPERDataset(IterableDataset):
                 batch_data = self.fetch_from_cache(batch_id)
 
             if batch_data is not None:
+                tranform_start_time = time.perf_counter()
                 torch_imgs, torch_labels = self.deserialize_torch_batch(batch_data)
+                transform_duration =  time.perf_counter() - tranform_start_time
                 cache_hit = True
+                
             else:
                 imgs, labels = self.fetch_from_s3(batch_indicies)
+                tranform_start_time = time.perf_counter()
                 imgs, labels = self.apply_transformations(imgs, labels)
+                transform_duration =  time.perf_counter() - tranform_start_time
                 torch_imgs, torch_labels = torch.stack(imgs), torch.tensor(labels)
+        
         if cache_hit:
             cache_hit_count = len(batch_indicies)
         else:
             cache_hit_count = 0
-
-        return torch_imgs, torch_labels, cache_hit_count
+        
+        fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
+        return torch_imgs, torch_labels, cache_hit_count, fetch_duration, transform_duration
      
     
     def fetch_from_cache(self, batch_id, max_attempts = 5):

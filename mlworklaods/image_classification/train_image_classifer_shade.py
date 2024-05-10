@@ -108,6 +108,8 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
     total_samples = 0
     batch_time = AverageMeter("Time", ":6.3f")
     data_time = AverageMeter("Data", ":6.3f")
+    fetch_time = AverageMeter("Fetch", ":6.3f")
+    transform_time = AverageMeter("Transform", ":6.3f")
     compute_time = AverageMeter("Compute", ":6.3f")
     losses = AverageMeter("Loss", ":6.2f")
     top1 = AverageMeter("Acc1", ":6.2f")
@@ -119,8 +121,11 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
     with ResourceMonitor() as monitor:
         end = time.perf_counter()
 
-        for batch_idx, (images, target, cache_hits) in enumerate(train_dataloader):
+        for batch_idx, (images, target, cache_hits, fetch_duration, transform_duration) in enumerate(train_dataloader):
             data_time.update(time.perf_counter() - end)
+            fetch_time.update(fetch_duration)
+            transform_time.update(transform_duration)
+
             batch_size = images.size(0)
             toal_cahce_hits += cache_hits
             cache_hit_ratio.update(cache_hits / batch_size, 1)
@@ -185,12 +190,14 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
                 progress.display(batch_idx + 1)
 
                 logger.save_train_batch_metrics(
-                    epoch=epoch,
+                   epoch=epoch,
                     step=batch_idx + 1,
                     global_step=(epoch * max_iters) + batch_idx + 1,
                     num_samples=batch_size,
                     total_time=batch_time.val,
                     data_time=data_time.val,
+                    fetch_time = fetch_time.val,
+                    transform_time = transform_time.val,
                     compute_time=compute_time.val,
                     cache_hits=cache_hits,
                     loss=losses.val,
@@ -199,7 +206,7 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
                     avg_cpu=monitor.resource_data["cpu_util"].summarize()["mean"],
                     max_cpu=monitor.resource_data["cpu_util"].summarize()["max"],
                     avg_gpu=monitor.resource_data["gpu_util"].summarize()["mean"],
-                    max_gpu=monitor.resource_data["gpu_util"].summarize()["max"],
+                    max_gpu=monitor.resource_data["gpu_util"].summarize()["max"]
                 )
 
             if batch_idx >= max_iters:
@@ -209,9 +216,13 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
 
         logger.save_train_epoch_metrics(
             epoch=epoch,
-            total_samples=total_samples,
+            num_samples=total_samples,
+            num_batches = batch_idx + 1,
+            global_step=(epoch * max_iters) + batch_idx + 1,
             total_time=batch_time.sum,
             data_time=data_time.sum,
+            fetch_time=fetch_time.sum,
+            transform_time = transform_time.sum,
             compute_time=compute_time.sum,
             loss=losses.avg,
             acc1=top1.avg,
@@ -220,7 +231,7 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
             avg_cpu=monitor.resource_data["cpu_util"].summarize()["mean"],
             max_cpu=monitor.resource_data["cpu_util"].summarize()["max"],
             avg_gpu=monitor.resource_data["gpu_util"].summarize()["mean"],
-            max_gpu=monitor.resource_data["gpu_util"].summarize()["max"],
+            max_gpu=monitor.resource_data["gpu_util"].summarize()["max"]
         )
         train_dataloader.sampler.sampler.on_epoch_end(losses.avg)
 
