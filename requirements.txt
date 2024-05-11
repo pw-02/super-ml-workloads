@@ -14,7 +14,7 @@ transformers
 hydra-core
 psutil
 pynvml
-
+heapdict
 # nltk
 # redis-py-cluster
 #nlp workload

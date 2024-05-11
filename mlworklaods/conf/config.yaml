@@ -6,7 +6,7 @@ defaults:
   - training: ???
   - override hydra/job_logging: disabled
   - override hydra/hydra_logging: disabled  
-
+  - training: resnet18
 
 num_jobs: 4
 num_devices_per_job: 1
@@ -18,11 +18,11 @@ run_training: true
 run_evaluation: false
 dataload_only: false
 
-hydra:
-  mode: MULTIRUN
-  output_subdir: null
-  sweeper:
-    params:
-      training: resnet18
-      # training: resnet50, shufflenet, vgg16
+# hydra:
+#   mode: MULTIRUN
+#   output_subdir: null
+#   sweeper:
+#     params:
+#       training: resnet18
+#       # training: resnet50, shufflenet, vgg16
 
