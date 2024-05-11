@@ -37,11 +37,11 @@ class SUPERDataLoader(DataLoader):
             self.dataset.index = 0
             # del(self.dataset.super_client)
         
-        for data, target, batch_id, cache_hit in super().__iter__():
+        for data, target, cache_hits, fetch_duration, transform_duration in super().__iter__():
             self._latest_worker_idx = next(self._worker_idx_iter)  # type: ignore
             self._num_samples_yielded_streaming += data.size(0)
             
-            yield data, target,cache_hit, batch_id
+            yield data, target, cache_hits, fetch_duration, transform_duration
 
         self.restore = False
 
