@@ -254,7 +254,7 @@ def make_dataloaders(fabric: Fabric, train_args: TrainArgs, data_args: DataArgs,
             data_dir=data_args.train_data_dir,
             batch_size=train_args.get_batch_size(fabric.world_size),
             transform=transform(),
-            world_size=fabric.world_size(),
+            world_size=fabric.world_size,
             super_address=super_args.super_address,
             cache_address=super_args.cache_address,
             simulate_delay=super_args.simulate_data_delay)
