@@ -67,7 +67,7 @@ def train_model(fabric: Fabric, seed: int, config: DictConfig, train_args: Train
 
     for epoch in range(1, train_args.epochs + 1):
         if train_dataloader:
-            max_iters = min(len(train_dataloader), train_args.epoch_max_iters(fabric.world_size))
+            max_iters = min(len(train_dataloader), train_args.get_epoch_max_iters(fabric.world_size))
             fabric.print(f"Starting training loop for epoch {epoch}")
             model.train(True)
             loss_train, acc1_train, acc5_train = train_loop(fabric, epoch, model, optimizer, train_dataloader, max_iters, logger, train_args.dataload_only)
@@ -75,7 +75,7 @@ def train_model(fabric: Fabric, seed: int, config: DictConfig, train_args: Train
             best_acc5_train = max(acc5_train, best_acc5_train)
 
         if val_dataloader:
-            max_iters = min(len(val_dataloader), train_args.epoch_max_iters(fabric.world_size))
+            max_iters = min(len(val_dataloader), train_args.get_epoch_max_iters(fabric.world_size))
             fabric.print(f"Starting validation loop for epoch {epoch}")
             model.eval()
             loss_eval, acc1_eval, acc5_eval = val_loop(fabric, epoch, model, val_dataloader, max_iters, logger)
