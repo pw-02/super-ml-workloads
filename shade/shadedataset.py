@@ -11,7 +11,6 @@ import io
 import numpy as np
 import redis
 import PIL
-from rediscluster import RedisCluster
 import super_dl.s3utils as s3utils
 from super_dl.s3utils import S3Url
 import json

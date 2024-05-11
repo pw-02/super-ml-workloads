@@ -11,7 +11,6 @@ import random
 import redis
 import heapdict
 import PIL
-from rediscluster import RedisCluster
 from collections import OrderedDict
 
 
