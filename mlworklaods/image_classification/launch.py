@@ -74,9 +74,12 @@ def spawn_multiple_jobs(config, train_args, data_args, dataloader_args):
     processes = []
     lr_array = [0.01, 0.011, 0.012, 0.013, 0.014, 0.015, 0.016, 0.017]
 
+    # for job in range(num_jobs):
+    #     start_gpu_id = job * config.num_devices_per_job
+    #     end_gpu_id = start_gpu_id + config.num_devices_per_job - 1
     for job in range(num_jobs):
-        start_gpu_id = job * config.num_devices_per_job
-        end_gpu_id = start_gpu_id + config.num_devices_per_job - 1
+        start_gpu_id = job
+        end_gpu_id = job
         
         # Create a dictionary of process-specific arguments
         process_args = {
