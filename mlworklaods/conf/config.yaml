@@ -2,7 +2,7 @@
 defaults:
   - _self_
   - dataloader: super #shade, torch_lru, super
-  - dataset: imagenet1k
+  - dataset: imagenet
   # - training: ???
   - training: resnet18
   - override hydra/job_logging: disabled
