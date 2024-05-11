@@ -80,6 +80,7 @@ def spawn_multiple_jobs(config, train_args, data_args, dataloader_args):
     for job in range(num_jobs):
         start_gpu_id = job
         end_gpu_id = job
+        train_args.devices = job
         
         # Create a dictionary of process-specific arguments
         process_args = {
