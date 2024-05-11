@@ -23,7 +23,7 @@ from super_dl.super_client import SuperClient
 def run_super_job(pid:int, config: DictConfig, train_args: TrainArgs, data_args: DataArgs, super_args:SUPERArgs):
     start_time = time.perf_counter()
     precision = get_default_supported_precision(training=True)
-    fabric = Fabric(accelerator=train_args.accelerator, devices=1, strategy="auto", precision=precision)
+    fabric = Fabric(accelerator=train_args.accelerator, devices=train_args.devices, strategy="auto", precision=precision)
 
     super_client:SuperClient = SuperClient(super_addresss=super_args.super_address)     
     super_client.register_job(job_id=train_args.job_id, data_dir=data_args.train_data_dir)
