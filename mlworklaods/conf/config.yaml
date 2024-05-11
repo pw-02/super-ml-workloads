@@ -3,10 +3,10 @@ defaults:
   - _self_
   - dataloader: super #shade, torch_lru, super
   - dataset: imagenet1k
-  - training: ???
+  # - training: ???
+  - training: resnet18
   - override hydra/job_logging: disabled
   - override hydra/hydra_logging: disabled  
-  - training: resnet18
 
 num_jobs: 4
 num_devices_per_job: 1
