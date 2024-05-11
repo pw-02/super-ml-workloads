@@ -1,8 +1,8 @@
 
 defaults:
   - _self_
-  - dataloader: torch_lru #shade, torch_lru, super
-  - dataset: cifar10
+  - dataloader: super #shade, torch_lru, super
+  - dataset: imagenet1k
   - training: ???
   - override hydra/job_logging: disabled
   - override hydra/hydra_logging: disabled  
@@ -13,7 +13,7 @@ num_devices_per_job: 1
 seed: 41
 accelerator: 'gpu'
 log_dir: mlworklaods/reports
-log_interval: 1
+log_interval: 10
 run_training: true
 run_evaluation: false
 dataload_only: false

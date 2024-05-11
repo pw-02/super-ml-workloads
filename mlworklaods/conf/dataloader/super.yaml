@@ -1,5 +1,5 @@
 kind: super_image
 sampler_kind: null #iterable datasets dont use samplers
-cache_address: '172.17.0.3:6378' # '34.221.149.124:6378'
+cache_address: '10.0.29.229:6378' #  '172.17.0.3:6378' # '34.221.149.124:6378'
 super_address:  '172.17.0.3:50051'  #172.18.0.1 #172.17.0.1
 simulate_data_delay: null
