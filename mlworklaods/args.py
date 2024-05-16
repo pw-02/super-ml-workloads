@@ -27,7 +27,7 @@ class TrainArgs:
     def get_epoch_max_iters(self, devices: int) -> int:
         """Calculate max iterations per epoch per device."""
         if self.epoch_max_iters:
-            epoch_iters = self.epoch_max_iters // devices
+            epoch_iters = self.epoch_max_iters #// devices
             if epoch_iters <= 0:
                 raise ValueError("Epoch max iterations must be greater than zero.")
             return epoch_iters
@@ -35,7 +35,7 @@ class TrainArgs:
 
     def get_batch_size(self, devices: int) -> int:
         """Calculate batch size per device."""
-        batch_size_per_device = self.batch_size // devices
+        batch_size_per_device = self.batch_size #// devices
         if batch_size_per_device <= 0:
             raise ValueError("Batch size per device must be greater than zero.")
         return batch_size_per_device

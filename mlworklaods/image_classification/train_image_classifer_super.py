@@ -5,7 +5,7 @@ from typing import List, Dict
 import hydra
 from omegaconf import DictConfig
 from lightning.fabric import Fabric
-
+import sys
 from common import make_model, transform, accuracy
 
 # Additional imports
@@ -25,9 +25,15 @@ def run_super_job(pid:int, config: DictConfig, train_args: TrainArgs, data_args:
     precision = get_default_supported_precision(training=True)
     fabric = Fabric(accelerator=train_args.accelerator, devices=train_args.devices, strategy="auto", precision=precision)
 
+
     super_client:SuperClient = SuperClient(super_addresss=super_args.super_address)     
-    super_client.register_job(job_id=train_args.job_id, data_dir=data_args.train_data_dir)
+    sucess = super_client.register_job(job_id=train_args.job_id, data_dir=data_args.train_data_dir)
     del(super_client)
+    if not sucess:
+        sys.exit()
+
+        pass
+
 
     fabric.launch(train_model, train_args.seed, config, train_args, data_args, super_args)
 
@@ -103,7 +109,7 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
     top5 = AverageMeter("Acc5", ":6.2f")
     cache_hit_ratio = AverageMeter("hit%", ":6.2f")
 
-    progress = ProgressMeter(max_iters, [batch_time, data_time, compute_time, losses, cache_hit_ratio], prefix=f"Epoch {epoch}")
+    progress = ProgressMeter(max_iters, [batch_time, data_time, fetch_time, transform_time, compute_time, losses, cache_hit_ratio], prefix=f"Epoch {epoch}")
 
     with ResourceMonitor() as monitor:
         end = time.perf_counter()
@@ -139,7 +145,7 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
             total_samples += batch_size
 
             if batch_idx % logger.log_freq == 0:
-                progress.display(batch_idx + 1)
+                fabric.print(f'{progress.display(batch_idx + 1)}')
 
                 logger.save_train_batch_metrics(
                     epoch=epoch,

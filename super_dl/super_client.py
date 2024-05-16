@@ -4,19 +4,19 @@ import super_dl.cache_coordinator_pb2_grpc as cache_coordinator_pb2_grpc
 import logging
 from super_dl.cache_coordinator_pb2_grpc import CacheCoordinatorServiceStub
 
-def configure_logger():
-    # Set the log levels for specific loggers to WARNING
-    logging.getLogger("PIL").setLevel(logging.WARNING)
-    logging.getLogger("botocore").setLevel(logging.WARNING)
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("boto3").setLevel(logging.WARNING)
+# def configure_logger():
+#     # Set the log levels for specific loggers to WARNING
+#     logging.getLogger("PIL").setLevel(logging.WARNING)
+#     logging.getLogger("botocore").setLevel(logging.WARNING)
+#     logging.getLogger("urllib3").setLevel(logging.WARNING)
+#     logging.getLogger("boto3").setLevel(logging.WARNING)
 
-    # Configure the root logger with a custom log format
-    logging.basicConfig(level=logging.INFO, format='%(message)s')
-    logger = logging.getLogger("SUPERWorkload")
-    return logger
+#     # Configure the root logger with a custom log format
+#     logging.basicConfig(level=logging.INFO, format='%(message)s')
+#     logger = logging.getLogger("SUPERWorkload")
+#     return logger
 
-logger = configure_logger()
+# logger = configure_logger()
 
 
 
@@ -31,19 +31,19 @@ class SuperClient:
     def ping_server(self):
         try:
             ping_response = self.stub.Ping(cache_coordinator_pb2.PingRequest(message='ping'))
-            logger.info(f"Ping Response: {ping_response.message}")
+            logging.info(f"Ping Response: {ping_response.message}")
         except Exception as e:
-            logger.error(f"Error in ping_server request: {e}")
+            logging.error(f"Error in ping_server request: {e}")
 
     def register_job(self, job_id:int, data_dir:str):
         try:       
             register_job_response = self.stub.RegisterJob(cache_coordinator_pb2.RegisterJobRequest(
                 job_id=job_id, 
                 data_dir=data_dir))
-            logger.info(f"Register job Response: {register_job_response.message}")
+            logging.info(f"Register job Response: {register_job_response.message}")
             return register_job_response.job_registered
         except Exception as e:
-            logger.error(f"Error in register_job request: {e}")
+            logging.error(f"Error in register_job request: {e}")
     
     def get_next_batch(self, job_int:int, num_batches_requested:int = 1):
         try:   
@@ -56,7 +56,7 @@ class SuperClient:
                 # logger.info(f"Received batch: {batch.batch_id}, {batch.indicies}, {batch.is_cached}")
             return next_batch_response.batches
         except Exception as e:
-            logger.error(f"Error in get_next_batch request: {e}")
+            logging.error(f"Error in get_next_batch request: {e}")
     
     def get_dataset_details(self, data_dir:str =''):
         try:   
@@ -67,16 +67,16 @@ class SuperClient:
             return dataset_info_response
         
         except Exception as e:
-            logger.error(f"Error in get_dataset_details request: {e}")
+            logging.error(f"Error in get_dataset_details request: {e}")
     
     
     def job_ended_notification(self, job_int:int):
         try:   
             self.stub.JobEnded(cache_coordinator_pb2.JobEndedRequest(job_id=job_int))
-            logger.info("Job Ended notification sent")
+            logging.info("Job Ended notification sent")
 
         except Exception as e:
-            logger.error(f"Error in job_ended_notification request: {e}")
+            logging.error(f"Error in job_ended_notification request: {e}")
     
     def __del__(self):
         # Check if the channel is not None before trying to close it

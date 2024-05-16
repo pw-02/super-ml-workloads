@@ -48,6 +48,8 @@ def prepare_args(config: DictConfig):
             super_address=config.dataloader.super_address,
             cache_address=config.dataloader.cache_address,
             simulate_data_delay=config.dataloader.simulate_data_delay)
+        if super_args.simulate_data_delay is not None:
+            train_args.dataload_only = True
         return train_args, data_args, super_args
 
     elif 'shade' in train_args.dataloader_kind:

@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
-from timm import create_model
 
 
 def load_data():
@@ -16,7 +15,7 @@ def load_data():
     batch_size = 32
 
     train_set = torchvision.datasets.CIFAR10(
-        root="/data", train=True, download=True, transform=transform
+        root="~/data", train=True, download=True, transform=transform
     )
     train_loader = torch.utils.data.DataLoader(
         train_set, batch_size=batch_size, shuffle=True, num_workers=4

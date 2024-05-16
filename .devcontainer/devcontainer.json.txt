@@ -1,0 +1,33 @@
+{
+  "name": "super-workloads",
+  "context": "..",
+  "dockerFile": "./Dockerfile",
+  "runArgs": [
+      "--gpus=all",
+      "--ipc=host"
+  ],
+  "mounts": [
+      // Uncomment if you want to use your local AWS credentials
+       "source=${env:HOME}${env:USERPROFILE}/.aws,target=/root/.aws,type=bind"
+      // Uncomment if you want to use the host Docker socket inside the container
+      // "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
+  // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+  // "remoteUser": "root",
+  "customizations": {
+      "vscode": {
+          "extensions": [
+            "ms-python.python",
+            "ms-python.vscode-pylance",
+            "mutantdino.resourcemonitor",
+            "redhat.vscode-yaml",
+            "GrapeCity.gc-excelviewer",
+            "kangping.protobuf",
+            "ms-azuretools.vscode-docker"
+          ]
+      }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+}
+}
