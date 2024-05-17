@@ -11,7 +11,7 @@ from torch.multiprocessing import Pool, Process, set_start_method
 from typing import List
 from typing import Dict, Any
 import os
-
+import time
 # Helper function to prepare arguments for a job
 def prepare_args(config: DictConfig):
     log_dir_base = f"{config.log_dir}/{config.dataset.name}/{config.training.model_name}"
@@ -101,6 +101,7 @@ def spawn_multiple_jobs(config, train_args, data_args, dataloader_args):
     # Start all processes
     for process in processes:
         process.start()
+        time.sleep(5)
 
     # Join all processes
     for process in processes:
