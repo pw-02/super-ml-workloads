@@ -12,8 +12,9 @@ from common import make_model, transform, accuracy
 from mlworklaods.args import TrainArgs, DataArgs, SUPERArgs
 from mlworklaods.utils import ResourceMonitor, get_default_supported_precision, num_model_parameters
 from mlworklaods.log_utils import ExperimentLogger, AverageMeter, ProgressMeter, create_exp_summary_report
-
 from super_dl.dataloader.super_dataloader import SUPERDataLoader
+from torch.utils.data import DataLoader
+# from super_dl.dataloader.super_dataloader import SUPERDataLoader
 from super_dl.dataset.super_dataset import SUPERDataset
 
 # from super_dl.sampler.super_sampler import SUPERBacthSampler
@@ -95,7 +96,7 @@ def train_model(fabric: Fabric, seed: int, config: DictConfig, train_args: Train
   
 
 # Train loop
-def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Optimizer, train_dataloader: SUPERDataLoader, max_iters: int, logger: ExperimentLogger, dataload_only: bool):
+def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Optimizer, train_dataloader: DataLoader, max_iters: int, logger: ExperimentLogger, dataload_only: bool):
     
     toal_cahce_hits = 0
     total_samples = 0
@@ -195,7 +196,7 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
     return losses.avg, top1.avg, top5.avg
 
 # Validation loop
-def val_loop(fabric: Fabric, epoch: int, model: nn.Module, val_dataloader: SUPERDataLoader, max_iters: int, logger: ExperimentLogger):
+def val_loop(fabric: Fabric, epoch: int, model: nn.Module, val_dataloader: DataLoader, max_iters: int, logger: ExperimentLogger):
     batch_time = AverageMeter("Time", ":6.3f")
     losses = AverageMeter("Loss", ":6.2f")
     top1 = AverageMeter("Acc1", ":6.2f")
@@ -265,7 +266,7 @@ def make_dataloaders(fabric: Fabric, train_args: TrainArgs, data_args: DataArgs,
             cache_address=super_args.cache_address,
             simulate_delay=super_args.simulate_data_delay)
         
-        train_dataloader = SUPERDataLoader(dataset=dataset, batch_size=None, num_workers=train_args.num_pytorch_workers)
+        train_dataloader = DataLoader(dataset=dataset, batch_size=None, num_workers=train_args.num_pytorch_workers)
         train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True, use_distributed_sampler=True)
 
     if train_args.run_evaluation:

@@ -1,17 +1,17 @@
 
 defaults:
   - _self_
-  - dataloader: torch_lru #shade, torch_lru, super
+  - dataloader: super #shade, torch_lru, super
   - dataset: cifar10  #imagenet
   # - training: ???
   - training: resnet18
   - override hydra/job_logging: disabled
   - override hydra/hydra_logging: disabled  
 
-num_jobs: 2
+num_jobs: 4
 num_devices_per_job: 1
 seed: 41
-accelerator: 'cpu'
+accelerator: 'gpu'
 log_dir: mlworklaods/reports
 log_interval: 1
 run_training: true

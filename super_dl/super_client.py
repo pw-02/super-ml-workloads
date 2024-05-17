@@ -35,7 +35,7 @@ class SuperClient:
         except Exception as e:
             logging.error(f"Error in ping_server request: {e}")
 
-    def register_job(self, job_id:int, data_dir:str):
+    def register_job(self, job_id:str, data_dir:str):
         try:       
             register_job_response = self.stub.RegisterJob(cache_coordinator_pb2.RegisterJobRequest(
                 job_id=job_id, 

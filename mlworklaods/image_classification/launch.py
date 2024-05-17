@@ -117,7 +117,7 @@ def spawn_jobs(process_args: Dict[str, Any]):
     end_gpu_id = process_args["end_gpu_id"]
     lr = process_args["lr"]
 
-    train_args.job_id = f"{train_args.job_id}_{job_id}"
+    train_args.job_id = int(f"{train_args.job_id}{job_id}")
     train_args.learning_rate = lr
     train_args.log_dir = f"{train_args.log_dir}_HPO/job_{job_id}"
 

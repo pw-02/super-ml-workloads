@@ -138,7 +138,7 @@ class SUPERDataset(IterableDataset):
                     #     torch_labels = torch.cat((torch_labels, labels), dim=0)
 
                     # yield torch_imgs, torch_labels, batch_id, cache_hit
-        # self.index = 0
+        self.index = 0
     
     def _get_next_super_batch(self,super_client:SuperClient):       
         next_batch = super_client.get_next_batch(self.job_id)
