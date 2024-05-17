@@ -16,7 +16,7 @@ log_dir: mlworklaods/reports
 log_interval: 1
 run_training: true
 run_evaluation: false
-dataload_only: true
+dataload_only: false
 
 # hydra:
 #   mode: MULTIRUN
