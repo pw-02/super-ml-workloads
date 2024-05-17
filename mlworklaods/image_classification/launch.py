@@ -124,8 +124,8 @@ def spawn_jobs(process_args: Dict[str, Any]):
     if train_args.accelerator == 'cpu':
         train_args.devices = config.num_devices_per_job
     else:
-        # train_args.devices = [start_gpu_id, end_gpu_id]
-        train_args.devices = start_gpu_id
+        train_args.devices = [start_gpu_id]
+        # train_args.devices = start_gpu_id
     print(f"Spawning a {config.num_devices_per_job} GPU job starting at GPU#{start_gpu_id}")
     
     if 'super' in train_args.dataloader_kind:
