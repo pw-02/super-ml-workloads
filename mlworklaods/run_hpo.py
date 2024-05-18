@@ -8,14 +8,14 @@ from mlworklaods.image_classification.imager_classifer_model import ImageClassif
 from lightning.fabric.loggers import CSVLogger
 from ray import tune
 from ray.air import session
-import ray
+from lightning.pytorch.core.saving import save_hparams_to_yaml
 
 # Helper function to prepare arguments for a job
 def prepare_args(config: DictConfig,expid):
+    log_dir = f"{config.log_dir}/{config.dataset.name}/{config.training.model_name}"
     if expid:
-        log_dir = f"{config.log_dir}/{config.dataset.name}/hpo_{expid}"
-    else:
-        log_dir = f"{config.log_dir}/{config.dataset.name}"
+        log_dir = f"{log_dir}/hpo_{expid}"
+
     train_args = TrainArgs(
         job_id=os.getpid(),
         model_name=config.training.model_name,
@@ -66,8 +66,8 @@ def prepare_args(config: DictConfig,expid):
             cache_address=config.dataloader.cache_address,
             cache_granularity=config.dataloader.cache_granularity,
             shuffle=config.dataloader.shuffle)
-        
-        return train_args, data_args, torchlru_args
+
+    return train_args, data_args, torchlru_args
 
 def get_default_supported_precision(training: bool) -> str:
     from lightning.fabric.accelerators import MPSAccelerator
@@ -75,13 +75,13 @@ def get_default_supported_precision(training: bool) -> str:
         return "16-mixed" if training else "16-true"
     return "bf16-mixed" if training else "bf16-true"
 
-def train_model(config, hydra_config, expid=None):
-
-    train_args, data_args, dataloader_args = prepare_args(hydra_config, expid)
-
+def train_model(config, hydra_config):
+    train_args, data_args, dataloader_args = prepare_args(hydra_config, session.get_experiment_name())
+    train_args.learning_rate = config["lr"]
+    hydra_config.training.learning_rate =train_args.learning_rate 
     model = ImageClassifierModel(train_args.model_name, train_args.learning_rate, num_classes = data_args.num_classes)
     
-    logger = CSVLogger(root_dir=train_args.log_dir, name=train_args.model_name, flush_logs_every_n_steps=train_args.log_freq)
+    logger = CSVLogger(root_dir=train_args.log_dir, name="", flush_logs_every_n_steps=train_args.log_freq)
 
     trainer = MyCustomTrainer(
         accelerator=train_args.accelerator,
@@ -97,6 +97,8 @@ def train_model(config, hydra_config, expid=None):
 
     train_loader, val_loader = model.make_dataloaders(train_args, data_args, dataloader_args, trainer.fabric.world_size)
     avg_loss, avg_acc = trainer.fit(model, train_loader, val_loader, train_args.seed)
+    hparams_file = os.path.join(logger.log_dir, "hparms.yaml")
+    save_hparams_to_yaml(hparams_file, hydra_config)
     session.report({"loss": avg_loss, "accuracy": avg_acc})
 
 @hydra.main(version_base=None, config_path="./conf", config_name="config")
@@ -104,23 +106,23 @@ def main(hydra_config: DictConfig):
     os.environ["RAY_CHDIR_TO_TRIAL_DIR"] = "0"
     os.environ["RAY_DEDUP_LOGS"] = "0"
 
-    pid = os.getpid()
     search_space = {
-        "training.learning_rate": tune.loguniform(1e-5, 1e-2),
+        "lr": tune.loguniform(1e-5, 1e-2),
         # "training.batch_size": tune.choice([16, 32, 64, 128]),
     }
 
     result = tune.run(
-        tune.with_parameters(train_model, hydra_config=hydra_config,expid=pid),
-        resources_per_trial={"cpu": 20, "gpu": 1},
+        tune.with_parameters(train_model, hydra_config=hydra_config),
+        resources_per_trial={"gpu": 1},
         metric="loss",
         mode="min",
-        max_concurrent_trials=2,
+        max_concurrent_trials=4,
         config=search_space,
-        num_samples=2,
+        num_samples=hydra_config.num_jobs,
         verbose=0,
         checkpoint_freq=0, 
     )
+    print(result.results_df)
     best_trial = result.get_best_trial("loss", "min", "last")
     print(f"Best trial config: {best_trial.config}")
     print(f"Best trial final loss: {best_trial.last_result['loss']}")

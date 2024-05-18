@@ -148,6 +148,7 @@ class MyCustomTrainer:
 
         self.fabric.launch()
 
+        
         # setup dataloaders
         train_loader = self.fabric.setup_dataloaders(train_loader, use_distributed_sampler=self.use_distributed_sampler)
         if val_loader is not None:
