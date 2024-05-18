@@ -1,6 +1,6 @@
 import functools
-import super_dl.s3utils as s3utils
-from  super_dl.s3utils import S3Url
+import mlworklaods.s3utils as s3utils
+from  mlworklaods.s3utils import S3Url
 from typing import List, Tuple, Dict
 from torch.utils.data import SequentialSampler, IterableDataset, RandomSampler, DataLoader
 import torch

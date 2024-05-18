@@ -1,8 +1,8 @@
 import grpc
-import super_dl.cache_coordinator_pb2 as cache_coordinator_pb2
-import super_dl.cache_coordinator_pb2_grpc as cache_coordinator_pb2_grpc
+import mlworklaods.dataloaders.super_dl.cache_coordinator_pb2 as cache_coordinator_pb2
+import mlworklaods.dataloaders.super_dl.cache_coordinator_pb2_grpc as cache_coordinator_pb2_grpc
 import logging
-from super_dl.cache_coordinator_pb2_grpc import CacheCoordinatorServiceStub
+from mlworklaods.dataloaders.super_dl.cache_coordinator_pb2_grpc import CacheCoordinatorServiceStub
 
 # def configure_logger():
 #     # Set the log levels for specific loggers to WARNING

@@ -13,7 +13,6 @@ from lightning.pytorch.utilities.model_helpers import is_overridden
 from lightning_utilities import apply_to_collection
 from tqdm import tqdm
 import time
-from mlworklaods.log_utils import ExperimentLogger
 from mlworklaods.utils import ResourceMonitor
 from collections import OrderedDict
 import json

@@ -2,24 +2,13 @@
 from omegaconf import DictConfig
 import hydra
 from mlworklaods.args import *
-from mlworklaods.log_utils import  get_next_exp_version
-import torch.multiprocessing as mp 
-from torch.multiprocessing import Pool, Process, set_start_method 
-from typing import List
-from typing import Dict, Any
 import os
 import time
 from mlworklaods.image_classification.image_classifer_trainer import MyCustomTrainer
 import torch
-from image_classification.imager_classifer_model import ImageClassifierModel
+from mlworklaods.image_classification.imager_classifer_model import ImageClassifierModel
 # Helper function to prepare arguments for a job
-from torch_lru.batch_sampler_with_id import BatchSamplerWithID
-from torch_lru.torch_lru_dataset import TorchLRUDataset
-from mlworklaods.common import transform
-from torch.utils.data import DataLoader, SequentialSampler, RandomSampler  
-from super_dl.dataset.super_dataset import SUPERDataset
-from mlworklaods.image_classification.callbacks import LoggingCallback
-from mlworklaods.log_utils import ExperimentLogger
+
 from lightning.fabric.loggers import CSVLogger
 
 
@@ -86,63 +75,6 @@ def prepare_args(config: DictConfig):
         return train_args, data_args, torchlru_args
 
 
-def make_lru_torch_datalaoders(train_args: TrainArgs, data_args: DataArgs, lru_torch_args:LRUTorchArgs, world_size:int):
-    train_dataloader = None
-    val_dataloader = None
-    if train_args.run_training:
-        train_dataset =  TorchLRUDataset(
-            data_dir = data_args.train_data_dir,
-            transform=transform(),
-            cache_address=lru_torch_args.cache_address,
-            cache_granularity=lru_torch_args.cache_granularity)
-          
-        train_base_sampler = RandomSampler(data_source=train_dataset) if lru_torch_args.shuffle else SequentialSampler(data_source=train_dataset)
-        train_batch_sampler = BatchSamplerWithID(sampler=train_base_sampler, batch_size=train_args.get_batch_size(world_size), drop_last=False)  
-        train_dataloader = DataLoader(dataset=train_dataset, sampler=train_batch_sampler, batch_size=None, num_workers=lru_torch_args.num_pytorch_workers)
-
-    if train_args.run_evaluation:
-        val_dataset =  TorchLRUDataset(
-            data_dir = data_args.val_data_dir,
-            transform=transform(),
-            cache_address=lru_torch_args.cache_address,
-            cache_granularity=lru_torch_args.cache_granularity)
-        
-        val_base_sampler = RandomSampler(data_source=val_dataset) if lru_torch_args.shuffle else SequentialSampler(data_source=val_dataset)
-        val_batch_sampler = BatchSamplerWithID(sampler=val_base_sampler, batch_size=train_args.get_batch_size(world_size), drop_last=False)
-        
-        val_dataloader = DataLoader(dataset=val_dataset, sampler=val_batch_sampler, batch_size=None, num_workers=lru_torch_args.num_pytorch_workers)
-    return train_dataloader, val_dataloader
-
-
-# Dataloader creation function
-def make_super_dataloaders(train_args: TrainArgs, data_args: DataArgs, super_args:SUPERArgs, world_size:int):
-    train_dataloader = None
-    val_dataloader = None
-    if train_args.run_training:  
-        dataset = SUPERDataset(
-            job_id=train_args.job_id,
-            data_dir=data_args.train_data_dir,
-            batch_size=train_args.get_batch_size(world_size),
-            transform=transform(),
-            world_size=world_size,
-            super_address=super_args.super_address,
-            cache_address=super_args.cache_address,
-            simulate_delay=super_args.simulate_data_delay)
-        
-        train_dataloader = DataLoader(dataset=dataset, batch_size=None, num_workers=super_args.num_pytorch_workers)
-
-    if train_args.run_evaluation:
-         dataset = SUPERDataset(
-            job_id=train_args.job_id,
-            data_dir=data_args.val_data_dir,
-            batch_size=train_args.get_batch_size(world_size),
-            transform=transform(),
-            world_size=world_size,
-            super_address=super_args.super_address,
-            cache_address=super_args.cache_address,
-            simulate_delay=super_args.simulate_data_delay)
-    
-    return train_dataloader, val_dataloader
 
 
 def get_default_supported_precision(training: bool) -> str:
@@ -173,22 +105,12 @@ def main(config: DictConfig):
         grad_accum_steps=train_args.grad_accum_steps
     )
 
-    if 'super' in train_args.dataloader_kind:
-         train_loader, val_loader = make_super_dataloaders(train_args, data_args,dataloader_args, trainer.fabric.world_size)
-    elif 'torch_lru' in train_args.dataloader_kind:
-         train_loader, val_loader = make_lru_torch_datalaoders(train_args, data_args,dataloader_args, trainer.fabric.world_size)
-    else:
-        raise Exception(f"Unknown dataloader_kind {train_args.dataloader_kind}")
-    
+
+    train_loader, val_loader = model.make_dataloaders(train_args, data_args,dataloader_args, trainer.fabric.world_size)
     trainer.fit(model, train_loader, val_loader,train_args.seed)
 
     
 
 
-
-
-
-
-   
 if __name__ == "__main__":
     main()

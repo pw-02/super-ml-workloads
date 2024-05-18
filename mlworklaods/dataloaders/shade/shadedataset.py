@@ -11,8 +11,8 @@ import io
 import numpy as np
 import redis
 import PIL
-import super_dl.s3utils as s3utils
-from super_dl.s3utils import S3Url
+import mlworklaods.s3utils as s3utils
+from mlworklaods.s3utils import S3Url
 import json
 from pathlib import Path
 import functools

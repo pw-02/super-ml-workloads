@@ -1,6 +1,6 @@
 import functools
-import super_dl.s3utils as s3utils
-from  super_dl.s3utils import S3Url
+import mlworklaods.s3utils as s3utils
+from  mlworklaods.s3utils import S3Url
 from typing import List, Tuple, Dict
 from torch.utils.data import SequentialSampler, IterableDataset, RandomSampler, DataLoader
 import torchvision
@@ -13,11 +13,6 @@ import unicodedata
 import nltk
 import random
 from nltk.corpus import wordnet
-import redis
-import zlib
-import io
-import base64
-from io import BytesIO
 nltk.download('wordnet')
 nltk.download('stopwords')
 UNICODE_PUNCT = {
@@ -67,8 +62,9 @@ PUNCT_OR_NON_PRINTING_CHARS_RE = re.compile(
 )
 
 
-class RedisTextIterableDataset(IterableDataset):
-    def __init__(self,data_dir:str, tokenizer, block_size:int, batch_size = 12, shuffle = False):
+
+class S3TextIterableDataset(IterableDataset):
+    def __init__(self,data_dir:str, tokenizer, block_size:int, shuffle = False):
         super().__init__()
         self.epoch = 0
         self.block_size = block_size
@@ -77,9 +73,6 @@ class RedisTextIterableDataset(IterableDataset):
         self.samples:List[str] = s3utils.load_unpaired_s3_object_keys(data_dir, False, True)
         self.bucket_name = S3Url(data_dir).bucket
         self.tokenizer = tokenizer
-        self.cache_client = redis.StrictRedis(host='t-001.rdior4.0001.usw2.cache.amazonaws.com', port='6379')
-        self.sampler = iter(SequentialSampler(self))
-        self.batch_size = batch_size
 
     def normalize(self, line: str, accent=True, case=True, numbers=True, punct=1) -> str:
         line = line.strip()
@@ -94,7 +87,7 @@ class RedisTextIterableDataset(IterableDataset):
         if punct == 1:
             line = self.replace_unicode_punct(line)
         line = self.remove_non_printing_char(line)
-
+        
         line = self.remove_pii(line)
         line = self.normalize_spacing_for_tok(line)
         line = self.remove_stop_words(line)
@@ -297,92 +290,26 @@ class RedisTextIterableDataset(IterableDataset):
 
         return chunks
     
-    def split_into_batches(self, xs, ys, batch_size):
-        num_batches = (xs.size(0) + batch_size - 1) // batch_size
-        return [(xs[i * batch_size:(i + 1) * batch_size], ys[i * batch_size:(i + 1) * batch_size]) for i in range(num_batches)]
-
 
     def __iter__(self):
 
-        prepared_batches = []
-        while True:
-            if prepared_batches:
-                 next_x, next_y = prepared_batches.pop(0)
-            else:
-                next_x, next_y = self._get_next_batch()        
-
-            next_batch_size = next_x.size(0)
-            if next_batch_size == self.batch_size:
-                yield next_x, next_y
-            elif next_batch_size > self.batch_size:
-                
-                split_batches = self.split_into_batches(next_x,next_y,self.batch_size)
-                for txs, tys in split_batches:
-                    prepared_batches.append((txs, tys))  
-                yield prepared_batches.pop(0)
-
-            else:
-                while next_x.size(0) <= self.batch_size:
-                    txs, tys = self._get_next_batch()
-                    next_x = torch.cat((next_x, txs), dim=0)
-                    next_y = torch.cat((next_y, tys), dim=0)
-                
-                if next_x.size(0) > self.batch_size:
-                    split_batches = self.split_into_batches(next_x,next_y,self.batch_size)
-                    for txs, tys in split_batches:
-                        prepared_batches.append((txs, tys))  
-                    yield prepared_batches.pop(0)
-                else:
-                    yield next_x, next_y
-
-    
-    def _get_next_batch(self):
-        # if self.super_client is None:
-        #     self.setup_super_client()
-        idx = next(self.sampler)
-        batch_data = None
-
-        try:
-            batch_data = self.cache_client.get(idx)
-        except Exception as e:
-            batch_data = None
-
-        if batch_data is not None:
-            x_tensor, y_tensor = self.deserialize_torch_batch(batch_data)
-            return  x_tensor, y_tensor 
-
+        if self.shuffle_urls:
+            sampler = RandomSampler(self)
         else:
+            sampler = SequentialSampler(self)
+        
+        for idx in sampler:
             file_path = self.samples[idx]
             sample_input = s3utils.get_s3_object(self.bucket_name, file_path)
             normalized_input = self.normalize(sample_input)
+
             tokenized_chunks = self.tokenize(normalized_input)
-            # Combine tensors
-            combined_xs = []
-            combined_ys = []
-
             for x, y in tokenized_chunks:
-                combined_xs.append(x)
-                combined_ys.append(y)
+                yield x, y
 
-            # Convert the list of combined tensors into a single tensor
-            combined_x_tensor = torch.stack(combined_xs,dim=0)
-            combined_y_tensor = torch.stack(combined_ys,dim=0)
-            torch_tuple = (combined_x_tensor, combined_y_tensor)
-            buffer = BytesIO()
-            torch.save(torch_tuple, buffer)
-            serialized_tensor_batch = buffer.getvalue()
-            serialized_tensor_batch = zlib.compress(serialized_tensor_batch)
-            serialized_tensor_batch = base64.b64encode(serialized_tensor_batch).decode('utf-8')
-            self.cache_client.set(str(idx),serialized_tensor_batch)
-
-            return combined_x_tensor, combined_y_tensor
     
-    def deserialize_torch_batch(self, batch_data):
-        decoded_data = base64.b64decode(batch_data) # Decode base64
-        decoded_data = zlib.decompress(decoded_data)
-        buffer = io.BytesIO(decoded_data)
-        batch_samples, batch_labels = torch.load(buffer)
-        return  batch_samples, batch_labels
+    def set_epoch(self, epoch):
+        self.epoch = epoch
 
 
 if __name__ == "__main__":
@@ -400,18 +327,17 @@ if __name__ == "__main__":
     train_data_dir = 's3://openwebtxt/owt/train/'
     block_size = 2048
 
-    dataset = RedisTextIterableDataset(data_dir=train_data_dir,
+    dataset = S3TextIterableDataset(data_dir=train_data_dir,
                                     tokenizer=tiktoken.get_encoding("gpt2"),
-                                    block_size=block_size,
-                                    batch_size=12,
+                                    block_size=2048,
                                     shuffle=True)
 
-    data_loader = DataLoader(dataset, batch_size=None)
+    data_loader = DataLoader(dataset, batch_size=12)
     # Get the size of the tensor using pympler
     end = time.perf_counter()
-    for x,y in data_loader:
+    for input, target in data_loader:
         print(f"Time to preprocess: {time.perf_counter() - end:.02f} seconds")
-        batch_size_mb,size_in_kb  = get_batch_size_mb(x)
+        batch_size_mb,size_in_kb  = get_batch_size_mb(input)
         print(f"Batch size: {batch_size_mb:.2f} MB, {size_in_kb:.2f} KB")
-        print(x.shape)
+        print(input.shape, target.shape)
         end = time.perf_counter()
