@@ -9,6 +9,8 @@ import numpy as np
 import psutil
 import torch.cuda
 
+
+
 from pynvml import (
     nvmlInit,
     nvmlDeviceGetUtilizationRates,
@@ -170,6 +172,29 @@ def get_default_supported_precision(training: bool) -> str:
         return "16-mixed" if training else "16-true"
     return "bf16-mixed" if training else "bf16-true"
 
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self, name, fmt=':f'):
+        self.name = name
+        self.fmt = fmt
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
+    def __str__(self):
+        #fmtstr = "{name} {val" + self.fmt + "} ({avg" + self.fmt + "})"
+        fmtstr = "{name}:{val" + self.fmt +"}"
+        return fmtstr.format(**self.__dict__)
 
 if __name__ == "__main__":
     pass

@@ -13,14 +13,15 @@ num_devices_per_job: 1
 seed: 41
 accelerator: 'gpu'
 log_dir: mlworklaods/logs
-log_freq: 10
+log_freq: 1
 run_training: true
 run_evaluation: false
 dataload_only: false
-hydra:  
-  output_subdir: null  
-  run:  
-    dir: .
+# hydra:  
+#   output_subdir: null  
+#   run:  
+#     dir: .
+
 # hydra:
 #   mode: MULTIRUN
 #   output_subdir: null
@@ -29,3 +30,20 @@ hydra:
 #       training: resnet18
 #       # training: resnet50, shufflenet, vgg16
 
+# Disable Hydra logging while ensuring Ray Tune can still manage its directories
+hydra:
+  run:
+    dir: .  # Current directory or a specific directory where Ray Tune expects to find it
+  sweep:
+    dir: .  # Same as above
+  output_subdir: null
+  job_logging:
+    level: DISABLE  # Disable job-specific logging
+  hydra_logging:
+    level: DISABLE  # Disable Hydra-specific logging
+
+# Additional Ray Tune configuration (if needed)
+ray:
+  tune:
+    local_dir: ./ray_results
+    log_to_file: false  # Disable Ray Tune logging to files if not needed

@@ -13,6 +13,8 @@ from mlworklaods.dataloaders.torch_lru.batch_sampler_with_id import BatchSampler
 from mlworklaods.dataloaders.torch_lru.torch_lru_dataset import TorchLRUDataset
 from torch.utils.data import DataLoader, SequentialSampler, RandomSampler  
 from mlworklaods.dataloaders.super_dl.dataset.super_dataset import SUPERDataset
+from mlworklaods.utils import AverageMeter
+
 
 class ImageClassifierModel(pl.LightningModule):
 
@@ -28,6 +30,10 @@ class ImageClassifierModel(pl.LightningModule):
         self.loss_fn = torch.nn.CrossEntropyLoss()
         self.optimizer = optimizer
         self.learning_rate = learning_rate
+        self.losses =  AverageMeter("Loss", ":6.2f")
+        #losses = AverageMeter("Loss", ":6.2f")
+        self.top1 = AverageMeter("Acc1", ":6.2f")
+        # top5 = AverageMeter("Acc5", ":6.2f")
 
 
     def forward(self, x):
@@ -39,9 +45,15 @@ class ImageClassifierModel(pl.LightningModule):
 
         loss = self.loss_fn(logits, y)
         top1 = accuracy(logits.argmax(-1), y, num_classes=10, task="multiclass", top_k=1)
-
+        
+        self.losses.update(loss.item())
+        self.top1.update(top1.item())
         # calculating the cross entropy loss on the result
         return {"loss": loss, "top1": top1}
+    
+    # def on_train_epoch_end(self):
+    #     self.log("ptl/val_loss", self.losses.avg)
+    #     self.log("ptl/val_accuracy", self.top1.avg)
 
     def validation_step(self, batch, batch_nb):
         x, y = batch
@@ -54,14 +66,16 @@ class ImageClassifierModel(pl.LightningModule):
         self.log('val_loss', loss) 
         # logging the loss with "val_" prefix
         return loss
+    
 
-    # def validation_epoch_end(self, results):
-    #     accuracy = self.correctly_classified / self.total_classified
-    #     self.log('val_accuracy', accuracy)
-    #     # logging accuracy
-    #     self.total_classified = 0
-    #     self.correctly_classified = 0
-    #     return accuracy
+
+    def validation_epoch_end(self, results):
+        accuracy = self.correctly_classified / self.total_classified
+        self.log('val_accuracy', accuracy)
+        # logging accuracy
+        self.total_classified = 0
+        self.correctly_classified = 0
+        return accuracy
 
     def configure_optimizers(self):
         # Choose an optimizer and set up a learning rate according to hyperparameters

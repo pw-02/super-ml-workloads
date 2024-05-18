@@ -1,7 +1,7 @@
 model_name: resnet18
-max_epochs: 30
+max_epochs: 1
 max_steps: null
-limit_train_batches: .inf
+limit_train_batches: 5 #.inf
 limit_val_batches: .inf
 batch_size: 64
 learning_rate: 6e-4

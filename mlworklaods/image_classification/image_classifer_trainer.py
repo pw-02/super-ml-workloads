@@ -198,6 +198,8 @@ class MyCustomTrainer:
                 self.save(state)
         # reset for next fit call
         self.should_stop = False
+    
+        return model.losses.avg, model.top1.avg
 
     def train_loop(
         self,
@@ -219,7 +221,7 @@ class MyCustomTrainer:
                 for supported values.
 
         """
-        self.fabric.call("on_train_epoch_start")
+        # self.fabric.call("on_train_epoch_start")
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
@@ -281,10 +283,10 @@ class MyCustomTrainer:
                 # if should_optim_step:
                 #     self.step_scheduler(model, scheduler_cfg, level="step", current_value=self.global_step)
 
-                # add output values to progress bar
-                self._current_train_return["compute"] =compute_time
-                self._current_train_return["data"] =data_time
-                self._current_train_return["transform"] =transform_time
+                # # add output values to progress bar
+                # self._current_train_return["compute"] =compute_time
+                # self._current_train_return["data"] =data_time
+                # self._current_train_return["transform"] =transform_time
 
                 self._format_iterable(iterable, self._current_train_return, "t")
 
@@ -295,7 +297,7 @@ class MyCustomTrainer:
                     break
                 end = time.perf_counter()
 
-            self.fabric.call("on_train_epoch_end")
+            # self.fabric.call("on_train_epoch_end")
 
     def val_loop(
         self,
