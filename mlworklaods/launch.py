@@ -2,9 +2,6 @@
 from omegaconf import DictConfig
 import hydra
 from mlworklaods.args import *
-from image_classification.train_image_classifer_super import run_super_job
-from image_classification.train_image_classifer_shade import run_shade_job
-from image_classification.train_image_classifer_lru_torch import run_lru_torch_job
 from mlworklaods.log_utils import  get_next_exp_version
 import torch.multiprocessing as mp 
 from torch.multiprocessing import Pool, Process, set_start_method 
@@ -12,6 +9,9 @@ from typing import List
 from typing import Dict, Any
 import os
 import time
+from mlworklaods.image_classification.image_classifer_trainer import MyCustomTrainer
+import torch
+
 # Helper function to prepare arguments for a job
 def prepare_args(config: DictConfig):
     log_dir_base = f"{config.log_dir}/{config.dataset.name}/{config.training.model_name}"
@@ -66,6 +66,55 @@ def prepare_args(config: DictConfig):
             shuffle=config.dataloader.shuffle)
         
         return train_args, data_args, torchlru_args
+
+
+def train(model):
+
+    train_set = MNIST(root="/tmp/data/MNIST", train=True, transform=ToTensor(), download=True)
+    val_set = MNIST(root="/tmp/data/MNIST", train=False, transform=ToTensor(), download=False)
+
+    train_loader = torch.utils.data.DataLoader(
+        train_set, batch_size=64, shuffle=True, pin_memory=torch.cuda.is_available(), num_workers=4
+    )
+    val_loader = torch.utils.data.DataLoader(
+        val_set, batch_size=64, shuffle=False, pin_memory=torch.cuda.is_available(), num_workers=4
+    )
+
+    # MPS backend currently does not support all operations used in this example.
+    # If you want to use MPS, set accelerator='auto' and also set PYTORCH_ENABLE_MPS_FALLBACK=1
+    accelerator = "cpu" if torch.backends.mps.is_available() else "auto"
+
+    trainer = MyCustomTrainer(
+        accelerator=accelerator, devices="auto", limit_train_batches=10, limit_val_batches=20, max_epochs=3
+    )
+    trainer.fit(model, train_loader, val_loader)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         
 
@@ -138,9 +187,10 @@ def spawn_jobs(process_args: Dict[str, Any]):
     else:
         raise Exception(f"unknown dataloader_kind {train_args.dataloader_kind}")
 
+
 @hydra.main(version_base=None, config_path="./conf", config_name="config")
 def main(config: DictConfig):
-    
+
     train_args, data_args, dataloader_args = prepare_args(config)
 
     if config.num_jobs == 1:

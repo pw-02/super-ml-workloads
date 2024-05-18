@@ -2,9 +2,9 @@
 from omegaconf import DictConfig
 import hydra
 from mlworklaods.args import *
-from train_image_classifer_super import run_super_job
-from train_image_classifer_shade import run_shade_job
-from train_image_classifer_lru_torch import run_lru_torch_job
+from image_classification.train_image_classifer_super import run_super_job
+from image_classification.train_image_classifer_shade import run_shade_job
+from image_classification.train_image_classifer_lru_torch import run_lru_torch_job
 from mlworklaods.log_utils import  get_next_exp_version
 import torch.multiprocessing as mp 
 from torch.multiprocessing import Pool, Process, set_start_method 
@@ -138,9 +138,14 @@ def spawn_jobs(process_args: Dict[str, Any]):
     else:
         raise Exception(f"unknown dataloader_kind {train_args.dataloader_kind}")
 
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
+
+@hydra.main(version_base=None, config_path="./conf", config_name="config")
 def main(config: DictConfig):
+
     train_args, data_args, dataloader_args = prepare_args(config)
+
+    
+
 
     if config.num_jobs == 1:
         

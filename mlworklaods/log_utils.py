@@ -9,21 +9,22 @@ from lightning.fabric import Fabric
 from typing import Any, Dict, List, Mapping, Optional, Set, Union
 from mlworklaods.utils import calc_throughput, calculate_average
 from enum import Enum
+from collections import OrderedDict
 
 
 class ExperimentLogger():
-    def __init__(self, fabric:Fabric, log_dir:str, log_freq:int):
+    def __init__(self, log_dir:str, log_freq:int, local_rank = 0):
         self.log_freq = log_freq
-        self.fabric = fabric
+        self.local_rank = local_rank
         self.print_rank_0_only = False
-        self.experiment_writer = ExperimentWriter(log_dir=log_dir, rank=self.fabric.local_rank)
+        self.experiment_writer = ExperimentWriter(log_dir=log_dir, rank=local_rank)
         self.train_job_metrics = None
         self.eval_job_metrics = None
         self.total_tokens = None
 
     def save_train_batch_metrics(self,epoch,step,global_step,num_samples,total_time,data_time, fetch_time, transform_time,compute_time,loss, avg_cpu, max_cpu,cache_hits, avg_gpu=0, max_gpu=0, num_tokens = None, acc1 = None, acc5 = None, ):
         metrics = OrderedDict({
-                "device": self.fabric.local_rank,
+                "device": self.local_rank,
                 "epoch": epoch,
                 "epoch_step": step,
                 "global_step": global_step,
@@ -55,7 +56,7 @@ class ExperimentLogger():
     def save_train_epoch_metrics(self,epoch,num_samples,global_step,num_batches,total_time,data_time,fetch_time, transform_time,compute_time,loss, 
                                  avg_cpu, max_cpu, cache_hits, avg_gpu=0, max_gpu=0, num_tokens = None,acc1 = None, acc5=None,):
         metrics = OrderedDict({
-                "device": self.fabric.local_rank,
+                "device": self.local_rank,
                 "epoch": epoch,
                 "num_samples": num_samples,
                 "num_batches": num_batches,
@@ -104,7 +105,7 @@ class ExperimentLogger():
     
     def save_eval_batch_metrics(self,epoch,step,global_step,num_sampels,total_time,loss, acc1, acc5):
         metrics = OrderedDict({
-                "device": self.fabric.local_rank,
+                "device": self.local_rank,
                 "epoch": epoch,
                 "epoch_step": step,
                 "global_step": global_step,
@@ -119,7 +120,7 @@ class ExperimentLogger():
         
     def save_eval_epoch_metrics(self,epoch,num_samples,global_step,num_batches,total_time,loss, acc1, acc5):
         metrics = OrderedDict({
-                "device": self.fabric.local_rank,
+                "device": self.local_rank,
                 "epoch": epoch,
                 "num_samples": num_samples,
                 "num_batches": num_batches,
@@ -143,7 +144,7 @@ class ExperimentLogger():
         if self.train_job_metrics:
             metrics_dict = OrderedDict(
                 {
-                    "device": self.fabric.local_rank,
+                    "device": self.local_rank,
                     "total_epochs": self.train_job_metrics.epoch_times.count,
                     "total_batches": self.train_job_metrics.total_batches,
                     "total_samples": self.train_job_metrics.total_samples,
@@ -165,18 +166,16 @@ class ExperimentLogger():
             metrics_dict["total_tokens"] = self.total_tokens
 
         console_line = f'Total_Batches: {metrics_dict["total_batches"]}|Total_Time:{metrics_dict["total_time"]}|Data_time: {metrics_dict["data_time"]}|Compute_time: {metrics_dict["compute_time"]}|bps: {metrics_dict["bps"]}'
+        print(console_line)
+
         
-        if self.print_rank_0_only:
-            self.fabric.print(console_line)
-        else:
-            print(console_line)
-        
+    
         self.log_metrics(metrics=metrics_dict, step=1,prefix='train.job', force_save = True)
     
         if self.eval_job_metrics:
             metrics_dict = OrderedDict(
                 {
-                    "device": self.fabric.local_rank,
+                    "device": self.local_rank,
                     "total_epochs": self.eval_job_metrics.epoch_times.count,
                     "total_batches": self.eval_job_metrics.total_batches,
                     "total_samples": self.eval_job_metrics.total_samples,

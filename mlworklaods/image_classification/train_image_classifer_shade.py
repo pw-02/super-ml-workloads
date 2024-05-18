@@ -4,7 +4,7 @@ import torchvision
 from typing import List, Dict
 from omegaconf import DictConfig
 from lightning.fabric import Fabric
-from common import make_model, transform, accuracy
+from mlworklaods.image_classification.common import make_model, transform, accuracy
 
 from torch.utils.data import DataLoader
 

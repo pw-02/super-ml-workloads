@@ -5,9 +5,9 @@
             "name": "Python Debugger: Specific File",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/mlworklaods/image_classification/launch.py",
+            "program": "${workspaceFolder}/mlworklaods/run.py",
             "console": "integratedTerminal",
-            "justMyCode": true
+            "justMyCode": false
         }
     ]
 }

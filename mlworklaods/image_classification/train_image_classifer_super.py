@@ -6,7 +6,7 @@ import hydra
 from omegaconf import DictConfig
 from lightning.fabric import Fabric
 import sys
-from common import make_model, transform, accuracy
+from mlworklaods.image_classification.common import make_model, transform, accuracy
 
 # Additional imports
 from mlworklaods.args import TrainArgs, DataArgs, SUPERArgs

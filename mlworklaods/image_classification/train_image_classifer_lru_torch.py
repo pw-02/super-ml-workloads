@@ -4,7 +4,7 @@ from typing import List, Dict
 from omegaconf import DictConfig
 from lightning.fabric import Fabric
 from torch.utils.data import DataLoader, SequentialSampler, RandomSampler  
-from common import make_model, transform, accuracy
+from mlworklaods.image_classification.common import make_model, transform, accuracy
 # Additional imports
 from mlworklaods.args import TrainArgs, DataArgs, LRUTorchArgs
 from mlworklaods.utils import ResourceMonitor, get_default_supported_precision, num_model_parameters
@@ -147,12 +147,11 @@ def train_loop(fabric: Fabric, epoch: int, model: nn.Module, optimizer: optim.Op
                     loss=losses.val,
                     acc1=top1.val,
                     acc5=top5.val,
-                    avg_cpu=monitor.resource_data["cpu_util"].summarize()["mean"],
-                    max_cpu=monitor.resource_data["cpu_util"].summarize()["max"],
-                    avg_gpu=monitor.resource_data["gpu_util"].summarize()["mean"],
-                    max_gpu=monitor.resource_data["gpu_util"].summarize()["max"]
+                    avg_cpu=monitor.resource_data["cpu_util"].summarize(),
+                    avg_gpu=monitor.resource_data["gpu_util"].summarize(),
+                    max_gpu=monitor.resource_data["gpu_util"].summarize()
                 )
-
+                
             if batch_idx >= max_iters:
                 break
 

@@ -8,11 +8,14 @@ class TrainArgs:
     job_id: int
     model_name: str
     dataloader_kind: str
+    batch_size: int  # Global batch size for all devices
     dataload_only: bool = False
-    num_pytorch_workers: int = 0
-    epochs: int = 1
-    batch_size: int = 64  # Global batch size for all devices
-    epoch_max_iters: Optional[int] = None
+    max_steps: Optional[int] = None
+    max_epochs: Optional[int] = None
+    limit_train_batches: Optional[int] = None
+    limit_val_batches: Optional[int] = None
+    grad_accum_steps: Optional[int] = 1
+    # validation_frequency: Optional[int] = 1
     # Optimization parameters
     learning_rate: float = 1e-3
     weight_decay: float = 0.02
@@ -22,7 +25,7 @@ class TrainArgs:
     accelerator: Optional[str] = 'gpu'
     seed: int = 41
     log_dir: Optional[Path] = None
-    log_interval: int = 1
+    log_freq: int = 1
 
     def get_epoch_max_iters(self, devices: int) -> int:
         """Calculate max iterations per epoch per device."""
@@ -45,17 +48,21 @@ class TrainArgs:
 class DataArgs:
     train_data_dir: Path = Path("data/alpaca")
     val_data_dir: Optional[Path] = None
+    num_classes : Optional[Path] = None
 
 
 @dataclass
 class SUPERArgs:
+    num_pytorch_workers: int = 0
     super_address: Optional[str] = None
     cache_address: Optional[str] = None
     simulate_data_delay: Optional[str] = None
+    
 
 
 @dataclass
 class SHADEArgs:
+    num_pytorch_workers: int = 0
     cache_address: Optional[str] = None
     working_set_size: Optional[str] = None
     replication_factor: Optional[str] = None
@@ -63,6 +70,7 @@ class SHADEArgs:
 
 @dataclass
 class LRUTorchArgs:
+    num_pytorch_workers: int = 0
     cache_address: Optional[str] = None
     cache_granularity: Optional[str] = None
     shuffle: bool = False

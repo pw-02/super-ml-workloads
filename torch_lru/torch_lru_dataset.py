@@ -90,7 +90,7 @@ class TorchLRUDataset(torch.utils.data.Dataset):
             self.cache_client.set(batch_id, minibatch)
         
         fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
-        return torch.stack(data_samples), torch.tensor(labels), cache_hits, fetch_duration, transform_duration
+        return (torch.stack(data_samples), torch.tensor(labels)), cache_hits, fetch_duration, transform_duration
     
     def random_true_or_false(self) -> bool:
         import random
