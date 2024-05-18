@@ -3,7 +3,6 @@ from omegaconf import DictConfig
 import hydra
 from mlworklaods.args import *
 import os
-import time
 from mlworklaods.image_classification.image_classifer_trainer import MyCustomTrainer
 import torch
 from mlworklaods.image_classification.imager_classifer_model import ImageClassifierModel
@@ -11,12 +10,8 @@ from mlworklaods.image_classification.imager_classifer_model import ImageClassif
 
 from lightning.fabric.loggers import CSVLogger
 
-
 def prepare_args(config: DictConfig):
     log_dir = f"{config.log_dir}/{config.dataset.name}"
-    # exp_version = get_next_exp_version(log_dir_base, config.dataloader.kind)
-    # full_log_dir = os.path.join(log_dir_base, config.dataloader.kind, str(exp_version))
-
     train_args = TrainArgs(
         job_id=os.getpid(),
         model_name=config.training.model_name,
@@ -28,7 +23,6 @@ def prepare_args(config: DictConfig):
         grad_accum_steps=config.training.grad_accum_steps,
         run_training=config.run_training,
         run_evaluation=config.run_evaluation,
-        # validation_frequency = config.training.validation_frequency,
         devices=config.num_devices_per_job,
         accelerator=config.accelerator,
         seed=config.seed,
@@ -38,9 +32,6 @@ def prepare_args(config: DictConfig):
         learning_rate=config.training.learning_rate,
         weight_decay=config.training.weight_decay)
     
-
-
-
     data_args = DataArgs(
         train_data_dir=config.dataset.train_dir,
         val_data_dir=config.dataset.val_dir,
@@ -73,8 +64,6 @@ def prepare_args(config: DictConfig):
             shuffle=config.dataloader.shuffle)
         
         return train_args, data_args, torchlru_args
-
-
 
 
 def get_default_supported_precision(training: bool) -> str:
@@ -110,7 +99,5 @@ def main(config: DictConfig):
     trainer.fit(model, train_loader, val_loader,train_args.seed)
 
     
-
-
 if __name__ == "__main__":
     main()
