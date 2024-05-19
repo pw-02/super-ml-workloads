@@ -16,7 +16,8 @@ import time
 from mlworklaods.utils import ResourceMonitor
 from collections import OrderedDict
 import json
-class MyCustomTrainer:
+
+class DataloadOnlyTrainer:
     def __init__(
         self,
         accelerator: Union[str, Accelerator] = "auto",
@@ -200,7 +201,7 @@ class MyCustomTrainer:
         # reset for next fit call
         self.should_stop = False
     
-        return model.losses.avg, model.top1.avg
+        return 0, 0
 
     def train_loop(
         self,
@@ -240,20 +241,6 @@ class MyCustomTrainer:
                 compute_start = time.perf_counter()
                 # check if optimizer should step in gradient accumulation
                 should_optim_step = self.global_step % self.grad_accum_steps == 0
-                if should_optim_step:
-                    # # currently only supports a single optimizer
-                    # self.fabric.call("on_before_optimizer_step", optimizer, 0)
-
-                    # optimizer step runs train step internally through closure
-                    optimizer.step(partial(self.training_step, model=model, batch=batch, batch_idx=batch_idx))
-                    # self.fabric.call("on_before_zero_grad", optimizer)
-
-                    optimizer.zero_grad()
-
-                else:
-                    # gradient accumulation -> no optimizer step
-                    self.training_step(model=model, batch=batch, batch_idx=batch_idx)
-                
                 compute_time = time.perf_counter() - compute_start
 
                 # only increase global step if optimizer stepped
@@ -272,8 +259,8 @@ class MyCustomTrainer:
                         "transform_time": transform_time,
                         "compute_time": compute_time,
                         "cache_hits": cache_hits,
-                        "loss_train": self._current_train_return['loss'],
-                        "accuracy_train": self._current_train_return['top1'],
+                        "loss_train": 0,
+                        "accuracy_train": 0,
                         "cpu_usge": json.dumps(monitor.resource_data["cpu_util"].summarize()),
                         "gpu_usge": json.dumps( monitor.resource_data["gpu_util"].summarize())   
                         }),
@@ -285,9 +272,9 @@ class MyCustomTrainer:
                 #     self.step_scheduler(model, scheduler_cfg, level="step", current_value=self.global_step)
 
                 # # add output values to progress bar
-                self._current_train_return["comp"] =compute_time
-                self._current_train_return["data"] =data_time
-                self._current_train_return["tform"] =transform_time
+                # self._current_train_return["compute"] =compute_time
+                # self._current_train_return["data"] =data_time
+                # self._current_train_return["transform"] =transform_time
 
                 self._format_iterable(iterable, self._current_train_return, "t")
 

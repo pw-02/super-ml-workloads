@@ -1,4 +1,3 @@
-
 from omegaconf import DictConfig
 import hydra
 from mlworklaods.args import *
@@ -6,12 +5,17 @@ import os
 from mlworklaods.image_classification.image_classifer_trainer import MyCustomTrainer
 import torch
 from mlworklaods.image_classification.imager_classifer_model import ImageClassifierModel
-# Helper function to prepare arguments for a job
-
+from mlworklaods.image_classification.empty_model import EmptyModel
+from mlworklaods.image_classification.dataload_only_trainer import DataloadOnlyTrainer
 from lightning.fabric.loggers import CSVLogger
+from ray import tune
+from ray.air import session
+from lightning.pytorch.core.saving import save_hparams_to_yaml
 
-def prepare_args(config: DictConfig):
-    log_dir = f"{config.log_dir}/{config.dataset.name}"
+# Helper function to prepare arguments for a job
+def prepare_args(config: DictConfig,expid):
+    log_dir = f"{config.log_dir}/{config.dataset.name}/{config.training.model_name}/{expid}"
+
     train_args = TrainArgs(
         job_id=os.getpid(),
         model_name=config.training.model_name,
@@ -62,9 +66,8 @@ def prepare_args(config: DictConfig):
             cache_address=config.dataloader.cache_address,
             cache_granularity=config.dataloader.cache_granularity,
             shuffle=config.dataloader.shuffle)
-        
-        return train_args, data_args, torchlru_args
 
+    return train_args, data_args, torchlru_args
 
 def get_default_supported_precision(training: bool) -> str:
     from lightning.fabric.accelerators import MPSAccelerator
@@ -72,17 +75,17 @@ def get_default_supported_precision(training: bool) -> str:
         return "16-mixed" if training else "16-true"
     return "bf16-mixed" if training else "bf16-true"
 
-
-@hydra.main(version_base=None, config_path="./conf", config_name="config")
-def main(config: DictConfig):
-
-    train_args, data_args, dataloader_args = prepare_args(config)
-
+def train_model(config, hydra_config):
+    train_args, data_args, dataloader_args = prepare_args(hydra_config, f"hpo_{session.get_experiment_name()}")
+    train_args.learning_rate = config["lr"]
+    hydra_config.training.learning_rate =train_args.learning_rate 
+    
+    
     model = ImageClassifierModel(train_args.model_name, train_args.learning_rate, num_classes = data_args.num_classes)
     
-    logger = CSVLogger(root_dir=train_args.log_dir, name=train_args.model_name,flush_logs_every_n_steps=train_args.log_freq)
+    logger = CSVLogger(root_dir=train_args.log_dir, name="", flush_logs_every_n_steps=train_args.log_freq)
 
-    trainer = MyCustomTrainer(
+    trainer = DataloadOnlyTrainer(
         accelerator=train_args.accelerator,
         precision=get_default_supported_precision(True),
         devices=train_args.devices, 
@@ -91,12 +94,68 @@ def main(config: DictConfig):
         max_epochs=train_args.max_epochs,
         max_steps=train_args.max_steps,
         loggers=[logger],
-        grad_accum_steps=train_args.grad_accum_steps
+        grad_accum_steps=train_args.grad_accum_steps,
     )
 
+    train_loader, val_loader = model.make_dataloaders(train_args, data_args, dataloader_args, trainer.fabric.world_size)
+    avg_loss, avg_acc = trainer.fit(model, train_loader, val_loader, train_args.seed)
+    hparams_file = os.path.join(logger.log_dir, "hparms.yaml")
+    save_hparams_to_yaml(hparams_file, hydra_config)
+    session.report({"loss": avg_loss, "accuracy": avg_acc})
 
-    train_loader, val_loader = model.make_dataloaders(train_args, data_args,dataloader_args, trainer.fabric.world_size)
-    trainer.fit(model, train_loader, val_loader,train_args.seed)
-    
+@hydra.main(version_base=None, config_path="./conf", config_name="config")
+def main(hydra_config: DictConfig):
+
+    if hydra_config.num_jobs > 1:
+        os.environ["RAY_CHDIR_TO_TRIAL_DIR"] = "0"
+        os.environ["RAY_DEDUP_LOGS"] = "0"
+
+        search_space = {
+            "lr": tune.loguniform(1e-5, 1e-2),
+            # "training.batch_size": tune.choice([16, 32, 64, 128]),
+        }
+
+        result = tune.run(
+            tune.with_parameters(train_model, hydra_config=hydra_config),
+            resources_per_trial={"gpu": 0.1},
+            metric="loss",
+            mode="min",
+            max_concurrent_trials=hydra_config.num_jobs,
+            config=search_space,
+            num_samples=hydra_config.num_jobs,
+            checkpoint_freq=0, 
+            verbose=1,
+        )
+        best_trial = result.get_best_trial("loss", "min", "last")
+        print(f"Best trial config: {best_trial.config}")
+        print(f"Best trial final loss: {best_trial.last_result['loss']}")
+        print(f"Best trial final accuracy: {best_trial.last_result['accuracy']}")
+    else:
+        from datetime import datetime
+        train_args, data_args, dataloader_args = prepare_args(hydra_config, datetime.now().strftime("train_single_model_%Y-%m-%d_%H-%M-%S"))
+        
+        model = ImageClassifierModel(train_args.model_name, train_args.learning_rate, num_classes=data_args.num_classes)
+        
+        logger = CSVLogger(root_dir=train_args.log_dir, name="", flush_logs_every_n_steps=train_args.log_freq)
+
+        trainer = MyCustomTrainer(
+            accelerator=train_args.accelerator,
+            precision=get_default_supported_precision(True),
+            devices=train_args.devices, 
+            limit_train_batches=train_args.limit_train_batches, 
+            limit_val_batches=train_args.limit_val_batches, 
+            max_epochs=train_args.max_epochs,
+            max_steps=train_args.max_steps,
+            loggers=[logger],
+            grad_accum_steps=train_args.grad_accum_steps,
+        )
+
+        train_loader, val_loader = model.make_dataloaders(train_args, data_args, dataloader_args, trainer.fabric.world_size)
+        avg_loss, avg_acc = trainer.fit(model, train_loader, val_loader, train_args.seed)
+        hparams_file = os.path.join(logger.log_dir, "hparms.yaml")
+        save_hparams_to_yaml(hparams_file, hydra_config)
+        print(f"Training completed with loss: {avg_loss}, accuracy: {avg_acc}")
+
+
 if __name__ == "__main__":
     main()
