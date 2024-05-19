@@ -2,11 +2,11 @@ from omegaconf import DictConfig
 import hydra
 from mlworklaods.args import *
 import os
-from mlworklaods.image_classification.image_classifer_trainer import MyCustomTrainer
+from mlworklaods.trainers.image_classifer_trainer import MyCustomTrainer
 import torch
-from mlworklaods.image_classification.imager_classifer_model import ImageClassifierModel
-from mlworklaods.image_classification.empty_model import EmptyModel
-from mlworklaods.image_classification.dataload_only_trainer import DataloadOnlyTrainer
+from mlworklaods.models.imager_classifer_model import ImageClassifierModel
+from mlworklaods.models.empty_model import EmptyModel
+from mlworklaods.trainers.dataload_only_trainer import DataloadOnlyTrainer
 from lightning.fabric.loggers import CSVLogger
 from ray import tune
 from ray.air import session
