@@ -16,3 +16,4 @@ hydra-core
 psutil
 pynvml
 heapdict
+litdata

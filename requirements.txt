@@ -15,6 +15,7 @@ hydra-core
 psutil
 pynvml
 heapdict
+litdata
 # nltk
 # redis-py-cluster
 #nlp workload

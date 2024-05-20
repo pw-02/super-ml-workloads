@@ -1,6 +1,6 @@
 import functools
 import torch
-import mlworklaods.s3utils as s3utils
+import mlworklaods.image_classification.s3utils as s3utils
 from typing import List, Tuple, Dict
 from PIL import Image
 from mlworklaods.dataloaders.super_dl.super_client import SuperClient

@@ -3,6 +3,7 @@ from typing import Optional, Union
 from pathlib import Path
 from numpy import Infinity
 
+
 @dataclass
 class TrainArgs:
     job_id: int

@@ -1,7 +1,7 @@
 import functools
 import torch
-import mlworklaods.s3utils as s3utils
-from mlworklaods.s3utils import S3Url
+import mlworklaods.image_classification.s3utils as s3utils
+from mlworklaods.image_classification.s3utils import S3Url
 from typing import List, Tuple, Dict
 from PIL import Image
 import io
@@ -11,7 +11,7 @@ import os
 import redis
 import base64
 import zlib
-from mlworklaods.utils import timer_decorator
+from mlworklaods.image_classification.utils import timer_decorator
 import time
 
 class TorchLRUDataset(torch.utils.data.Dataset):

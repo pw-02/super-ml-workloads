@@ -1,25 +1,37 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
 
 """Utility functions for training and inference."""
-
+import inspect
 import math
+import os
 import pickle
+import shutil
 import sys
+from dataclasses import asdict, is_dataclass
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Literal, Mapping, Optional, TypeVar, Union
 
 import lightning as L
 import torch
 import torch.nn as nn
 import torch.utils._device
+import yaml
+from lightning.fabric.loggers import CSVLogger, TensorBoardLogger
 from lightning.fabric.strategies import FSDPStrategy
 from lightning.fabric.utilities.load import _lazy_load as lazy_load
+from lightning.pytorch.loggers import WandbLogger
 from torch.serialization import normalize_storage_type
 from typing_extensions import Self
 
 if TYPE_CHECKING:
-    from litgpt import GPT
+    from litgpt import GPT, Config
+
+
+def init_out_dir(out_dir: Path) -> Path:
+    if not out_dir.is_absolute() and "LIGHTNING_ARTIFACTS_DIR" in os.environ:
+        return Path(os.getenv("LIGHTNING_ARTIFACTS_DIR")) / out_dir
+    return out_dir
 
 
 def find_multiple(n: int, k: int) -> int:
@@ -35,16 +47,23 @@ def num_parameters(module: nn.Module, requires_grad: Optional[bool] = None) -> i
         if requires_grad is None or p.requires_grad == requires_grad:
             if hasattr(p, "quant_state"):
                 # bitsandbytes 4bit layer support
-                total += math.prod(p.quant_state[1])
+                total += math.prod(p.quant_state.shape)
             else:
                 total += p.numel()
     return total
 
 
-def check_valid_checkpoint_dir(checkpoint_dir: Path) -> None:
+def reset_parameters(module: nn.Module) -> None:
+    """Calls `reset_parameters` on the module and all its submodules."""
+    for mod in module.modules():
+        if callable(getattr(mod, "reset_parameters", None)):
+            mod.reset_parameters()
+
+
+def check_valid_checkpoint_dir(checkpoint_dir: Path, model_filename: str = "lit_model.pth") -> None:
     files = {
-        "lit_model.pth": (checkpoint_dir / "lit_model.pth").is_file(),
-        "lit_config.json": (checkpoint_dir / "lit_config.json").is_file(),
+        model_filename: (checkpoint_dir / model_filename).is_file(),
+        "model_config.yaml": (checkpoint_dir / "model_config.yaml").is_file(),
         "tokenizer.json OR tokenizer.model": (checkpoint_dir / "tokenizer.json").is_file()
         or (checkpoint_dir / "tokenizer.model").is_file(),
         "tokenizer_config.json": (checkpoint_dir / "tokenizer_config.json").is_file(),
@@ -67,8 +86,8 @@ def check_valid_checkpoint_dir(checkpoint_dir: Path) -> None:
 
     error_message = (
         f"--checkpoint_dir {str(checkpoint_dir.absolute())!r}{problem}."
-        "\nFind download instructions at https://github.com/Lightning-AI/lit-gpt/blob/main/tutorials\n"
-        f"{extra}\nSee all download options by running:\n python scripts/download.py"
+        "\nFind download instructions at https://github.com/Lightning-AI/litgpt/blob/main/tutorials\n"
+        f"{extra}\nSee all download options by running:\n litgpt download"
     )
     print(error_message, file=sys.stderr)
     raise SystemExit(1)
@@ -229,7 +248,7 @@ def chunked_cross_entropy(
     logits: Union[torch.Tensor, List[torch.Tensor]],
     targets: torch.Tensor,
     chunk_size: int = 128,
-    ignore_index: int = -1,
+    ignore_index: int = -100,
 ) -> torch.Tensor:
     # with large max_sequence_lengths, the beginning of `backward` allocates a large memory chunk which can dominate
     # the memory usage in fine-tuning settings with low number of parameters.
@@ -253,7 +272,8 @@ def chunked_cross_entropy(
             for logit_chunk, target_chunk in zip(logit_chunks, target_chunks)
         ]
         non_masked_elems = (targets != ignore_index).sum()
-        return torch.cat(loss_chunks).sum() / max(1, non_masked_elems)
+        # See [non_masked_elems div note]
+        return torch.cat(loss_chunks).sum() / non_masked_elems.maximum(torch.ones_like(non_masked_elems))
 
     # no chunking at all
     logits = logits.reshape(-1, logits.size(-1))
@@ -269,7 +289,11 @@ def chunked_cross_entropy(
         for logit_chunk, target_chunk in zip(logit_chunks, target_chunks)
     ]
     non_masked_elems = (targets != ignore_index).sum()
-    return torch.cat(loss_chunks).sum() / max(1, non_masked_elems)
+    # [non_masked_elems div note]:
+    #   max(1, non_masked_elems) would be more ergonomic to avoid a division by zero. However that
+    #   results in a python int which is then passed back to torch division. By using the
+    #   `x.maximum(torch.ones_like(x))` pattern we avoid a cudaStreamSynchronize.
+    return torch.cat(loss_chunks).sum() / non_masked_elems.maximum(torch.ones_like(non_masked_elems))
 
 
 def map_old_state_dict_weights(state_dict: Dict, mapping: Mapping, prefix: str) -> Dict:
@@ -370,10 +394,95 @@ class CycleIterator:
         return self
 
 
+def copy_config_files(source_dir: Path, out_dir: Path) -> None:
+    """Copies the specified configuration and tokenizer files into the output directory."""
+
+    config_files = ["config.json", "generation_config.json", "model_config.yaml"]
+    tokenizer_files = ["tokenizer.json", "tokenizer.model", "tokenizer_config.json"]
+
+    for file_name in config_files + tokenizer_files:
+        src_path = source_dir / file_name
+        if src_path.exists():
+            shutil.copy(src_path, out_dir)
+
+
 def CLI(*args: Any, **kwargs: Any) -> Any:
-    from jsonargparse import CLI, set_docstring_parse_options
+    from jsonargparse import CLI, set_config_read_mode, set_docstring_parse_options
 
     set_docstring_parse_options(attribute_docstrings=True)
+    set_config_read_mode(urls_enabled=True)
 
     kwargs.setdefault("as_positional", False)
+
     return CLI(*args, **kwargs)
+
+
+def capture_hparams() -> Dict[str, Any]:
+    """Captures the local variables ('hyperparameters') from where this function gets called."""
+    caller_frame = inspect.currentframe().f_back
+    locals_of_caller = caller_frame.f_locals
+    hparams = {}
+    for name, value in locals_of_caller.items():
+        if value is None or isinstance(value, (int, float, str, bool, Path)):
+            hparams[name] = value
+        elif is_dataclass(value):
+            hparams[name] = asdict(value)
+        else:
+            hparams[name] = str(value)
+    return hparams
+
+
+def save_hyperparameters(function: callable, checkpoint_dir: Path) -> None:
+    """Captures the CLI parameters passed to `function` without running `function` and saves them to the checkpoint."""
+    from jsonargparse import capture_parser
+
+    # TODO: Make this more robust
+    # This hack strips away the subcommands from the top-level CLI
+    # to parse the file as if it was called as a script
+    known_commands = [
+        ("finetune", "full"),
+        ("finetune", "lora"),
+        ("finetune", "adapter"),
+        ("finetune", "adapter_v2"),
+        ("finetune",),
+        ("pretrain",),
+    ]
+    for known_command in known_commands:
+        unwanted = slice(1, 1 + len(known_command))
+        if tuple(sys.argv[unwanted]) == known_command:
+            sys.argv[unwanted] = []
+
+    parser = capture_parser(lambda: CLI(function))
+    config = parser.parse_args()
+    parser.save(config, checkpoint_dir / "hyperparameters.yaml", overwrite=True)
+
+
+def save_config(config: "Config", checkpoint_dir: Path) -> None:
+    config_dict = asdict(config)
+    with open(checkpoint_dir / "model_config.yaml", "w", encoding="utf-8") as fp:
+        yaml.dump(config_dict, fp)
+
+
+def parse_devices(devices: Union[str, int]) -> int:
+    if devices in (-1, "auto"):
+        return torch.cuda.device_count() or 1
+    if isinstance(devices, int) and devices > 0:
+        return devices
+    raise ValueError(f"Devices must be 'auto' or a positive integer, got: {devices!r}")
+
+
+def choose_logger(
+    logger_name: Literal["csv", "tensorboard", "wandb"],
+    out_dir: Path,
+    name: str,
+    log_interval: int = 1,
+    resume: Optional[bool] = None,
+    **kwargs: Any,
+):
+    if logger_name == "csv":
+        return CSVLogger(root_dir=(out_dir / "logs"), name="csv", flush_logs_every_n_steps=log_interval, **kwargs)
+    if logger_name == "tensorboard":
+        return TensorBoardLogger(root_dir=(out_dir / "logs"), name="tensorboard", **kwargs)
+    if logger_name == "wandb":
+        return WandbLogger(project=name, resume=resume, **kwargs)
+    raise ValueError(f"`--logger_name={logger_name}` is not a valid option. Choose from 'csv', 'tensorboard', 'wandb'.")

@@ -17,12 +17,13 @@ from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
 from typing_extensions import Literal
 
-from litgpt import Tokenizer
-from litgpt.args import EvalArgs, TrainArgs
-from litgpt.config import name_to_config
-from litgpt.data import DataModule, TinyLlama
-from litgpt.model import GPT, Block, CausalSelfAttention, Config, LLaMAMLP
-from litgpt.utils import (
+from mlworklaods.llm.tokenizer import Tokenizer
+from mlworklaods.llm.args import EvalArgs, TrainArgs
+from mlworklaods.llm.config import name_to_config
+from mlworklaods.llm.data.base import DataModule
+# from data.tiny_llama import TinyLlama
+from mlworklaods.llm.model import GPT, Block, CausalSelfAttention, Config, LLaMAMLP
+from mlworklaods.llm.utils import (
     CLI,
     CycleIterator,
     capture_hparams,
@@ -38,8 +39,8 @@ from litgpt.utils import (
     save_hyperparameters,
 )
 
-
-def setup(
+def setup( 
+    train: TrainArgs,
     model_name: Optional[str] = None,
     model_config: Optional[Config] = None,
     out_dir: Path = Path("out/pretrain"),
@@ -47,21 +48,7 @@ def setup(
     initial_checkpoint_dir: Optional[Path] = None,
     resume: Union[bool, Path] = False,
     data: Optional[DataModule] = None,
-    train: TrainArgs = TrainArgs(
-        save_interval=1000,
-        log_interval=1,
-        global_batch_size=512,
-        micro_batch_size=4,
-        max_tokens=int(3e12),  # 3 trillion
-        learning_rate=4e-4,
-        weight_decay=1e-1,
-        beta1=0.9,
-        beta2=0.95,
-        max_norm=1.0,
-        min_lr=4e-5,
-        lr_warmup_steps=2000,
-        tie_embeddings=False,
-    ),
+
     eval: EvalArgs = EvalArgs(interval=1000, max_iters=100),
     devices: Union[int, str] = "auto",
     tokenizer_dir: Optional[Path] = None,
@@ -92,7 +79,7 @@ def setup(
         seed: The random seed to use for reproducibility.
     """
     hparams = capture_hparams()
-    data = TinyLlama() if data is None else data
+    # data = TinyLlama() if data is None else data
 
     if model_config is not None and model_name is not None:
         raise ValueError("Only one of `model_name` or `model_config` can be set.")
@@ -185,7 +172,7 @@ def main(
     )
     optimizer = fabric.setup_optimizers(optimizer)
 
-    train_dataloader, val_dataloader = get_dataloaders(fabric, data, tokenizer, train, model.max_seq_length)
+    train_dataloader, val_dataloader = get_dataloaders(fabric, data, tokenizer, train, train.max_seq_length)
     train_dataloader, val_dataloader = fabric.setup_dataloaders(train_dataloader, val_dataloader)
 
     if initial_checkpoint_dir:
@@ -444,3 +431,4 @@ def validate_args(train: TrainArgs, eval: EvalArgs, initial_checkpoint_dir, resu
         issues.append("Can't provide both `--resume` and `--initial_checkpoint_dir`. Choose one.")
     if issues:
         raise ValueError("\n".join(issues))
+

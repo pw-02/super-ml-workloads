@@ -1,22 +1,23 @@
 model_name: pythia-14m
-log_interval: 1
-global_batch_size: 8
-micro_batch_size: 8
-#gradient accumulation every global_batch_size/micro_batch_size iterations
-lr_warmup_steps: 0
-epochs: 1
-epoch_size: 16
-learning_rate: 6e-4
+save_interval: 1000
+global_batch_size: 64
+micro_batch_size: 4
+lr_warmup_steps: 2000
+lr_warmup_fraction: null
+epochs: null
+max_tokens: 3e12  # 3 trillion
+max_steps: null
+max_seq_length: null
+tie_embeddings: False
+
+learning_rate: 4e-4
 weight_decay: 1e-1
 beta1: 0.9
 beta2: 0.95
 max_norm: 1.0
-min_lr: 6e-5
-eval_iterval: 16
-max_eval_iters: 50
-max_tokens: 1000000 # 3000000 #999424
+min_lr: 4e-5
 
-
+num_pytorch_workers: 0
 
 # /*      'pythia-14m',
 #         'pythia-31m',
