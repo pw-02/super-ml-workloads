@@ -17,29 +17,19 @@ from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
 from typing_extensions import Literal
 from mlworklaods.args import LLMTrainArgs, EvalArgs
-from mlworklaods.llm.tokenizer import Tokenizer
 from mlworklaods.llm.config import name_to_config
-from mlworklaods.llm.data.base import DataModule
 from lightning.fabric.loggers import Logger
 from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 from mlworklaods.dataloaders.torch_lru.torch_lru_text_dataset import TorchLRUTextDataset
 
 # from data.tiny_llama import TinyLlama
 from mlworklaods.llm.model import GPT, Block, CausalSelfAttention, Config, LLaMAMLP
-from mlworklaods.llm.utils import (
-    CLI,
+from mlworklaods.utils import (
     CycleIterator,
-    capture_hparams,
-    choose_logger,
     chunked_cross_entropy,
-    copy_config_files,
-    get_default_supported_precision,
-    init_out_dir,
     num_parameters,
-    parse_devices,
     reset_parameters,
-    save_config,
-    save_hyperparameters,
+    get_default_supported_precision
 )
 
 def pretrain_llm( 
@@ -49,7 +39,6 @@ def pretrain_llm(
     precision: Literal["bf16-true", "bf16-mixed", "32-true", None] = None,
     initial_checkpoint_dir: Optional[Path] = None,
     resume: Union[bool, Path] = False,
-    data: Optional[DataModule] = None,
     eval: EvalArgs = EvalArgs(interval=1000, max_iters=100),
     devices: Union[int, str] = "auto",
     # tokenizer_dir: Optional[Path] = None,
@@ -61,14 +50,9 @@ def pretrain_llm(
     if model_name not in available_models:
         raise ValueError(f"Please specify --model_name <model_name>. Available values:\n{available_models}")
     
-    hparams = capture_hparams()
 
     config = Config.from_name(model_name)
     precision = precision or get_default_supported_precision(training=True)
-    devices = parse_devices(devices)
-    out_dir = init_out_dir(out_dir)
-    # in case the dataset requires the Tokenizer
-    tokenizer = Tokenizer(tokenizer_dir) if tokenizer_dir is not None else None
 
     if devices > 1:
         strategy = FSDPStrategy(auto_wrap_policy={Block}, state_dict_type="full", sharding_strategy="HYBRID_SHARD")
@@ -79,7 +63,6 @@ def pretrain_llm(
     
     fabric.launch()
 
-    fabric.print(pprint.pformat(hparams))
 
     main(
         fabric,
@@ -88,10 +71,8 @@ def pretrain_llm(
         initial_checkpoint_dir,
         resume,
         config,
-        data,
         out_dir,
         tokenizer_dir,
-        tokenizer,
         train,
         eval,
     )
@@ -104,10 +85,8 @@ def main(
     initial_checkpoint_dir: Optional[Path],
     resume: Union[bool, Path],
     config: Config,
-    data: DataModule,
     out_dir: Path,
     tokenizer_dir: Optional[Path],
-    tokenizer: Optional[Tokenizer],
     train: LLMTrainArgs,
     eval: EvalArgs,
 ) -> None:
@@ -166,9 +145,6 @@ def main(
 
     train_time = time.perf_counter()
     fit(fabric, devices, state, train_dataloader, val_dataloader, out_dir, tokenizer_dir, train, eval)
-
-    # Save final checkpoint
-    save_checkpoint(fabric, state, tokenizer_dir, out_dir / "final" / "lit_model.pth")
 
     fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
     if fabric.device.type == "cuda":
@@ -300,9 +276,6 @@ def fit(
             fabric.log_dict(metrics, step=state["iter_num"] - 1)
             fabric.barrier()
 
-        if train.checkpoint_interval is not None and not is_accumulating and state["step_count"] % train.checkpoint_interval == 0:
-            save_checkpoint(fabric, state, tokenizer_dir, out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth")
-
 
 @torch.no_grad()
 def validate(fabric: L.Fabric, model: nn.Module, val_dataloader: DataLoader, max_iters: int) -> torch.Tensor:
@@ -332,10 +305,6 @@ def get_dataloaders(
     import glob
     from transformers import GPT2Tokenizer
 
-    def collate_fn(batch):
-        input_ids = torch.stack([item[0] for item in batch])
-        labels = torch.stack([item[1] for item in batch])
-        return input_ids, labels
     
     train_dataset = TorchLRUTextDataset(glob.glob('data/openwebtext/train/*.txt'), 
                                   GPT2Tokenizer.from_pretrained('gpt2'), 
@@ -390,17 +359,6 @@ def initialize_weights(fabric: L.Fabric, model: GPT, n_layer: int, n_embd: int) 
     if not isinstance(fabric.strategy, FSDPStrategy):
         reset_parameters(model)
 
-
-def save_checkpoint(fabric, state, tokenizer_dir, checkpoint_file):
-    model = state["model"]
-    checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
-    fabric.print(f"Saving checkpoint to {str(checkpoint_file)!r}")
-    fabric.save(checkpoint_file, state)
-    if fabric.global_rank == 0:
-        save_hyperparameters(setup, checkpoint_file.parent)
-        if tokenizer_dir is not None:
-            copy_config_files(tokenizer_dir, checkpoint_file.parent)
-        save_config(model.config, checkpoint_file.parent)
 
 
 def validate_args(train: LLMTrainArgs, eval: EvalArgs, initial_checkpoint_dir, resume) -> None:

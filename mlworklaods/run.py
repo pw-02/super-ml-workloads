@@ -12,8 +12,6 @@ from mlworklaods.image_classification.data import CIFAR10DataModule, ImageNetDat
 from mlworklaods.utils import get_default_supported_precision
 from mlworklaods.args import *
 from datetime import datetime
-from mlworklaods.llm.data.text_files import TextFiles
-from mlworklaods.llm.data.openwebtext import OpenWebText
 from mlworklaods.llm.pretrain import pretrain_llm
 
 def train_model(config, hydra_config):
@@ -42,7 +40,6 @@ def train_model(config, hydra_config):
             precision=get_default_supported_precision(True),
             initial_checkpoint_dir=None,
             resume=False,
-            data=None,
             eval=EvalArgs(interval=1000, max_iters=100,initial_validation = False),
             devices=train_args.devices,
             loggers=[logger],
