@@ -12,6 +12,10 @@ from mlworklaods.image_classification.data import CIFAR10DataModule, ImageNetDat
 from mlworklaods.utils import get_default_supported_precision
 from mlworklaods.args import *
 from datetime import datetime
+from mlworklaods.llm.pretrain import setup
+from mlworklaods.llm.data.text_files import TextFiles
+from mlworklaods.llm.data.openwebtext import OpenWebText
+from mlworklaods.llm.pretrain import pretrain_llm
 
 def train_model(config, hydra_config):
     if config:
@@ -25,12 +29,24 @@ def train_model(config, hydra_config):
     
     logger = CSVLogger(root_dir=train_args.log_dir, name="", flush_logs_every_n_steps=train_args.log_interval)
 
+
     if isinstance(train_args, LLMTrainArgs):
-        pass
-    
-    
-    elif isinstance(train_args, ImgClassifierTrainArgs):
         
+        data = OpenWebText(data_path='data')
+
+        pretrain_llm(
+            train=train_args,
+            model_name=train_args.model_name,
+            precision=get_default_supported_precision(True),
+            initial_checkpoint_dir=None,
+            resume=False,
+            data=data,
+            eval=EvalArgs(interval=1000, max_iters=100,initial_validation = False),
+            devices=train_args.devices,
+            loggers=[logger],
+            seed=train_args.seed)
+        
+    elif isinstance(train_args, ImgClassifierTrainArgs):
         if 'cifar10' in data_args.dataset_name:
             data_module = CIFAR10DataModule()
         elif 'imagenet' in data_args.dataset_name:
@@ -59,6 +75,10 @@ def train_model(config, hydra_config):
         
         if config:
             session.report({"loss": avg_loss, "accuracy": avg_acc})
+
+
+
+
 
 @hydra.main(version_base=None, config_path="./conf", config_name="config")
 def main(hydra_config: DictConfig):
@@ -90,38 +110,6 @@ def main(hydra_config: DictConfig):
     else:
 
         train_model(config=None, hydra_config= hydra_config)
-        # from datetime import datetime
-        # train_args, data_args, dataloader_args = prepare_args(hydra_config, datetime.now().strftime("train_single_model_%Y-%m-%d_%H-%M-%S"))
-
-        # if 'cifar10' in data_args.dataset_name:
-        #     data_module = CIFAR10DataModule()
-        # elif 'imagenet' in data_args.dataset_name:
-        #     data_module = ImageNetDataModule()
-
-        # model = ImageClassifierModel(train_args.model_name, train_args.learning_rate, num_classes=data_module.num_classes)
-        
-        # logger = CSVLogger(root_dir=train_args.log_dir, name="", flush_logs_every_n_steps=train_args.log_freq)
-
-        # trainer = ImageClassificationTrainer(
-        #     accelerator=train_args.accelerator,
-        #     precision=get_default_supported_precision(True),
-        #     devices=train_args.devices, 
-        #     callbacks=None,
-        #     max_epochs=train_args.max_epochs,
-        #     max_steps=train_args.max_steps,
-        #     grad_accum_steps=train_args.grad_accum_steps,
-        #     limit_train_batches=train_args.limit_train_batches, 
-        #     limit_val_batches=train_args.limit_val_batches, 
-        #     loggers=[logger],
-        #     use_distributed_sampler=True
-        # )
-        
-        # train_loader, val_loader = data_module.make_dataloaders(train_args, data_args, dataloader_args, trainer.fabric.world_size)
-        # avg_loss, avg_acc = trainer.fit(model, train_loader, val_loader, train_args.seed)
-        # hparams_file = os.path.join(logger.log_dir, "hparms.yaml")
-        # save_hparams_to_yaml(hparams_file, hydra_config)
-        # print(f"Training completed with loss: {avg_loss}, accuracy: {avg_acc}")
-
 
 if __name__ == "__main__":
     main()

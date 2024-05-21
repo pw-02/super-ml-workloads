@@ -4,7 +4,7 @@ defaults:
   - dataloader: torch_lru #shade, torch_lru, super
   - dataset: cifar10  #imagenet
   # - training: ???
-  - training: resnet18 #resnet18, pythia14m
+  - training: pythia14m #resnet18, pythia14m
   - override hydra/job_logging: disabled
   - override hydra/hydra_logging: disabled  
 
@@ -17,12 +17,7 @@ log_dir: mlworklaods/logs
 checkpoint_interval: .inf
 run_training: True
 run_evaluation: False
-num_workers_per_job: 0
-
-
-
-
-
+num_workers_per_job: 1
 
 
 hydra:

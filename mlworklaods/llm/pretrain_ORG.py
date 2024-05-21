@@ -16,13 +16,11 @@ from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flo
 from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
 from typing_extensions import Literal
-from mlworklaods.args import LLMTrainArgs, EvalArgs
+
 from mlworklaods.llm.tokenizer import Tokenizer
+from mlworklaods.llm.args import EvalArgs, TrainArgs
 from mlworklaods.llm.config import name_to_config
 from mlworklaods.llm.data.base import DataModule
-from lightning.fabric.loggers import Logger
-from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
-
 # from data.tiny_llama import TinyLlama
 from mlworklaods.llm.model import GPT, Block, CausalSelfAttention, Config, LLaMAMLP
 from mlworklaods.llm.utils import (
@@ -42,43 +40,75 @@ from mlworklaods.llm.utils import (
 )
 
 def pretrain_llm( 
-    train: LLMTrainArgs,
+    train: TrainArgs,
     model_name: Optional[str] = None,
+    model_config: Optional[Config] = None,
     out_dir: Path = Path("out/pretrain"),
     precision: Literal["bf16-true", "bf16-mixed", "32-true", None] = None,
     initial_checkpoint_dir: Optional[Path] = None,
     resume: Union[bool, Path] = False,
     data: Optional[DataModule] = None,
+
     eval: EvalArgs = EvalArgs(interval=1000, max_iters=100),
     devices: Union[int, str] = "auto",
     # tokenizer_dir: Optional[Path] = None,
     tokenizer_dir: Optional[Path] = None,
-    loggers: Optional[Union[Logger, List[Logger]]] = None,
+    logger_name: Literal["wandb", "tensorboard", "csv"] = "tensorboard",
     seed: int = 42,
 ):
-    available_models = "\n".join(sorted(name_to_config))
-    if model_name not in available_models:
+    """Pretrain a model.
+
+    Arguments:
+        model_name: The name of the model to pretrain. Choose from names in ``litgpt.config``. Mutually exclusive with
+            ``model_config``.
+        model_config: A ``litgpt.Config`` object to define the model architecture. Mutually exclusive with
+            ``model_config``.
+        out_dir: Directory in which to save checkpoints and logs. If running in a Lightning Studio Job, look for it in
+            /teamspace/jobs/<job-name>/share.
+        precision: The precision to use for finetuning. Determines a compatible precision setting by default.
+        initial_checkpoint_dir: Optional path to a checkpoint directory to initialize the model from.
+            Useful for continued pretraining. Mutually exclusive with ``resume``.
+        resume: Path to a checkpoint directory to resume from in case training was interrupted, or ``True`` to resume
+            from the latest checkpoint in ``out_dir``.
+        data: Data-related arguments. If not provided, the default is ``litgpt.data.TinyLlama``.
+        train: Training-related arguments. See ``litgpt.args.TrainArgs`` for details.
+        eval: Evaluation-related arguments. See ``litgpt.args.EvalArgs`` for details.
+        devices: How many devices/GPUs to use. Uses all GPUs by default.
+        tokenizer_dir: Optional path to the tokenizer dir that was used for preprocessing the dataset. Only some data
+            module require this.
+        logger_name: The name of the logger to send metrics to.
+        seed: The random seed to use for reproducibility.
+    """
+    hparams = capture_hparams()
+    # data = TinyLlama() if data is None else data
+
+    if model_config is not None and model_name is not None:
+        raise ValueError("Only one of `model_name` or `model_config` can be set.")
+    elif model_config is None and model_name is None:
+        available_models = "\n".join(sorted(name_to_config))
         raise ValueError(f"Please specify --model_name <model_name>. Available values:\n{available_models}")
     
-    hparams = capture_hparams()
-
-    config = Config.from_name(model_name)
+    config = Config.from_name(model_name) if model_config is None else model_config
     precision = precision or get_default_supported_precision(training=True)
     devices = parse_devices(devices)
     out_dir = init_out_dir(out_dir)
     # in case the dataset requires the Tokenizer
     tokenizer = Tokenizer(tokenizer_dir) if tokenizer_dir is not None else None
 
+    logger = choose_logger(
+        logger_name, out_dir, name=f"pretrain-{config.name}", resume=resume, log_interval=train.log_interval
+    )
+
     if devices > 1:
         strategy = FSDPStrategy(auto_wrap_policy={Block}, state_dict_type="full", sharding_strategy="HYBRID_SHARD")
     else:
         strategy = "auto"
-
-    fabric = L.Fabric(devices=devices, strategy=strategy, precision=precision, loggers=loggers)
-    
+    fabric = L.Fabric(devices=devices, strategy=strategy, precision=precision, loggers=[logger])
     fabric.launch()
 
     fabric.print(pprint.pformat(hparams))
+    if logger_name in ("tensorboard", "wandb"):
+        fabric.logger.log_hyperparams(hparams)
 
     main(
         fabric,
@@ -107,7 +137,7 @@ def main(
     out_dir: Path,
     tokenizer_dir: Optional[Path],
     tokenizer: Optional[Tokenizer],
-    train: LLMTrainArgs,
+    train: TrainArgs,
     eval: EvalArgs,
 ) -> None:
     validate_args(train, eval, initial_checkpoint_dir, resume)
@@ -182,7 +212,7 @@ def fit(
     val_dataloader: DataLoader,
     out_dir: Path,
     tokenizer_dir: Optional[Path],
-    train: LLMTrainArgs,
+    train: TrainArgs,
     eval: EvalArgs,
 ) -> None:
     model = state["model"]
@@ -386,7 +416,7 @@ def save_checkpoint(fabric, state, tokenizer_dir, checkpoint_file):
         save_config(model.config, checkpoint_file.parent)
 
 
-def validate_args(train: LLMTrainArgs, eval: EvalArgs, initial_checkpoint_dir, resume) -> None:
+def validate_args(train: TrainArgs, eval: EvalArgs, initial_checkpoint_dir, resume) -> None:
     issues = []
     unsupported = [(train, ["max_steps", "epochs"]), (eval, ["max_new_tokens"])]
     for args, names in unsupported:

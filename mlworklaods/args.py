@@ -22,6 +22,7 @@ class BaseTrainArgs:
     checkpoint_interval: Optional[int] = 1000
     run_training: bool = True
     run_evaluation: bool = False
+    max_steps: Optional[int] = None
 
     def gradient_accumulation_iters(self, devices: int) -> int:
         """Number of iterations between gradient synchronizations"""
@@ -42,7 +43,7 @@ class BaseTrainArgs:
         if self.lr_warmup_steps:
             return min(max_iters, self.lr_warmup_steps * self.gradient_accumulation_iters(devices))
         return 0
-
+@dataclass
 class LLMTrainArgs(BaseTrainArgs):
     lr_warmup_steps: Optional[int] = 0
     lr_warmup_fraction: Optional[float] = None
@@ -145,6 +146,9 @@ def prepare_args(config: DictConfig,expid):
             min_lr=config.training.min_lr,
             run_training = config.run_training,
             run_evaluation = config.run_evaluation,
+            max_steps = config.training.max_steps,
+            max_seq_length = config.training.max_seq_length,
+
         )
     else:
         train_args = ImgClassifierTrainArgs(

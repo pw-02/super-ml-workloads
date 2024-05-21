@@ -1,15 +1,13 @@
 model_name: pythia-14m
-save_interval: 1000
-global_batch_size: 64
-micro_batch_size: 4
-lr_warmup_steps: 2000
-lr_warmup_fraction: null
-epochs: null
 max_tokens: 3e12  # 3 trillion
+global_batch_size: 64 #Number of samples between optimizer steps across data-parallel ranks
+micro_batch_size: 4 #Number of samples per data-parallel rank
+lr_warmup_steps: 0
+lr_warmup_fraction: null
 max_steps: null
 max_seq_length: 512
 tie_embeddings: False
-
+# Optimization args
 learning_rate: 4e-4
 weight_decay: 1e-1
 beta1: 0.9
@@ -17,7 +15,6 @@ beta2: 0.95
 max_norm: 1.0
 min_lr: 4e-5
 
-num_pytorch_workers: 0
 
 # /*      'pythia-14m',
 #         'pythia-31m',
