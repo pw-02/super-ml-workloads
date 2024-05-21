@@ -8,8 +8,7 @@ import pytorch_lightning as pl
 import torchvision
 from torchmetrics.functional.classification.accuracy import accuracy
 import torch.nn as nn
-from mlworklaods.image_classification.args import *
-from mlworklaods.image_classification.utils import AverageMeter
+from mlworklaods.utils import AverageMeter
 
 
 class ImageClassifierModel(pl.LightningModule):
@@ -17,7 +16,7 @@ class ImageClassifierModel(pl.LightningModule):
     def __init__(self, model_name, learning_rate, num_classes, optimizer='Adam'):
         # super(ImageClassifierModel, self).__init__()
         super().__init__()
-        self.model:nn.Module = torchvision.models.get_model(model_name,pretrained=False)
+        self.model:nn.Module = torchvision.models.get_model(model_name,weights=None)
 
         # Modify the final fully connected layer to match the number of classes in CIFAR-10
         num_ftrs = self.model.fc.in_features

@@ -11,7 +11,7 @@ import os
 import redis
 import base64
 import zlib
-from mlworklaods.image_classification.utils import timer_decorator
+from mlworklaods.utils import timer_decorator
 import time
 
 class TorchLRUDataset(torch.utils.data.Dataset):

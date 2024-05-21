@@ -6,6 +6,5 @@ limit_val_batches: .inf
 batch_size: 128
 learning_rate: 6e-4
 weight_decay: 1e-1
-num_pytorch_workers: 2
 grad_accum_steps: 1
 # validation_frequency: .inf

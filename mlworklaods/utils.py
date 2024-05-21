@@ -10,7 +10,6 @@ import psutil
 import torch.cuda
 
 
-
 from pynvml import (
     nvmlInit,
     nvmlDeviceGetUtilizationRates,
@@ -195,6 +194,14 @@ class AverageMeter(object):
         #fmtstr = "{name} {val" + self.fmt + "} ({avg" + self.fmt + "})"
         fmtstr = "{name}:{val" + self.fmt +"}"
         return fmtstr.format(**self.__dict__)
+    
+    
+def get_default_supported_precision(training: bool) -> str:
+    from lightning.fabric.accelerators import MPSAccelerator
+    if MPSAccelerator.is_available() or (torch.cuda.is_available() and not torch.cuda.is_bf16_supported()):
+        return "16-mixed" if training else "16-true"
+    return "bf16-mixed" if training else "bf16-true"
+
 
 if __name__ == "__main__":
     pass

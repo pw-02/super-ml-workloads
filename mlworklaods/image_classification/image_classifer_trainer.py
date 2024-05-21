@@ -2,7 +2,7 @@ import os
 from collections.abc import Mapping
 from functools import partial
 from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
-
+from lightning.fabric.strategies import FSDPStrategy
 import lightning as L
 import torch
 from lightning.fabric.accelerators import Accelerator
@@ -13,17 +13,20 @@ from lightning.pytorch.utilities.model_helpers import is_overridden
 from lightning_utilities import apply_to_collection
 from tqdm import tqdm
 import time
-from mlworklaods.image_classification.utils import ResourceMonitor
+from mlworklaods.utils import ResourceMonitor
 from collections import OrderedDict
 import json
-class MyCustomTrainer:
+from utils import get_default_supported_precision
+from lightning import LightningModule
+
+
+class ImageClassificationTrainer():
     def __init__(
         self,
         accelerator: Union[str, Accelerator] = "auto",
         strategy: Union[str, Strategy] = "auto",
         devices: Union[List[int], str, int] = "auto",
-        precision: Union[str, int] = "32-true",
-        plugins: Optional[Union[str, Any]] = None,
+        precision: Literal["bf16-true", "bf16-mixed", "32-true", None] = None,
         callbacks: Optional[Union[List[Any], Any]] = None,
         loggers: Optional[Union[Logger, List[Logger]]] = None,
         max_epochs: Optional[int] = 1000,
@@ -35,84 +38,14 @@ class MyCustomTrainer:
         use_distributed_sampler: bool = True,
         checkpoint_dir: str = "./checkpoints",
         checkpoint_frequency: int = 1000,
-        
     ) -> None:
-        """Exemplary Trainer with Fabric. This is a very simple trainer focused on readablity but with reduced
-        featureset. As a trainer with more included features, we recommend using the
-        :class:`lightning.pytorch.Trainer`.
-
-        Args:
-            accelerator: The hardware to run on. Possible choices are:
-                ``"cpu"``, ``"cuda"``, ``"mps"``, ``"gpu"``, ``"tpu"``, ``"auto"``.
-            strategy: Strategy for how to run across multiple devices. Possible choices are:
-                ``"dp"``, ``"ddp"``, ``"ddp_spawn"``, ``"deepspeed"``, ``"fsdp"``.
-            devices: Number of devices to train on (``int``),
-                which GPUs to train on (``list`` or ``str``), or ``"auto"``.
-                The value applies per node.
-            precision: Double precision (``"64"``), full precision (``"32"``), half precision AMP (``"16-mixed"``),
-                or bfloat16 precision AMP (``"bf16-mixed"``).
-            plugins: One or several custom plugins
-            callbacks: A single callback or a list of callbacks. The following hooks are supported:
-                - on_train_epoch_start
-                - on train_epoch_end
-                - on_train_batch_start
-                - on_train_batch_end
-                - on_before_backward
-                - on_after_backward
-                - on_before_zero_grad
-                - on_before_optimizer_step
-                - on_validation_model_eval
-                - on_validation_model_train
-                - on_validation_epoch_start
-                - on_validation_epoch_end
-                - on_validation_batch_start
-                - on_validation_batch_end
-
-            loggers: A single logger or a list of loggers. See :meth:`~lightning.fabric.fabric.Fabric.log` for more
-                information.
-
-            max_epochs: The maximum number of epochs to train
-            max_steps: The maximum number of (optimizer) steps to train
-            grad_accum_steps: How many batches to process before each optimizer step
-            limit_train_batches: Limits the number of train batches per epoch
-                If greater than number of batches in the dataloader, this has no effect.
-            limit_val_batches: Limits the number of validation batches per epoch.
-                If greater than number of batches in the dataloader, this has no effect.
-            validation_frequency: How many epochs to run before each validation epoch.
-            use_distributed_sampler: Wraps the sampler of each dataloader with a respective distributed-aware sampler
-                in case of distributed training.
-            checkpoint_dir: Directory to store checkpoints to.
-            checkpoint_frequency: How many epochs to run before each checkpoint is written.
-
-        Warning:
-            callbacks written for the lightning trainer (especially making assumptions on the trainer), won't work!
-
-        """
-
-        self.fabric = L.Fabric(
-            accelerator=accelerator,
-            strategy=strategy,
-            devices=devices,
-            precision=precision,
-            plugins=plugins,
-            callbacks=callbacks,
-            loggers=loggers,
-        )
+        
         self.global_step = 0
         self.grad_accum_steps: int = grad_accum_steps
         self.current_epoch = 0
-
         self.max_epochs = max_epochs
         self.max_steps = max_steps
         self.should_stop = False
-
-        # ensures limit_X_batches is either int or inf
-        if not isinstance(limit_train_batches, int):
-            assert limit_train_batches == float("inf")
-
-        if not isinstance(limit_val_batches, int):
-            assert limit_val_batches == float("inf")
-
         self.limit_train_batches = limit_train_batches
         self.limit_val_batches = limit_val_batches
         self.validation_frequency = validation_frequency
@@ -123,67 +56,53 @@ class MyCustomTrainer:
         self.checkpoint_frequency = checkpoint_frequency
         self.train_start_time = time.perf_counter()
 
-
-    def fit(
-        self,
-        model: L.LightningModule,
-        train_loader: torch.utils.data.DataLoader,
-        val_loader: torch.utils.data.DataLoader,
-        ckpt_path: Optional[str] = None,
-        seed:int = None,
-    ):
-        """The main entrypoint of the trainer, triggering the actual training.
-
-        Args:
-            model: the LightningModule to train.
-                Can have the same hooks as :attr:`callbacks` (see :meth:`MyCustomTrainer.__init__`).
-            train_loader: the training dataloader. Has to be an iterable returning batches.
-            val_loader: the validation dataloader. Has to be an iterable returning batches.
-                If not specified, no validation will run.
-            ckpt_path: Path to previous checkpoints to resume training from.
-                If specified, will always look for the latest checkpoint within the given directory.
-
-        """
+        self.fabric = L.Fabric(
+            accelerator=accelerator,
+            strategy=strategy,
+            devices=devices,
+            precision=precision,
+            callbacks=callbacks,
+            loggers=loggers,
+        )
+    
+    def fit(self,
+            model: LightningModule,
+            train_loader: torch.utils.data.DataLoader,
+            val_loader: torch.utils.data.DataLoader,
+            ckpt_path: Optional[str] = None,
+            seed:int = None,
+            ):
+                
         if seed:
             self.fabric.seed_everything(seed)
-
+        
         self.fabric.launch()
 
-        
         # setup dataloaders
         train_loader = self.fabric.setup_dataloaders(train_loader, use_distributed_sampler=self.use_distributed_sampler)
         if val_loader is not None:
             val_loader = self.fabric.setup_dataloaders(val_loader, use_distributed_sampler=self.use_distributed_sampler)
 
-        # setup model and optimizer
-        if isinstance(self.fabric.strategy, L.fabric.strategies.fsdp.FSDPStrategy):
-            # currently, there is no way to support fsdp with model.configure_optimizers in fabric
-            # as it would require fabric to hold a reference to the model, which we don't want to.
-            raise NotImplementedError("BYOT currently does not support FSDP")
-
         optimizer = model.configure_optimizers()
-        assert optimizer is not None
+        
         model, optimizer = self.fabric.setup(model, optimizer)
 
         # assemble state (current epoch and global step will be added in save)
         state = {"model": model, "optim": optimizer}
-
+        
         # load last checkpoint if available
         if ckpt_path is not None and os.path.isdir(ckpt_path):
             latest_checkpoint_path = self.get_latest_checkpoint(self.checkpoint_dir)
             if latest_checkpoint_path is not None:
                 self.load(state, latest_checkpoint_path)
-
                 # check if we even need to train here
                 if self.max_epochs is not None and self.current_epoch >= self.max_epochs:
                     self.should_stop = True
         
         self.train_start_time = time.perf_counter()
-
+        
         while not self.should_stop:
-            self.train_loop(
-                model, optimizer, train_loader, limit_batches=self.limit_train_batches
-            )
+            self.train_loop(model, optimizer, train_loader, limit_batches=self.limit_train_batches)
 
             if self.should_validate:
                 self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
@@ -200,29 +119,16 @@ class MyCustomTrainer:
                 self.save(state)
         # reset for next fit call
         self.should_stop = False
-    
+
         return model.losses.avg, model.top1.avg
 
     def train_loop(
         self,
-        model: L.LightningModule,
+        model: LightningModule,
         optimizer: torch.optim.Optimizer,
         train_loader: torch.utils.data.DataLoader,
         limit_batches: Union[int, float] = float("inf"),
     ):
-        """The training loop running a single training epoch.
-
-        Args:
-            model: the LightningModule to train
-            optimizer: the optimizer, optimizing the LightningModule.
-            train_loader: The dataloader yielding the training batches.
-            limit_batches: Limits the batches during this training epoch.
-                If greater than the number of batches in the ``train_loader``, this has no effect.
-            scheduler_cfg: The learning rate scheduler configuration.
-                Have a look at :meth:`~lightning.pytorch.core.LightningModule.configure_optimizers`
-                for supported values.
-
-        """
         # self.fabric.call("on_train_epoch_start")
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
@@ -231,13 +137,13 @@ class MyCustomTrainer:
             end = time.perf_counter()
             for batch_idx, (batch, cache_hits, fetch_time, transform_time) in enumerate(iterable):
                 data_time = time.perf_counter() - end
-
+                
                 # end epoch if stopping training completely or max batches for this epoch reached
                 if self.should_stop or batch_idx >= limit_batches:
                     break
 
-                # self.fabric.call("on_train_batch_start")
-
+                #self.fabric.call("on_train_batch_start")
+                
                 compute_start = time.perf_counter()
                 # check if optimizer should step in gradient accumulation
                 should_optim_step = self.global_step % self.grad_accum_steps == 0
@@ -387,16 +293,6 @@ class MyCustomTrainer:
         level: Literal["step", "epoch"],
         current_value: int,
     ) -> None:
-        """Steps the learning rate scheduler if necessary.
-
-        Args:
-            model: The LightningModule to train
-            scheduler_cfg: The learning rate scheduler configuration.
-                Have a look at :meth:`lightning.pytorch.LightningModule.configure_optimizers` for supported values.
-            level: whether we are trying to step on epoch- or step-level
-            current_value: Holds the current_epoch if ``level==epoch``, else holds the ``global_step``
-
-        """
 
         # no scheduler
         if scheduler_cfg is None:

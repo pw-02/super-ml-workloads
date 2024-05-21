@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 @dataclass
-class TrainArgs:
+class LLMTrainArgs:
 
     model_name: str
     
@@ -77,7 +77,7 @@ class TrainArgs:
 
 
 @dataclass
-class EvalArgs:
+class LLMEvalArgs:
     """Evaluation-related arguments"""
     interval: int = 600
     """Number of optimizer steps between evaluation calls"""
@@ -88,33 +88,3 @@ class EvalArgs:
     initial_validation: bool = False
     """Whether to evaluate on the validation set at the beginning of the training"""
 
-@dataclass
-class DataArgs:
-    train_data_dir: Path = Path("data/alpaca")
-    val_data_dir: Optional[Path] = None
-    num_classes : Optional[Path] = None
-
-
-@dataclass
-class SUPERArgs:
-    num_pytorch_workers: int = 0
-    super_address: Optional[str] = None
-    cache_address: Optional[str] = None
-    simulate_data_delay: Optional[str] = None
-    
-
-
-@dataclass
-class SHADEArgs:
-    num_pytorch_workers: int = 0
-    cache_address: Optional[str] = None
-    working_set_size: Optional[str] = None
-    replication_factor: Optional[str] = None
-
-
-@dataclass
-class LRUTorchArgs:
-    num_pytorch_workers: int = 0
-    cache_address: Optional[str] = None
-    cache_granularity: Optional[str] = None
-    shuffle: bool = False
