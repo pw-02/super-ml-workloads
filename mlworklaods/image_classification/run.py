@@ -11,7 +11,7 @@ from lightning.fabric.loggers import CSVLogger
 from ray import tune
 from ray.air import session
 from lightning.pytorch.core.saving import save_hparams_to_yaml
-
+from mlworklaods.image_classification.data import CIFAR10DataModule, ImageNetDataModule
 # Helper function to prepare arguments for a job
 def prepare_args(config: DictConfig,expid):
     log_dir = f"{config.log_dir}/{config.dataset.name}/{config.training.model_name}/{expid}"
@@ -37,9 +37,9 @@ def prepare_args(config: DictConfig,expid):
         weight_decay=config.training.weight_decay)
     
     data_args = DataArgs(
+        dataset_name=config.dataset.name,
         train_data_dir=config.dataset.train_dir,
         val_data_dir=config.dataset.val_dir,
-        num_classes=config.dataset.num_classes
     )
 
     if 'super' in train_args.dataloader_kind:
@@ -133,8 +133,13 @@ def main(hydra_config: DictConfig):
     else:
         from datetime import datetime
         train_args, data_args, dataloader_args = prepare_args(hydra_config, datetime.now().strftime("train_single_model_%Y-%m-%d_%H-%M-%S"))
-        
-        model = ImageClassifierModel(train_args.model_name, train_args.learning_rate, num_classes=data_args.num_classes)
+
+        if 'cifar10' in data_args.dataset_name:
+            data_module = CIFAR10DataModule()
+        elif 'imagenet' in data_args.dataset_name:
+            data_module = ImageNetDataModule()
+
+        model = ImageClassifierModel(train_args.model_name, train_args.learning_rate, num_classes=data_module.num_classes)
         
         logger = CSVLogger(root_dir=train_args.log_dir, name="", flush_logs_every_n_steps=train_args.log_freq)
 
@@ -150,7 +155,7 @@ def main(hydra_config: DictConfig):
             grad_accum_steps=train_args.grad_accum_steps,
         )
 
-        train_loader, val_loader = model.make_dataloaders(train_args, data_args, dataloader_args, trainer.fabric.world_size)
+        train_loader, val_loader = data_module.make_dataloaders(train_args, data_args, dataloader_args, trainer.fabric.world_size)
         avg_loss, avg_acc = trainer.fit(model, train_loader, val_loader, train_args.seed)
         hparams_file = os.path.join(logger.log_dir, "hparms.yaml")
         save_hparams_to_yaml(hparams_file, hydra_config)

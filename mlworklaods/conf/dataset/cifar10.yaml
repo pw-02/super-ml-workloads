@@ -3,4 +3,3 @@ name: cifar10
 # val_dir: s3://sdl-cifar10/test/
 train_dir: /workspaces/super-ml-workloads/data/cifar-10/train
 val_dir: /workspaces/super-ml-workloads/data/cifar-10/val
-num_classes: 10

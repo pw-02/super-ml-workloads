@@ -35,6 +35,7 @@ class MyCustomTrainer:
         use_distributed_sampler: bool = True,
         checkpoint_dir: str = "./checkpoints",
         checkpoint_frequency: int = 1000,
+        
     ) -> None:
         """Exemplary Trainer with Fabric. This is a very simple trainer focused on readablity but with reduced
         featureset. As a trainer with more included features, we recommend using the

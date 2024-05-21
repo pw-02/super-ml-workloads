@@ -4,33 +4,20 @@ defaults:
   - dataloader: torch_lru #shade, torch_lru, super
   - dataset: cifar10  #imagenet
   # - training: ???
-  - training: resnet18 #
+  - training: resnet50 #resnet18, pythia14m
   - override hydra/job_logging: disabled
   - override hydra/hydra_logging: disabled  
 
 num_jobs: 1
 num_devices_per_job: 1
-seed: 41
+seed: 42
 accelerator: 'gpu'
 log_dir: mlworklaods/logs
-log_freq: 50
+log_freq: 1
 run_training: true
 run_evaluation: false
 dataload_only: false
-# hydra:  
-#   output_subdir: null  
-#   run:  
-#     dir: .
 
-# hydra:
-#   mode: MULTIRUN
-#   output_subdir: null
-#   sweeper:
-#     params:
-#       training: resnet18
-#       # training: resnet50, shufflenet, vgg16
-
-# Disable Hydra logging while ensuring Ray Tune can still manage its directories
 hydra:
   run:
     dir: .  # Current directory or a specific directory where Ray Tune expects to find it
@@ -47,3 +34,18 @@ ray:
   tune:
     local_dir: ./ray_results
     log_to_file: false  # Disable Ray Tune logging to files if not needed
+
+# hydra:  
+#   output_subdir: null  
+#   run:  
+#     dir: .
+
+# hydra:
+#   mode: MULTIRUN
+#   output_subdir: null
+#   sweeper:
+#     params:
+#       training: resnet18
+#       # training: resnet50, shufflenet, vgg16
+
+# Disable Hydra logging while ensuring Ray Tune can still manage its directories

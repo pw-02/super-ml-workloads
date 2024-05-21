@@ -51,6 +51,7 @@ def setup(
 
     eval: EvalArgs = EvalArgs(interval=1000, max_iters=100),
     devices: Union[int, str] = "auto",
+    # tokenizer_dir: Optional[Path] = None,
     tokenizer_dir: Optional[Path] = None,
     logger_name: Literal["wandb", "tensorboard", "csv"] = "tensorboard",
     seed: int = 42,

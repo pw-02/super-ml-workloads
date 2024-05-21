@@ -47,9 +47,9 @@ class TrainArgs:
 
 @dataclass
 class DataArgs:
+    dataset_name:str
     train_data_dir: Path = Path("data/alpaca")
     val_data_dir: Optional[Path] = None
-    num_classes : Optional[Path] = None
 
 
 @dataclass

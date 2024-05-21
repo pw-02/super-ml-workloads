@@ -4,7 +4,9 @@ from lightning.pytorch.core.saving import save_hparams_to_yaml
 from datetime import datetime
 from args import *
 from mlworklaods.llm.pretrain import setup
-from mlworklaods.llm.data.openwebtext import OpenWebText
+# from mlworklaods.llm.data.openwebtext import OpenWebText
+from mlworklaods.llm.data.text_files import TextFiles
+from pathlib import Path
 # Helper function to prepare arguments for a job
 def prepare_args(config: DictConfig,expid):
     log_dir = f"{config.log_dir}/{config.dataset.name}/{config.training.model_name}/{expid}"
@@ -70,20 +72,20 @@ def prepare_args(config: DictConfig,expid):
 def main(hydra_config: DictConfig):
 
     train_args, data_args, dataloader_args = prepare_args(hydra_config, datetime.now().strftime("train_single_model_%Y-%m-%d_%H-%M-%S"))
-
-    data = OpenWebText('data/openwebtext')
+    data = TextFiles(train_data_path=Path('data/openwebtxt/owt/train'), 
+                     val_data_path=None)
 
     setup(
         model_name=train_args.model_name,
         model_config=None,
         precision=None,
         resume=False,
-        data=None,
+        data=data,
         train=train_args,
         # eval=None,
         devices=train_args.devices,
         logger_name='csv',
-        seed=train_args.seed)
+        seed=train_args.seed,)
 
 if __name__ == "__main__":
     main()

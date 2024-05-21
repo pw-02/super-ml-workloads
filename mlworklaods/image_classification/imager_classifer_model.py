@@ -9,10 +9,6 @@ import torchvision
 from torchmetrics.functional.classification.accuracy import accuracy
 import torch.nn as nn
 from mlworklaods.image_classification.args import *
-from mlworklaods.dataloaders.torch_lru.batch_sampler_with_id import BatchSamplerWithID
-from mlworklaods.dataloaders.torch_lru.torch_lru_dataset import TorchLRUDataset
-from torch.utils.data import DataLoader, SequentialSampler, RandomSampler  
-from mlworklaods.dataloaders.super_dl.dataset.super_dataset import SUPERDataset
 from mlworklaods.image_classification.utils import AverageMeter
 
 
@@ -26,14 +22,11 @@ class ImageClassifierModel(pl.LightningModule):
         # Modify the final fully connected layer to match the number of classes in CIFAR-10
         num_ftrs = self.model.fc.in_features
         self.model.fc = nn.Linear(num_ftrs, num_classes)
-
         self.loss_fn = torch.nn.CrossEntropyLoss()
         self.optimizer = optimizer
         self.learning_rate = learning_rate
         self.losses =  AverageMeter("Loss", ":6.2f")
-        #losses = AverageMeter("Loss", ":6.2f")
         self.top1 = AverageMeter("Acc1", ":6.2f")
-        # top5 = AverageMeter("Acc5", ":6.2f")
 
 
     def forward(self, x):
@@ -67,8 +60,6 @@ class ImageClassifierModel(pl.LightningModule):
         # logging the loss with "val_" prefix
         return loss
     
-
-
     def validation_epoch_end(self, results):
         accuracy = self.correctly_classified / self.total_classified
         self.log('val_accuracy', accuracy)
@@ -86,86 +77,7 @@ class ImageClassifierModel(pl.LightningModule):
         else:
             raise NotImplementedError
     
-    def make_dataloaders(self, train_args, data_args,dataloader_args, world_size):
-        if 'super' in train_args.dataloader_kind:
-            return self.make_super_dataloaders(train_args, data_args,dataloader_args, world_size)
-        elif 'torch_lru' in train_args.dataloader_kind:
-           return self.make_lru_torch_datalaoders(train_args, data_args,dataloader_args, world_size)
-        else:
-            raise Exception(f"Unknown dataloader_kind {train_args.dataloader_kind}")
-    
-    
-    def make_lru_torch_datalaoders(self,train_args: TrainArgs, data_args: DataArgs, lru_torch_args:LRUTorchArgs, world_size:int):
-        train_dataloader = None
-        val_dataloader = None
-        if train_args.run_training:
-            train_dataset =  TorchLRUDataset(
-                data_dir = data_args.train_data_dir,
-                transform=self.transform(),
-                cache_address=lru_torch_args.cache_address,
-                cache_granularity=lru_torch_args.cache_granularity)
-            
-            train_base_sampler = RandomSampler(data_source=train_dataset) if lru_torch_args.shuffle else SequentialSampler(data_source=train_dataset)
-            train_batch_sampler = BatchSamplerWithID(sampler=train_base_sampler, batch_size=train_args.get_batch_size(world_size), drop_last=False)  
-            train_dataloader = DataLoader(dataset=train_dataset, sampler=train_batch_sampler, batch_size=None, num_workers=lru_torch_args.num_pytorch_workers)
-
-        if train_args.run_evaluation:
-            val_dataset =  TorchLRUDataset(
-                data_dir = data_args.val_data_dir,
-                transform=self.transform(),
-                cache_address=lru_torch_args.cache_address,
-                cache_granularity=lru_torch_args.cache_granularity)
-            
-            val_base_sampler = RandomSampler(data_source=val_dataset) if lru_torch_args.shuffle else SequentialSampler(data_source=val_dataset)
-            val_batch_sampler = BatchSamplerWithID(sampler=val_base_sampler, batch_size=train_args.get_batch_size(world_size), drop_last=False)
-            
-            val_dataloader = DataLoader(dataset=val_dataset, sampler=val_batch_sampler, batch_size=None, num_workers=lru_torch_args.num_pytorch_workers)
-        return train_dataloader, val_dataloader
-
-
-    # Dataloader creation function
-    def make_super_dataloaders(self,train_args: TrainArgs, data_args: DataArgs, super_args:SUPERArgs, world_size:int):
-        train_dataloader = None
-        val_dataloader = None
-        if train_args.run_training:  
-            dataset = SUPERDataset(
-                job_id=train_args.job_id,
-                data_dir=data_args.train_data_dir,
-                batch_size=train_args.get_batch_size(world_size),
-                transform=self.transform(),
-                world_size=world_size,
-                super_address=super_args.super_address,
-                cache_address=super_args.cache_address,
-                simulate_delay=super_args.simulate_data_delay)
-            
-            train_dataloader = DataLoader(dataset=dataset, batch_size=None, num_workers=super_args.num_pytorch_workers)
-
-        if train_args.run_evaluation:
-            dataset = SUPERDataset(
-                job_id=train_args.job_id,
-                data_dir=data_args.val_data_dir,
-                batch_size=train_args.get_batch_size(world_size),
-                transform=self.transform(),
-                world_size=world_size,
-                super_address=super_args.super_address,
-                cache_address=super_args.cache_address,
-                simulate_delay=super_args.simulate_data_delay)
-        
-        return train_dataloader, val_dataloader
-    
-    # Transformation function for data augmentation
-    def transform(self):
-            normalize = transforms.Normalize(
-                mean=[0.485, 0.456, 0.406], 
-                std=[0.229, 0.224, 0.225],
-            )
-            return transforms.Compose([
-                transforms.RandomResizedCrop(224),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                normalize,
-            ])
-
+   
 
 # if __name__ == "__main__":
 

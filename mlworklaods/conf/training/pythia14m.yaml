@@ -7,7 +7,7 @@ lr_warmup_fraction: null
 epochs: null
 max_tokens: 3e12  # 3 trillion
 max_steps: null
-max_seq_length: null
+max_seq_length: 512
 tie_embeddings: False
 
 learning_rate: 4e-4
