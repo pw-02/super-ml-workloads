@@ -28,7 +28,7 @@ class TorchLRUTextDataset(Dataset):
         return tokens
 
     def _get_next_batch(self):
-        required_size = self.block_size * self.batch_size + 1
+        required_size = (self.block_size +1) * self.batch_size
         remaining_tokens = self.current_tokens[self.current_position:]
         
         while len(remaining_tokens) < required_size:
@@ -56,14 +56,13 @@ class TorchLRUTextDataset(Dataset):
 
     def __getitem__(self, idx):
         batch_tokens = self._get_next_batch()
-        input_ids = batch_tokens[:self.block_size * self.batch_size].reshape(self.batch_size, self.block_size)
-        labels = batch_tokens[1:self.block_size * self.batch_size + 1].reshape(self.batch_size, self.block_size)
-        return input_ids, labels
+        data = batch_tokens[:(self.block_size +1) * self.batch_size].reshape(self.batch_size, (self.block_size+1))
+        
+        input_ids = data[:, 0 : self.block_size].contiguous().long()
+        targets = data[:, 1 : (self.block_size + 1)].contiguous().long()
 
-def collate_fn(batch):
-    input_ids = torch.stack([item[0] for item in batch])
-    labels = torch.stack([item[1] for item in batch])
-    return input_ids, labels
+        return input_ids, targets
+
 
 # Example Usage
 if __name__ == "__main__":
@@ -72,12 +71,13 @@ if __name__ == "__main__":
     file_list = glob.glob('data/openwebtext/train/*.txt')  # Adjust the path to your .txt files
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
     block_size = 6
-    batch_size = 1
+    batch_size = 2
 
     dataset = TorchLRUTextDataset(file_list, tokenizer, block_size, batch_size)
-    dataloader = DataLoader(dataset, batch_size=1, collate_fn=collate_fn, shuffle=False, num_workers=0)
+    dataloader = DataLoader(dataset, batch_size=None, shuffle=False, num_workers=0)
 
-    for input_ids, labels in dataloader:
+    for input_ids, targets in dataloader:
         print(f"Input IDs: {input_ids.shape}")
-        print(f"Labels: {labels.shape}")
+        print(f"targets: {targets.shape}")
+
         # break

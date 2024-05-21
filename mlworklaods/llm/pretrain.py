@@ -113,8 +113,8 @@ def main(
 ) -> None:
     validate_args(train, eval, initial_checkpoint_dir, resume)
 
-    if fabric.global_rank == 0:
-        out_dir.mkdir(parents=True, exist_ok=True)
+    # if fabric.global_rank == 0:
+    #     out_dir.mkdir(parents=True, exist_ok=True)
 
     fabric.seed_everything(seed)  # same seed for every process to init model (FSDP)
 
@@ -144,7 +144,7 @@ def main(
     )
     optimizer = fabric.setup_optimizers(optimizer)
 
-    train_dataloader, val_dataloader = get_dataloaders(fabric, train, train.max_seq_length)
+    train_dataloader, val_dataloader = get_dataloaders(fabric, train, model.max_seq_length)
     train_dataloader, val_dataloader = fabric.setup_dataloaders(train_dataloader, val_dataloader)
 
     if initial_checkpoint_dir:
@@ -222,7 +222,7 @@ def fit(
 
     warmup_iters = train.warmup_iters(devices, max_iters, train_dataloader)
 
-    for train_data in train_iterator:
+    for input_ids, targets  in train_iterator:
         if state["iter_num"] >= max_iters:
             break
 
@@ -234,8 +234,8 @@ def fit(
         state["iter_num"] += 1
         iter_t0 = time.perf_counter()
 
-        input_ids = train_data[:, 0 : model.max_seq_length].contiguous().long()
-        targets = train_data[:, 1 : (model.max_seq_length + 1)].contiguous().long()
+        # input_ids = train_data[:, 0 : model.max_seq_length].contiguous().long()
+        # targets = train_data[:, 1 : (model.max_seq_length + 1)].contiguous().long()
 
         is_accumulating = state["iter_num"] % train.gradient_accumulation_iters(devices) != 0
         with fabric.no_backward_sync(model, enabled=is_accumulating):
@@ -300,7 +300,7 @@ def fit(
             fabric.log_dict(metrics, step=state["iter_num"] - 1)
             fabric.barrier()
 
-        if train.save_interval is not None and not is_accumulating and state["step_count"] % train.save_interval == 0:
+        if train.checkpoint_interval is not None and not is_accumulating and state["step_count"] % train.checkpoint_interval == 0:
             save_checkpoint(fabric, state, tokenizer_dir, out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth")
 
 
@@ -311,11 +311,11 @@ def validate(fabric: L.Fabric, model: nn.Module, val_dataloader: DataLoader, max
     model.eval()
 
     losses = []
-    for k, batch in enumerate(val_dataloader):
+    for k, (input_ids, targets) in enumerate(val_dataloader):
         if k >= max_iters:
             break
-        input_ids = batch[:, 0 : model.max_seq_length].contiguous().long()
-        targets = batch[:, 1 : (model.max_seq_length + 1)].contiguous().long()
+        # input_ids = batch[:, 0 : model.max_seq_length].contiguous().long()
+        # targets = batch[:, 1 : (model.max_seq_length + 1)].contiguous().long()
         logits = model(input_ids)
         loss = chunked_cross_entropy(logits, targets)
         losses.append(loss)
@@ -340,16 +340,16 @@ def get_dataloaders(
     train_dataset = TorchLRUTextDataset(glob.glob('data/openwebtext/train/*.txt'), 
                                   GPT2Tokenizer.from_pretrained('gpt2'), 
                                   block_size, 
-                                  train.batch_size(fabric.world_size))
+                                  train.micro_batch_size)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=train.batch_size(fabric.world_size), collate_fn=collate_fn, shuffle=False, num_workers=0)
+    train_dataloader = DataLoader(train_dataset, batch_size=None, shuffle=False, num_workers=0)
 
     val_dataset = TorchLRUTextDataset(glob.glob('data/openwebtext/val/*.txt'), 
                                   GPT2Tokenizer.from_pretrained('gpt2'), 
                                   block_size, 
-                                  train.batch_size(fabric.world_size))
+                                  train.micro_batch_size)
 
-    val_dataloader = DataLoader(val_dataset, batch_size=train.batch_size(fabric.world_size), collate_fn=collate_fn, shuffle=False, num_workers=0)
+    val_dataloader = DataLoader(val_dataset, batch_size=None, shuffle=False, num_workers=0)
 
     return train_dataloader, val_dataloader
 

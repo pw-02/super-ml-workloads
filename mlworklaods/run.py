@@ -34,7 +34,7 @@ def train_model(config, hydra_config):
         # data = TextFiles(train_data_path=Path("openwebtext_chunks/train"),
         #                  num_workers=0
         #                  )
-        data = OpenWebText(data_path='data')
+        # data = OpenWebText(data_path='data')
 
         pretrain_llm(
             train=train_args,
@@ -42,7 +42,7 @@ def train_model(config, hydra_config):
             precision=get_default_supported_precision(True),
             initial_checkpoint_dir=None,
             resume=False,
-            data=data,
+            data=None,
             eval=EvalArgs(interval=1000, max_iters=100,initial_validation = False),
             devices=train_args.devices,
             loggers=[logger],
