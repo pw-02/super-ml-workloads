@@ -1,4 +1,0 @@
-kind: langauge
-train_dir: datasets/openwebtext/val.bin
-val_dir: datasets/openwebtext/val.bin
-name: openwebtext

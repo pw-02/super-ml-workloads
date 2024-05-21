@@ -14,7 +14,7 @@ import zlib
 from mlworklaods.utils import timer_decorator
 import time
 
-class TorchLRUDataset(torch.utils.data.Dataset):
+class TorchLRUMappeedDataset(torch.utils.data.Dataset):
     def __init__(self,data_dir:str, transform, cache_address:str = None, cache_granularity:str = 'sample'):
 
         self.is_s3: bool = data_dir.startswith("s3://")

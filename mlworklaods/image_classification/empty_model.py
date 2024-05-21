@@ -10,7 +10,7 @@ from torchmetrics.functional.classification.accuracy import accuracy
 import torch.nn as nn
 from mlworklaods.image_classification.args import *
 from mlworklaods.dataloaders.torch_lru.batch_sampler_with_id import BatchSamplerWithID
-from mlworklaods.dataloaders.torch_lru.torch_lru_dataset import TorchLRUDataset
+from mlworklaods.dataloaders.torch_lru.torch_lru_mapped_dataset import TorchLRUDataset
 from torch.utils.data import DataLoader, SequentialSampler, RandomSampler  
 from mlworklaods.dataloaders.super_dl.dataset.super_dataset import SUPERDataset
 from mlworklaods.image_classification.utils import AverageMeter

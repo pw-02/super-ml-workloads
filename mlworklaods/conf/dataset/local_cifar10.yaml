@@ -1,3 +1,0 @@
-name: cifar10
-train_dir: s3://sdl-cifar10/train/
-val_dir: s3://sdl-cifar10/test/

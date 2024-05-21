@@ -22,6 +22,7 @@ from mlworklaods.llm.config import name_to_config
 from mlworklaods.llm.data.base import DataModule
 from lightning.fabric.loggers import Logger
 from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
+from mlworklaods.dataloaders.torch_lru.torch_lru_text_dataset import TorchLRUTextDataset
 
 # from data.tiny_llama import TinyLlama
 from mlworklaods.llm.model import GPT, Block, CausalSelfAttention, Config, LLaMAMLP
@@ -143,7 +144,7 @@ def main(
     )
     optimizer = fabric.setup_optimizers(optimizer)
 
-    train_dataloader, val_dataloader = get_dataloaders(fabric, data, tokenizer, train, train.max_seq_length)
+    train_dataloader, val_dataloader = get_dataloaders(fabric, train, train.max_seq_length)
     train_dataloader, val_dataloader = fabric.setup_dataloaders(train_dataloader, val_dataloader)
 
     if initial_checkpoint_dir:
@@ -326,14 +327,30 @@ def validate(fabric: L.Fabric, model: nn.Module, val_dataloader: DataLoader, max
 
 
 def get_dataloaders(
-    fabric: L.Fabric, data: DataModule, tokenizer: Tokenizer, train: TrainArgs, block_size: int
+    fabric: L.Fabric, train: LLMTrainArgs, block_size: int
 ) -> Tuple[DataLoader, DataLoader]:
-    data.connect(tokenizer=tokenizer, batch_size=train.micro_batch_size, max_seq_length=block_size)
-    with fabric.rank_zero_first():
-        data.prepare_data()
-    data.setup()
-    train_dataloader = data.train_dataloader()
-    val_dataloader = data.val_dataloader()
+    import glob
+    from transformers import GPT2Tokenizer
+
+    def collate_fn(batch):
+        input_ids = torch.stack([item[0] for item in batch])
+        labels = torch.stack([item[1] for item in batch])
+        return input_ids, labels
+    
+    train_dataset = TorchLRUTextDataset(glob.glob('data/openwebtext/train/*.txt'), 
+                                  GPT2Tokenizer.from_pretrained('gpt2'), 
+                                  block_size, 
+                                  train.batch_size(fabric.world_size))
+
+    train_dataloader = DataLoader(train_dataset, batch_size=train.batch_size(fabric.world_size), collate_fn=collate_fn, shuffle=False, num_workers=0)
+
+    val_dataset = TorchLRUTextDataset(glob.glob('data/openwebtext/val/*.txt'), 
+                                  GPT2Tokenizer.from_pretrained('gpt2'), 
+                                  block_size, 
+                                  train.batch_size(fabric.world_size))
+
+    val_dataloader = DataLoader(val_dataset, batch_size=train.batch_size(fabric.world_size), collate_fn=collate_fn, shuffle=False, num_workers=0)
+
     return train_dataloader, val_dataloader
 
 
@@ -388,7 +405,7 @@ def save_checkpoint(fabric, state, tokenizer_dir, checkpoint_file):
 
 def validate_args(train: LLMTrainArgs, eval: EvalArgs, initial_checkpoint_dir, resume) -> None:
     issues = []
-    unsupported = [(train, ["max_steps", "epochs"]), (eval, ["max_new_tokens"])]
+    unsupported = [(train, ["max_steps"]), (eval, ["max_new_tokens"])]
     for args, names in unsupported:
         for name in names:
             if getattr(args, name) is not None:

@@ -12,7 +12,6 @@ from mlworklaods.image_classification.data import CIFAR10DataModule, ImageNetDat
 from mlworklaods.utils import get_default_supported_precision
 from mlworklaods.args import *
 from datetime import datetime
-from mlworklaods.llm.pretrain import setup
 from mlworklaods.llm.data.text_files import TextFiles
 from mlworklaods.llm.data.openwebtext import OpenWebText
 from mlworklaods.llm.pretrain import pretrain_llm
@@ -32,6 +31,9 @@ def train_model(config, hydra_config):
 
     if isinstance(train_args, LLMTrainArgs):
         
+        # data = TextFiles(train_data_path=Path("openwebtext_chunks/train"),
+        #                  num_workers=0
+        #                  )
         data = OpenWebText(data_path='data')
 
         pretrain_llm(
@@ -75,9 +77,6 @@ def train_model(config, hydra_config):
         
         if config:
             session.report({"loss": avg_loss, "accuracy": avg_acc})
-
-
-
 
 
 @hydra.main(version_base=None, config_path="./conf", config_name="config")
