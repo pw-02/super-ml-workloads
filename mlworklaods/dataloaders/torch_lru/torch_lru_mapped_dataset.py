@@ -54,7 +54,6 @@ class TorchLRUMappeedDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         batch_id, batch_indices,  = idx
-        print(batch_id)
         fetch_start_time = time.perf_counter()
 
         batch_data = None
@@ -70,8 +69,10 @@ class TorchLRUMappeedDataset(torch.utils.data.Dataset):
             # print('data returned') 
             cache_hits = len(batch_indices)
             fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
-            return (torch_imgs, torch_labels), cache_hits, fetch_duration, transform_duration
-         
+            
+            if torch_imgs is not None and torch_labels is not None:
+                return (torch_imgs, torch_labels), cache_hits, fetch_duration, transform_duration
+        
         data_samples, labels, cache_hits = self.fetch_batch_data(batch_indices)
 
         tranform_start_time = time.perf_counter()
@@ -91,8 +92,6 @@ class TorchLRUMappeedDataset(torch.utils.data.Dataset):
                 self.cache_client.set(batch_id, minibatch)
             except:
                 return None
-            
-        
         fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
         return (torch.stack(data_samples), torch.tensor(labels)), cache_hits, fetch_duration, transform_duration
     

@@ -110,7 +110,7 @@ def main(hydra_config: DictConfig):
             config=search_space,
             num_samples=hydra_config.num_jobs,
             checkpoint_freq=0, 
-            verbose=1,
+            verbose=0,
         )
         best_trial = result.get_best_trial("loss", "min", "last")
         print(f"Best trial config: {best_trial.config}")
