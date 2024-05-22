@@ -168,6 +168,7 @@ class LLMPretrainer():
             for input_ids, targets, fetch_time, transform_time  in train_iterator:
                 if state["iter_num"] >= max_iters:
                     break
+                print(transform_time)
                 data_load_times.update(time.perf_counter() - end)
                 fetch_times.update(fetch_time)
                 transform_times.update(transform_time)

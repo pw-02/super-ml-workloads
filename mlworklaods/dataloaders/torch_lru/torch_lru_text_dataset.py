@@ -24,7 +24,7 @@ class TorchLRUTextDataset(Dataset):
 
         self.is_s3: bool = data_dir.startswith("s3://")
         if self.is_s3:
-            self.file_list: Dict[str, List[str]] = s3utils.load_unpaired_s3_object_keys(data_dir, False)
+            self.file_list: Dict[str, List[str]] = s3utils.load_unpaired_s3_object_keys(data_dir, False, True)
             self.bucket_name = S3Url(data_dir).bucket
         else:
             self.file_list = glob.glob(f'{self.data_dir}/*.txt')
@@ -37,14 +37,18 @@ class TorchLRUTextDataset(Dataset):
             # raise StopIteration("No more files to read.")
 
         file_path = self.file_list[self.current_file_idx]
-        with open(file_path, 'r', encoding='utf-8') as f:
-            text = f.read()
+
+        if self.is_s3:
+            text = s3utils.get_s3_object(self.bucket_name, file_path)
+        else:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                text = f.read()
                     # Apply transform if provided
         transform_start_time = time.perf_counter()
 
         if self.transform:
             text = self.transform(text)
-        
+
         transform_duration = time.perf_counter() - transform_start_time
 
         self.current_file_idx += 1
@@ -94,7 +98,7 @@ if __name__ == "__main__":
     from transformers import GPT2Tokenizer
     from mlworklaods.llm.data import TextTransformations
 
-    data_dir = 'data/openwebtext/test/train'  # Adjust the path to your .txt files
+    data_dir = 's3://openwebtxt/owt/train/'  # Adjust the path to your .txt files
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
     block_size = 512
     batch_size = 4
@@ -102,11 +106,14 @@ if __name__ == "__main__":
     transformations = TextTransformations()
 
 
-    dataset = TorchLRUTextDataset(data_dir, tokenizer, transformations.normalize, block_size, batch_size)
+    dataset = TorchLRUTextDataset(data_dir, tokenizer, None, block_size, batch_size)
     dataloader = DataLoader(dataset, batch_size=None, shuffle=False, num_workers=0)
 
-    for input_ids, targets in dataloader:
+    for input_ids, targets, fetch, transform in dataloader:
         print(f"Input IDs: {input_ids.shape}")
         print(f"targets: {targets.shape}")
+
+        print(f"fetch: {fetch}")
+        print(f"transform: {transform}")
 
         # break
