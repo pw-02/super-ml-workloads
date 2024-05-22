@@ -5,6 +5,7 @@ from mlworklaods.dataloaders.torch_lru.torch_lru_mapped_dataset import TorchLRUM
 from mlworklaods.dataloaders.super_dl.dataset.super_dataset import SUPERDataset
 from typing import Tuple, Optional
 from mlworklaods.args import * 
+import torch
 
 class BaseDataModule:
     def __init__(self, transform, num_classes: int):
@@ -32,7 +33,7 @@ class BaseDataModule:
             cache_address=lru_torch_args.cache_address,
             cache_granularity=lru_torch_args.cache_granularity
         )
-        base_sampler = RandomSampler(data_source=dataset) if lru_torch_args.shuffle else SequentialSampler(data_source=dataset)
+        base_sampler = RandomSampler(data_source=dataset, generator=torch.Generator().manual_seed(train_args.seed)) if lru_torch_args.shuffle else SequentialSampler(data_source=dataset)
         batch_sampler = BatchSamplerWithID(sampler=base_sampler, batch_size=train_args.batch_size(world_size), drop_last=False)
         return DataLoader(dataset=dataset, sampler=batch_sampler, batch_size=None, num_workers=lru_torch_args.num_pytorch_workers)
 

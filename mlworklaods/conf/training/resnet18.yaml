@@ -1,9 +1,9 @@
 model_name: resnet18
-max_epochs: 20
+max_epochs: 3
 max_steps: null
-global_batch_size: 64 #Number of samples between optimizer steps across data-parallel ranks
-micro_batch_size: 64 #Number of samples per data-parallel rank
-limit_train_batches: .inf #.inf
+global_batch_size: 128 #Number of samples between optimizer steps across data-parallel ranks
+micro_batch_size: 128 #Number of samples per data-parallel rank
+limit_train_batches: .inf
 limit_val_batches: .inf
 # Optimization args
 learning_rate: 6e-4
