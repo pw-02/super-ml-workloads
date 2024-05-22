@@ -22,7 +22,7 @@ def train_model(hydra_config):
         # train_args, data_args, dataloader_args = prepare_args(hydra_config, datetime.now().strftime("train_single_model_%Y-%m-%d_%H-%M-%S"))
     #    train_args, data_args, dataloader_args = prepare_args(hydra_config, f"{hydra_config.exp_id}/{hydra_config.job_id}" )
     
-    train_args, data_args, dataloader_args = prepare_args(hydra_config, f"{hydra_config.exp_id}" )
+    train_args, data_args, dataloader_args = prepare_args(hydra_config, f"{hydra_config.exp_id}/{hydra_config.job_id}" )
 
     logger = CSVLogger(root_dir=train_args.log_dir, name="", flush_logs_every_n_steps=train_args.log_interval)
     
@@ -55,6 +55,7 @@ def train_model(hydra_config):
         model = ImageClassifierModel(train_args.model_name, train_args.learning_rate, num_classes=data_module.num_classes)
         
         trainer = ImageClassificationTrainer(
+            job_id=hydra_config.job_id,
             accelerator=train_args.accelerator,
             precision=get_default_supported_precision(True),
             devices=train_args.devices, 

@@ -24,6 +24,7 @@ from mlworklaods.utils import AverageMeter
 class ImageClassificationTrainer():
     def __init__(
         self,
+        job_id,
         accelerator: Union[str, Accelerator] = "auto",
         strategy: Union[str, Strategy] = "auto",
         devices: Union[List[int], str, int] = "auto",
@@ -40,7 +41,7 @@ class ImageClassificationTrainer():
         checkpoint_dir: str = "./checkpoints",
         checkpoint_frequency: int = 1000,
     ) -> None:
-        
+        self.job_id = job_id
         self.global_step = 0
         self.grad_accum_steps: int = grad_accum_steps
         self.current_epoch = 0
@@ -199,7 +200,7 @@ class ImageClassificationTrainer():
                 # self._format_iterable(iterable, self._current_train_return, "t")
                 
                 self.fabric.print(
-                f"Epoch {metrics['epoch']} | iter {metrics['batch_idx']}/{min(len(train_loader),self.limit_train_batches)} |"
+                f"{self.job_id} | Epoch {metrics['epoch']} | iter {metrics['batch_idx']}/{min(len(train_loader),self.limit_train_batches)} |"
                 f" loss train: {metrics['loss_train']:.3f} |"
                 # f" val: {val_loss} |"
                 f" iter time: {metrics['batch_time']:.2f} |"
