@@ -87,7 +87,11 @@ class TorchLRUMappeedDataset(torch.utils.data.Dataset):
             torch.save(minibatch, buffer)
             minibatch = zlib.compress(buffer.getvalue()) #use_compression:
             minibatch = base64.b64encode(minibatch).decode('utf-8')
-            self.cache_client.set(batch_id, minibatch)
+            try:
+                self.cache_client.set(batch_id, minibatch)
+            except:
+                return None
+            
         
         fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
         return (torch.stack(data_samples), torch.tensor(labels)), cache_hits, fetch_duration, transform_duration
@@ -125,7 +129,10 @@ class TorchLRUMappeedDataset(torch.utils.data.Dataset):
                     byte_stream = io.BytesIO()
                     data.save(byte_stream, format=data.format)
                     byte_stream.seek(0)
-                    self.cache_client.set(data_path, byte_stream.read())
+                    try:
+                        self.cache_client.set(data_path, byte_stream.read())
+                    except:
+                        return None
 
             data_samples.append(data)
             labels.append(label)
