@@ -1,10 +1,18 @@
 #!/bin/bash
 
-# Start the first Python script and run it in the background
-python mlworklaods/image_classification/launch.py
+# Define an array of GPU indices
+gpu_indices=(0 1 2 3)
 
-# Start the second Python script and run it in the background
-# python mlworklaods/image_classification/launch.py &
+# Define an array of learning rates
+learning_rates=(0.001 0.01 0.1 1.0)
 
-# Wait for all background processes to finish
+# Loop over each job
+for i in "${!gpu_indices[@]}"; do
+    gpu_index=${gpu_indices[$i]}
+    lr=${learning_rates[$i]}
+    CUDA_VISIBLE_DEVICES="$gpu_index" python train.py --learning-rate "$lr" &
+    sleep 1  # Wait for 1 second
+done
+
+# Wait for all background jobs to finish
 wait

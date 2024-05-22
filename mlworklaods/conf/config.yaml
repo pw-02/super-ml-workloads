@@ -8,7 +8,8 @@ defaults:
   - override hydra/hydra_logging: disabled  
   # - training: ???
 
-num_jobs: 4
+
+num_jobs: 1
 num_devices_per_job: 1
 seed: 42
 accelerator: 'gpu'
@@ -18,7 +19,6 @@ checkpoint_interval: .inf
 run_training: True
 run_evaluation: False
 num_workers_per_job: 4
-
 
 hydra:
   run:

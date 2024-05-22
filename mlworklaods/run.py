@@ -103,7 +103,7 @@ def main(hydra_config: DictConfig):
 
         result = tune.run(
             tune.with_parameters(train_model, hydra_config=hydra_config),
-            resources_per_trial={"gpu": 1},
+            resources_per_trial={"gpu": 0.25},
             metric="loss",
             mode="min",
             max_concurrent_trials=hydra_config.num_jobs,
