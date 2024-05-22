@@ -131,12 +131,12 @@ class ImageClassificationTrainer():
         limit_batches: Union[int, float] = float("inf"),
     ):
         # self.fabric.call("on_train_epoch_start")
-        iterable = self.progbar_wrapper(
-            train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
-        )
+        # iterable = self.progbar_wrapper(
+        #     train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
+        # )
         with ResourceMonitor() as monitor:
             end = time.perf_counter()
-            for batch_idx, (batch, cache_hits, fetch_time, transform_time) in enumerate(iterable):
+            for batch_idx, (batch, cache_hits, fetch_time, transform_time) in enumerate(train_loader):
                 data_time = time.perf_counter() - end
                 
                 # end epoch if stopping training completely or max batches for this epoch reached
@@ -167,12 +167,11 @@ class ImageClassificationTrainer():
                 # only increase global step if optimizer stepped
                 self.global_step += int(should_optim_step)
 
-                self.fabric.log_dict(
-                    metrics= OrderedDict({
+                metrics= OrderedDict({
                         "elapsed_time": time.perf_counter() - self.train_start_time,
                         "device": self.fabric.global_rank,
-                        "epoch": self.current_epoch,
-                        "batch_idx": batch_idx,
+                        "epoch": self.current_epoch+1,
+                        "batch_idx": batch_idx+1,
                         "batch_size": batch[0].size(0),
                         "batch_time": time.perf_counter() - end,
                         "data_time": data_time,
@@ -184,10 +183,10 @@ class ImageClassificationTrainer():
                         "accuracy_train": self._current_train_return['top1'],
                         "cpu_usge": json.dumps(monitor.resource_data["cpu_util"].summarize()),
                         "gpu_usge": json.dumps( monitor.resource_data["gpu_util"].summarize())   
-                        }),
-                        step=self.global_step
-                )
-    
+                        })
+
+                self.fabric.log_dict(metrics,step=self.global_step)
+
                 # # this guard ensures, we only step the scheduler once per global step
                 # if should_optim_step:
                 #     self.step_scheduler(model, scheduler_cfg, level="step", current_value=self.global_step)
@@ -197,7 +196,21 @@ class ImageClassificationTrainer():
                 self._current_train_return["data"] =data_time
                 self._current_train_return["tform"] =transform_time
 
-                self._format_iterable(iterable, self._current_train_return, "t")
+                # self._format_iterable(iterable, self._current_train_return, "t")
+                
+                self.fabric.print(
+                f"Epoch {metrics['epoch']} | iter {metrics['batch_idx']}/{min(len(train_loader),self.limit_train_batches)} |"
+                f" loss train: {metrics['loss_train']:.3f} |"
+                # f" val: {val_loss} |"
+                f" iter time: {metrics['batch_time']:.2f} |"
+                f" data time: {metrics['data_time']:.2f} |"
+                f" compute time: {metrics['compute_time']:.2f} |"
+                f" fetch time: {metrics['fetch_time']:.2f} |"
+                f" transform time: {metrics['transform_time']:.2f} |"
+
+                # f"{' (step)' if not is_accumulating else ''}"
+                # f" remaining time: {timedelta(seconds=int(metrics['remaining_time']))!s}"
+            )
 
 
                 # stopping criterion on step level
@@ -214,15 +227,7 @@ class ImageClassificationTrainer():
         val_loader: Optional[torch.utils.data.DataLoader],
         limit_batches: Union[int, float] = float("inf"),
     ):
-        """The validation loop ruunning a single validation epoch.
-
-        Args:
-            model: the LightningModule to evaluate
-            val_loader: The dataloader yielding the validation batches.
-            limit_batches: Limits the batches during this validation epoch.
-                If greater than the number of batches in the ``val_loader``, this has no effect.
-
-        """
+        
         # no validation if val_loader wasn't passed
         if val_loader is None:
             return
@@ -241,9 +246,9 @@ class ImageClassificationTrainer():
 
         self.fabric.call("on_validation_epoch_start")
 
-        iterable = self.progbar_wrapper(val_loader, total=min(len(val_loader), limit_batches), desc="Validation")
+        # iterable = self.progbar_wrapper(val_loader, total=min(len(val_loader), limit_batches), desc="Validation")
 
-        for batch_idx, batch in enumerate(iterable):
+        for batch_idx, batch in enumerate(val_loader):
             # end epoch if stopping training completely or max batches for this epoch reached
             if self.should_stop or batch_idx >= limit_batches:
                 break
@@ -265,23 +270,12 @@ class ImageClassificationTrainer():
         torch.set_grad_enabled(True)
 
     def training_step(self, model: L.LightningModule, batch: Any, batch_idx: int) -> torch.Tensor:
-        """A single training step, running forward and backward. The optimizer step is called separately, as this is
-        given as a closure to the optimizer step.
-
-        Args:
-            model: the lightning module to train
-            batch: the batch to run the forward on
-            batch_idx: index of the current batch w.r.t the current epoch
-
-        """
+       
         outputs: Union[torch.Tensor, Mapping[str, Any]] = model.training_step(batch, batch_idx=batch_idx)
-
         loss = outputs if isinstance(outputs, torch.Tensor) else outputs["loss"]
-
         # self.fabric.call("on_before_backward", loss)
         self.fabric.backward(loss)
         # self.fabric.call("on_after_backward")
-
         # avoid gradients in stored/accumulated values -> prevents potential OOM
         self._current_train_return = apply_to_collection(outputs, dtype=torch.Tensor, function=lambda x: x.detach())
 

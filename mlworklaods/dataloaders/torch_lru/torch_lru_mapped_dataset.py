@@ -91,7 +91,7 @@ class TorchLRUMappeedDataset(torch.utils.data.Dataset):
             try:
                 self.cache_client.set(batch_id, minibatch)
             except:
-                return None
+                pass
         fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
         return (torch.stack(data_samples), torch.tensor(labels)), cache_hits, fetch_duration, transform_duration
     
