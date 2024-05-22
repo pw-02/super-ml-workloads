@@ -50,10 +50,8 @@ def pretrain_llm(
     if model_name not in available_models:
         raise ValueError(f"Please specify --model_name <model_name>. Available values:\n{available_models}")
     
-
     config = Config.from_name(model_name)
     precision = precision or get_default_supported_precision(training=True)
-
     if devices > 1:
         strategy = FSDPStrategy(auto_wrap_policy={Block}, state_dict_type="full", sharding_strategy="HYBRID_SHARD")
     else:

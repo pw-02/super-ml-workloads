@@ -9,41 +9,51 @@ from ray import tune
 from ray.air import session
 from lightning.pytorch.core.saving import save_hparams_to_yaml
 from mlworklaods.image_classification.data import CIFAR10DataModule, ImageNetDataModule
+from mlworklaods.llm.data import OpenWebTextDataModule
 from mlworklaods.utils import get_default_supported_precision
 from mlworklaods.args import *
 from datetime import datetime
-from mlworklaods.llm.pretrain import pretrain_llm
+from mlworklaods.llm.llm_pretrainer import LLMPretrainer
 
 def train_model(config, hydra_config):
     if config:
         train_args, data_args, dataloader_args = prepare_args(hydra_config, f"hpo_{session.get_experiment_name()}")
     else:
         train_args, data_args, dataloader_args = prepare_args(hydra_config, datetime.now().strftime("train_single_model_%Y-%m-%d_%H-%M-%S"))
-
+        
     if config is not None:
         train_args.learning_rate = config["lr"]
         hydra_config.training.learning_rate =train_args.learning_rate 
-    
+
     logger = CSVLogger(root_dir=train_args.log_dir, name="", flush_logs_every_n_steps=train_args.log_interval)
-
-
+    
     if isinstance(train_args, LLMTrainArgs):
         
-        # data = TextFiles(train_data_path=Path("openwebtext_chunks/train"),
-        #                  num_workers=0
-        #                  )
-        # data = OpenWebText(data_path='data')
+        if 'openwebtext' in data_args.dataset_name:
+            data_module = OpenWebTextDataModule()
 
-        pretrain_llm(
-            train=train_args,
-            model_name=train_args.model_name,
+        trainer = LLMPretrainer(
+            train= train_args,
+            accelerator=train_args.accelerator,
             precision=get_default_supported_precision(True),
-            initial_checkpoint_dir=None,
-            resume=False,
-            eval=EvalArgs(interval=1000, max_iters=100,initial_validation = False),
-            devices=train_args.devices,
+            devices=train_args.devices, 
             loggers=[logger],
-            seed=train_args.seed)
+            model_name=train_args.model_name,
+            seed=train_args.seed
+        )
+
+        model, optmizer = trainer.initialize_model_and_optimizer()
+        
+        train_loader, val_loader = data_module.make_dataloaders(train_args, data_args, dataloader_args, model.max_seq_length)
+
+        avg_loss, avg_acc = trainer.fit(model, optmizer, train_loader, val_loader)
+        hparams_file = os.path.join(logger.log_dir, "hparms.yaml")
+        save_hparams_to_yaml(hparams_file, hydra_config)
+        print(f"Training completed with loss: {avg_loss}, accuracy: {avg_acc}")
+
+        if config:
+            session.report({"loss": avg_loss, "accuracy": avg_acc})
+
         
     elif isinstance(train_args, ImgClassifierTrainArgs):
         if 'cifar10' in data_args.dataset_name:

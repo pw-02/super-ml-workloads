@@ -4,46 +4,59 @@ from typing import List
 import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import PreTrainedTokenizer
+from typing import List, Tuple, Dict
+import mlworklaods.image_classification.s3utils as s3utils
+from mlworklaods.image_classification.s3utils import S3Url
+import glob
 
 class TorchLRUTextDataset(Dataset):
 
-    def __init__(self, file_list: List[str], tokenizer: PreTrainedTokenizer, block_size: int, batch_size: int):
-        self.file_list = file_list
+    def __init__(self, data_dir: str, tokenizer: PreTrainedTokenizer, transform, block_size: int, batch_size: int):
+
+        self.data_dir = data_dir
         self.tokenizer = tokenizer
         self.block_size = block_size
         self.batch_size = batch_size
+        self.transform = transform
         self.current_file_idx = 0
         self.current_position = 0
-        self.current_tokens = self._load_next_file()
+
+        self.is_s3: bool = data_dir.startswith("s3://")
+        if self.is_s3:
+            self.file_list: Dict[str, List[str]] = s3utils.load_unpaired_s3_object_keys(data_dir, False)
+            self.bucket_name = S3Url(data_dir).bucket
+        else:
+            self.file_list = glob.glob(f'{self.data_dir}/*.txt')
+        self.current_tokens = None #self._load_next_file()
 
     def _load_next_file(self):
         if self.current_file_idx >= len(self.file_list):
-            raise StopIteration("No more files to read.")
+            # Reset to start reading files from the beginning
+            self.current_file_idx = 0
+            # raise StopIteration("No more files to read.")
+
         file_path = self.file_list[self.current_file_idx]
         with open(file_path, 'r', encoding='utf-8') as f:
             text = f.read()
+                    # Apply transform if provided
+        
+        if self.transform:
+            text = self.transform(text)
+
         self.current_file_idx += 1
         self.current_position = 0
         tokens = self.tokenizer(text, truncation=False, padding=False, return_tensors='pt').input_ids.squeeze()
         return tokens
 
     def _get_next_batch(self):
+        if self.current_tokens is None:
+            self.current_tokens = self._load_next_file()
         required_size = (self.block_size +1) * self.batch_size
         remaining_tokens = self.current_tokens[self.current_position:]
-        
+
         while len(remaining_tokens) < required_size:
-            if self.current_file_idx < len(self.file_list):
-                next_tokens = self._load_next_file()
-                remaining_tokens = torch.cat((remaining_tokens, next_tokens), dim=0)
-            else:
-                if len(remaining_tokens) >= required_size:
-                    self.current_tokens = remaining_tokens
-                    self.current_position = 0
-                else:
-                    # Pad remaining tokens to the required size
-                    pad_size = required_size - len(remaining_tokens)
-                    remaining_tokens = torch.cat((remaining_tokens, torch.zeros(pad_size, dtype=remaining_tokens.dtype)), dim=0)
-                break
+            next_tokens = self._load_next_file()
+            remaining_tokens = torch.cat((remaining_tokens, next_tokens), dim=0)
         
         batch_tokens = remaining_tokens[:required_size]
         self.current_position += required_size
@@ -63,17 +76,24 @@ class TorchLRUTextDataset(Dataset):
 
         return input_ids, targets
 
+# Example transform function
+def example_transform(text: str) -> str:
+    return text.lower()  # Example transformation: convert text to lowercase
 
 # Example Usage
 if __name__ == "__main__":
     from transformers import GPT2Tokenizer
+    from mlworklaods.llm.data import TextTransformations
 
-    file_list = glob.glob('data/openwebtext/train/*.txt')  # Adjust the path to your .txt files
+    data_dir = 'data/openwebtext/test/train'  # Adjust the path to your .txt files
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-    block_size = 6
-    batch_size = 2
+    block_size = 512
+    batch_size = 4
 
-    dataset = TorchLRUTextDataset(file_list, tokenizer, block_size, batch_size)
+    transformations = TextTransformations()
+
+
+    dataset = TorchLRUTextDataset(data_dir, tokenizer, transformations.normalize, block_size, batch_size)
     dataloader = DataLoader(dataset, batch_size=None, shuffle=False, num_workers=0)
 
     for input_ids, targets in dataloader:

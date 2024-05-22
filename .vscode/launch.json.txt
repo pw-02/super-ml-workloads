@@ -7,7 +7,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/mlworklaods/run.py",
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": true
         }
     ]
 }

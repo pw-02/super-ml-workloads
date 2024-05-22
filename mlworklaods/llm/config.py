@@ -9,7 +9,7 @@ import torch
 import yaml
 from typing_extensions import Self
 
-from mlworklaods.llm.utils import find_multiple
+from mlworklaods.utils import find_multiple
 
 @dataclass
 class Config:

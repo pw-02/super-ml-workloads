@@ -1,7 +1,6 @@
 name: openwebtext
-
-train_dir: openwebtext_chunks/openwebtext/train
-val_dir: enwebtext_chunks/openwebtext/val
+train_dir: data/openwebtext/test/train
+val_dir: data/openwebtext/test/val
 
 # train_dir: datasets/openwebtext/val.bin
 # val_dir: datasets/openwebtext/val.bin
