@@ -17,7 +17,7 @@ from mlworklaods.llm.pretrainer import LLMPretrainer
 
 def train_model(config, hydra_config):
     if config:
-        train_args, data_args, dataloader_args = prepare_args(hydra_config, f"hpo_{session.get_experiment_name()}")
+        train_args, data_args, dataloader_args = prepare_args(hydra_config, f"hpo_{session.get_experiment_name()}/{session.get_trial_name()}")
     else:
         train_args, data_args, dataloader_args = prepare_args(hydra_config, datetime.now().strftime("train_single_model_%Y-%m-%d_%H-%M-%S"))
         
@@ -77,8 +77,8 @@ def train_model(config, hydra_config):
 
         train_loader, val_loader = data_module.make_dataloaders(train_args, data_args, dataloader_args, trainer.fabric.world_size)
         hparams_file = os.path.join(logger.log_dir, "hparms.yaml")
-        # os.makedirs(logger.log_dir, exist_ok=True)
-        # save_hparams_to_yaml(hparams_file, hydra_config)
+        os.makedirs(logger.log_dir, exist_ok=True)
+        save_hparams_to_yaml(hparams_file, hydra_config)
        
         avg_loss, avg_acc = trainer.fit(model, train_loader, val_loader, train_args.seed)
         hparams_file = os.path.join(logger.log_dir, "hparms.yaml")
