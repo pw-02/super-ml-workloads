@@ -24,7 +24,7 @@ learning_rates=(0.001 0.01 0.1 1.0)
 for i in "${!gpu_indices[@]}"; do
     gpu_index=${gpu_indices[$i]}
     lr=${learning_rates[$i]}
-    CUDA_VISIBLE_DEVICES="$gpu_index" python mlworklaods/run.py config.training.learning_rate="$lr" &
+    CUDA_VISIBLE_DEVICES="$gpu_index" python mlworklaods/run.py training.learning_rate="$lr" &
     sleep 1  # Wait for 1 second
 done
 
