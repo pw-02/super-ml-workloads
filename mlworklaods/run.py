@@ -74,7 +74,6 @@ def train_model(hydra_config):
         avg_loss, avg_acc = trainer.fit(model, train_loader, val_loader, train_args.seed)
         print(f"Training completed with loss: {avg_loss}, accuracy: {avg_acc}")
         
-  
 
 
 @hydra.main(version_base=None, config_path="./conf", config_name="config")
