@@ -13,7 +13,7 @@ from mlworklaods.llm.data import OpenWebTextDataModule
 from mlworklaods.utils import get_default_supported_precision
 from mlworklaods.args import *
 from datetime import datetime
-from mlworklaods.llm.llm_pretrainer import LLMPretrainer
+from mlworklaods.llm.pretrainer import LLMPretrainer
 
 def train_model(config, hydra_config):
     if config:

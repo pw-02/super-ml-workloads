@@ -14,7 +14,7 @@ import nltk
 from nltk.corpus import stopwords, wordnet
 from nltk.tokenize import word_tokenize
 
-from mlworklaods.image_classification.s3utils import S3Url
+from mlworklaods.s3utils import S3Url
 from mlworklaods.dataloaders.torch_lru.torch_lru_text_dataset import TorchLRUTextDataset
 from mlworklaods.args import LLMTrainArgs, DataArgs, SUPERArgs, LRUTorchArgs
 

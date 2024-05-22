@@ -18,6 +18,7 @@ from collections import OrderedDict
 import json
 from utils import get_default_supported_precision
 from lightning import LightningModule
+from mlworklaods.utils import AverageMeter
 
 
 class ImageClassificationTrainer():

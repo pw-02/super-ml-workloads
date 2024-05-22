@@ -1,7 +1,7 @@
 import functools
 import torch
-import mlworklaods.image_classification.s3utils as s3utils
-from mlworklaods.image_classification.s3utils import S3Url
+import mlworklaods.s3utils as s3utils
+from mlworklaods.s3utils import S3Url
 from typing import List, Tuple, Dict
 from PIL import Image
 import io

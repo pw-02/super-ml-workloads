@@ -23,6 +23,7 @@ from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 from mlworklaods.dataloaders.torch_lru.torch_lru_text_dataset import TorchLRUTextDataset
 from lightning.fabric.accelerators import Accelerator
 from lightning.fabric.strategies import Strategy
+from mlworklaods.utils import ResourceMonitor, AverageMeter
 
 # from data.tiny_llama import TinyLlama
 from mlworklaods.llm.model import GPT, Block, CausalSelfAttention, Config, LLaMAMLP
@@ -69,6 +70,8 @@ class LLMPretrainer():
             self.fabric.seed_everything(seed)
         
         self.fabric.launch()
+        self.train_start_time = time.perf_counter()
+
         
 
     def initialize_model_and_optimizer(self):
@@ -153,81 +156,111 @@ class LLMPretrainer():
 
         warmup_iters = self.train.warmup_iters(self.devices, max_iters, train_dataloader)
 
-        for input_ids, targets  in train_iterator:
-            if state["iter_num"] >= max_iters:
-                break
+     
+        data_load_times =  AverageMeter("Loss", ":6.2f")
+        compute_times = AverageMeter("Acc1", ":6.2f")
+        fetch_times =  AverageMeter("Loss", ":6.2f")
+        transform_times = AverageMeter("Acc1", ":6.2f")
+        self.train_start_time = time.perf_counter()
 
-            # determine and set the learning rate for this iteration
-            lr = get_lr(self.train.learning_rate, state["iter_num"], warmup_iters, max_iters, self.train.min_lr)
-            for param_group in optimizer.param_groups:
-                param_group["lr"] = lr
+        with ResourceMonitor() as monitor:
+            end = time.perf_counter()
+            for input_ids, targets, fetch_time, transform_time  in train_iterator:
+                if state["iter_num"] >= max_iters:
+                    break
+                data_load_times.update(time.perf_counter() - end)
+                fetch_times.update(fetch_time)
+                transform_times.update(transform_time)
 
-            state["iter_num"] += 1
-            iter_t0 = time.perf_counter()
+                # determine and set the learning rate for this iteration
+                lr = get_lr(self.train.learning_rate, state["iter_num"], warmup_iters, max_iters, self.train.min_lr)
+                for param_group in optimizer.param_groups:
+                    param_group["lr"] = lr
 
-            is_accumulating = state["iter_num"] % self.train.gradient_accumulation_iters(self.devices) != 0
-            with self.fabric.no_backward_sync(model, enabled=is_accumulating):
-                logits = model(input_ids)
-                loss = chunked_cross_entropy(logits, targets)
-                self.fabric.backward(loss / self.train.gradient_accumulation_iters(self.devices))
+                state["iter_num"] += 1
+                iter_t0 = time.perf_counter()
 
-            running_loss.update(loss.detach())
+                compute_start = time.perf_counter()
 
-            if not is_accumulating:
-                self.fabric.clip_gradients(model, optimizer, max_norm=self.train.max_norm)
-                optimizer.step()
-                optimizer.zero_grad()
-                state["step_count"] += 1
+                is_accumulating = state["iter_num"] % self.train.gradient_accumulation_iters(self.devices) != 0
+                with self.fabric.no_backward_sync(model, enabled=is_accumulating):
+                    logits = model(input_ids)
+                    loss = chunked_cross_entropy(logits, targets)
+                    self.fabric.backward(loss / self.train.gradient_accumulation_iters(self.devices))
 
-            if state["iter_num"] % log_iter_interval == 0:
-                loss = running_loss.compute().item()  # expensive device-to-host synchronization
-                t1 = time.perf_counter()
-                throughput.update(
-                    time=(t1 - total_t0),
-                    flops=(measured_flops * log_iter_interval),
-                    batches=state["iter_num"],
-                    samples=(state["iter_num"] * self.train.micro_batch_size),
-                    lengths=(state["iter_num"] * self.train.micro_batch_size * model.max_seq_length),
-                )
-                metrics = {
-                    "loss": loss,
-                    "iter": state["iter_num"],
-                    "step": state["step_count"],
-                    "epoch": train_iterator.epoch,
-                    "iter_time": t1 - iter_t0,
-                    "remaining_time": (
-                        (t1 - total_t0) / (state["iter_num"] - initial_iter) * (max_iters - state["iter_num"])
-                    ),
-                    "tokens": state["iter_num"] * self.train.micro_batch_size * model.max_seq_length,
-                    "total_tokens": (state["iter_num"] * self.train.micro_batch_size * model.max_seq_length * self.fabric.world_size),
-                    "learning_rate": lr,
-                }
-                if isinstance(val_loss, float):
-                    val_loss = f"{val_loss:.3f}"
+                running_loss.update(loss.detach())
 
-                self.fabric.print(
-                    f"Epoch {metrics['epoch']+1} | iter {metrics['iter']} step {metrics['step']} |"
-                    f" loss train: {metrics['loss']:.3f},"
-                    f" val: {val_loss} |"
-                    f" iter time: {metrics['iter_time'] * 1000:.2f} ms"
-                    f"{' (step)' if not is_accumulating else ''}"
-                    f" remaining time: {timedelta(seconds=int(metrics['remaining_time']))!s}"
-                )
+                if not is_accumulating:
+                    self.fabric.clip_gradients(model, optimizer, max_norm=self.train.max_norm)
+                    optimizer.step()
+                    optimizer.zero_grad()
+                    state["step_count"] += 1
+                
+                compute_times.update(time.perf_counter() - compute_start)
 
-                throughput_metrics = throughput.compute()
-                metrics.update(throughput_metrics)
-                self.fabric.log_dict(metrics, step=state["iter_num"] - 1)
+                if state["iter_num"] % log_iter_interval == 0:
+                    loss = running_loss.compute().item()  # expensive device-to-host synchronization
+                    t1 = time.perf_counter()
+                    throughput.update(
+                        time=(t1 - total_t0),
+                        flops=(measured_flops * log_iter_interval),
+                        batches=state["iter_num"],
+                        samples=(state["iter_num"] * self.train.micro_batch_size),
+                        lengths=(state["iter_num"] * self.train.micro_batch_size * model.max_seq_length),
+                    )
+                    metrics = {
+                        "loss": loss,
+                        "iter": state["iter_num"],
+                        "step": state["step_count"],
+                        "epoch": train_iterator.epoch,
+                        "iter_time": t1 - iter_t0,
+                        "remaining_time": (
+                            (t1 - total_t0) / (state["iter_num"] - initial_iter) * (max_iters - state["iter_num"])
+                        ),
+                        "tokens": state["iter_num"] * self.train.micro_batch_size * model.max_seq_length,
+                        "total_tokens": (state["iter_num"] * self.train.micro_batch_size * model.max_seq_length * self.fabric.world_size),
+                        "learning_rate": lr,
+                        "data_time": data_load_times.sum,
+                        "compute_time": compute_times.sum,
+                        "fetch_time": fetch_times.sum,
+                        "transform_time": transform_times.sum,
+                        "elapsed_time": time.perf_counter() - self.train_start_time
 
-            if val_dataloader is not None and not is_accumulating and state["step_count"] % eval.interval == 0:
-                t0 = time.perf_counter()
-                val_loss = validate(self.fabric, model, val_dataloader, max_iters=self.eval.max_iters)
-                val_loss = val_loss.item()
-                td = time.perf_counter() - t0
+                    }
+                    if isinstance(val_loss, float):
+                        val_loss = f"{val_loss:.3f}"
 
-                self.fabric.print(f"iter {state['iter_num']}: val loss {val_loss:.4f}, val time: {td * 1000:.2f} ms")
-                metrics = {"val_loss": val_loss, "val_ppl": math.exp(val_loss)}
-                self.fabric.log_dict(metrics, step=state["iter_num"] - 1)
-                self.fabric.barrier()
+                    self.fabric.print(
+                        f"Epoch {metrics['epoch']+1} | iter {metrics['iter']} step {metrics['step']} |"
+                        f" loss train: {metrics['loss']:.3f},"
+                        f" val: {val_loss} |"
+                        f" iter time: {metrics['iter_time'] * 1000:.2f} ms"
+                        f"{' (step)' if not is_accumulating else ''}"
+                        f" remaining time: {timedelta(seconds=int(metrics['remaining_time']))!s}"
+                    )
+
+                    throughput_metrics = throughput.compute()
+                    metrics.update(throughput_metrics)
+                    self.fabric.log_dict(metrics, step=state["iter_num"] - 1)
+                    data_load_times.reset()
+                    compute_times.reset()
+                    fetch_times.reset()
+                    transform_times.reset()
+
+                if val_dataloader is not None and not is_accumulating and state["step_count"] % eval.interval == 0:
+                    t0 = time.perf_counter()
+                    val_loss = validate(self.fabric, model, val_dataloader, max_iters=self.eval.max_iters)
+                    val_loss = val_loss.item()
+                    td = time.perf_counter() - t0
+
+                    self.fabric.print(f"iter {state['iter_num']}: val loss {val_loss:.4f}, val time: {td * 1000:.2f} ms")
+                    metrics = {"val_loss": val_loss, "val_ppl": math.exp(val_loss)}
+                    self.fabric.log_dict(metrics, step=state["iter_num"] - 1)
+                    self.fabric.barrier()
+                end = time.perf_counter()
+                
+
+             
 
         self.fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
         if  self.fabric.device.type == "cuda":
