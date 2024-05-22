@@ -1,3 +1,0 @@
-kind: local_text_iterable
-num_pytorch_workers: 2
-shuffle: True

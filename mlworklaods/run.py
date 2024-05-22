@@ -68,10 +68,9 @@ def train_model(hydra_config):
 
         train_loader, val_loader = data_module.make_dataloaders(train_args, data_args, dataloader_args, trainer.fabric.world_size)
 
+        avg_loss, avg_acc = trainer.fit(model, train_loader, val_loader, train_args.seed)
         os.makedirs(logger.log_dir, exist_ok=True)
         save_hparams_to_yaml(os.path.join(logger.log_dir, "hparms.yaml"), hydra_config)
-       
-        avg_loss, avg_acc = trainer.fit(model, train_loader, val_loader, train_args.seed)
         print(f"Training completed with loss: {avg_loss}, accuracy: {avg_acc}")
         
 
