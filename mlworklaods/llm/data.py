@@ -25,9 +25,6 @@ def check_and_download_nltk_resource(resource_name: str):
     except LookupError:
         nltk.download(resource_name)
 
-check_and_download_nltk_resource('stopwords')
-check_and_download_nltk_resource('wordnet')
-
 # Regex patterns
 UNICODE_PUNCT = {
     "，": ",", "。": ".", "、": ",", "„": '"', "”": '"', "“": '"', "«": '"', "»": '"',
@@ -247,6 +244,8 @@ class BaseDataModule:
 
 class OpenWebTextDataModule(BaseDataModule):
     """Data module for OpenWebText dataset."""
+    check_and_download_nltk_resource('stopwords')
+    check_and_download_nltk_resource('wordnet')
     
     def __init__(self):
         text_transformer = TextTransformations()
