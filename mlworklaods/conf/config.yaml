@@ -13,7 +13,7 @@ num_devices_per_job: 1
 seed: 42
 accelerator: 'gpu'
 log_interval: 25
-log_dir: mlworklaods/logs
+log_dir: logs
 checkpoint_interval: .inf
 run_training: True
 run_evaluation: False

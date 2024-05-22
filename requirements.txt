@@ -16,6 +16,7 @@ psutil
 pynvml
 heapdict
 litdata
+"ray[tune]"
 # nltk
 # redis-py-cluster
 #nlp workload

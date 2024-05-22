@@ -17,3 +17,4 @@ psutil
 pynvml
 heapdict
 litdata
+"ray[tune]"
