@@ -243,11 +243,12 @@ class BaseDataModule:
         return train_dataloader, val_dataloader
 
 class OpenWebTextDataModule(BaseDataModule):
-    """Data module for OpenWebText dataset."""
-    check_and_download_nltk_resource('stopwords')
-    check_and_download_nltk_resource('wordnet')
+
     
     def __init__(self):
+        """Data module for OpenWebText dataset."""
+        check_and_download_nltk_resource('stopwords')
+        check_and_download_nltk_resource('wordnet')
         text_transformer = TextTransformations()
         transform_func = text_transformer.normalize
         super().__init__(transform=transform_func, tokenizer=GPT2Tokenizer.from_pretrained('gpt2'))
