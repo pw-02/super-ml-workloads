@@ -19,8 +19,9 @@ def train_model(config, hydra_config):
     if config:
         train_args, data_args, dataloader_args = prepare_args(hydra_config, f"hpo_{session.get_experiment_name()}/{session.get_trial_name()}")
     else:
-        train_args, data_args, dataloader_args = prepare_args(hydra_config, datetime.now().strftime("train_single_model_%Y-%m-%d_%H-%M-%S"))
-        
+        # train_args, data_args, dataloader_args = prepare_args(hydra_config, datetime.now().strftime("train_single_model_%Y-%m-%d_%H-%M-%S"))
+        train_args, data_args, dataloader_args = prepare_args(hydra_config, f"{hydra_config.multi_job}/{hydra_config.job_id}" )
+
     if config is not None:
         train_args.learning_rate = config["lr"]
         hydra_config.training.learning_rate =train_args.learning_rate 
