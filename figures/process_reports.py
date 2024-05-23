@@ -10,7 +10,7 @@ def convert_csv_to_dict(csv_file):
 def convert_all_csv_to_dict(folder_path):
     metrics = OrderedDict({
          "num_jobs": 0,
-         "elapsed_time(s)":1000,
+         "elapsed_time(s)":0,
          "aggregated_time(s)": 0,
          "aggregated_batches": 0,
          "aggregated_compute_time(s)": 0,
@@ -26,6 +26,7 @@ def convert_all_csv_to_dict(folder_path):
         if 'metrics.csv' in file_name:
             csv_data = convert_csv_to_dict(csv_file)
             metrics["num_jobs"] +=1
+            metrics["elapsed_time(s)"] = max(metrics["elapsed_time(s)"],csv_data['elapsed_time'][len(csv_data['elapsed_time'])-1])
             metrics["aggregated_time(s)"] += sum(csv_data["batch_time"])
             metrics["aggregated_batches"] += len(csv_data["batch_idx"])
             metrics["aggregated_compute_time(s)"] += sum(csv_data["compute_time"])
@@ -50,7 +51,8 @@ def save_dict_to_csv(data_dict, output_file):
 
 
 if __name__ == "__main__":
-    folder_path = "C:\\Users\\pw\\Desktop\\logs\\cifar10\\resnet18"
+    # folder_path = "C:\\Users\\pw\\Desktop\\logs\\cifar10\\resnet18"
+    folder_path = "C:\\Users\\pw\\Desktop\\logs\\imagenet1k\\resnet50"
 
     subfolders = glob.glob(os.path.join(folder_path, '*'))
     for subfolder in subfolders:
