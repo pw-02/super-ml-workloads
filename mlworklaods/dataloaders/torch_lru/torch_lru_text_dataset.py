@@ -47,7 +47,11 @@ class TorchLRUTextDataset(Dataset):
         transform_start_time = time.perf_counter()
 
         if self.transform:
-            text = self.transform(text)
+            try:
+                text = self.transform(text)
+            except:
+                
+                text = self.transform(text)
 
         transform_duration = time.perf_counter() - transform_start_time
 
