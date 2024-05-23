@@ -70,9 +70,10 @@ class CIFAR10DataModule(BaseDataModule):
 class ImageNetDataModule(BaseDataModule):
     def __init__(self):
         transform = transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        transforms.Resize(256),                    # Resize the image to 256x256 pixels
+        transforms.RandomResizedCrop(224),   # Randomly crop a 224x224 patch
+        transforms.RandomHorizontalFlip(), # Randomly flip the image horizontally
+        transforms.ToTensor(),  # Convert the image to a PyTorch tensor
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
         super().__init__(transform, num_classes=1000)
