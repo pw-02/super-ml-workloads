@@ -31,7 +31,7 @@ def convert_all_csv_to_dict(folder_path):
             metrics["aggregated_batches"] += len(csv_data["batch_idx"])
             metrics["aggregated_compute_time(s)"] += sum(csv_data["compute_time"])
             metrics["aggregated_data_time(s)"] += sum(csv_data["data_time"])
-            metrics["aggregated_transform_time(s)"] += sum(csv_data["transform_time"])
+            metrics["aggregated_transform_time(s)"] += sum(csv_data["transform_time"])/4
             metrics["aggregated_cache_hits"] += (sum(csv_data["cache_hits"])//csv_data["batch_size"][0])
         
     metrics["aggregated_data_time(s)"] = metrics["aggregated_data_time(s)"] -  metrics["aggregated_transform_time(s)"]

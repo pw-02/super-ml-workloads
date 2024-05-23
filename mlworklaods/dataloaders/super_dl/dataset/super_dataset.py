@@ -14,6 +14,8 @@ import functools
 import logging
 import time
 import math
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
+import concurrent.futures
 
 # from lightning.fabric import Fabric
 
@@ -220,19 +222,39 @@ class SUPERDataset(IterableDataset):
     #         cached_data = None
     #     return cached_data
     
-    
+    def get_data_sample(self, bucket_name, data_sample):
+        sample_path, sample_label = data_sample
+        content = s3utils.get_s3_object(bucket_name, sample_path)
+
+        img = Image.open(io.BytesIO(content))
+        img = img.convert("RGB")      
+        return content, sample_label
+
     def fetch_from_s3(self, indices:List[int]):
         images = []
-        labels = []   
-        for idx in indices:
-            file_path, label = self._classed_items[idx]
-            content = s3utils.get_s3_object(self.s3_bucket_name, file_path)
-            img = Image.open(io.BytesIO(content))
-            if img.mode == "L":
-                img = img.convert("RGB")
-            images.append(img)
-            labels.append(label)
+        labels = []
+        
+        with ThreadPoolExecutor() as executor:
+            futures = {executor.submit(self.get_data_sample, self.s3_bucket_name, sample): sample for sample in indices}
+            for future in concurrent.futures.as_completed(futures):
+                file_path = futures[future]
+            try:
+                image_content, label = future.result()
+                images.append(image_content)
+                labels.append(label)
+            except Exception as e:
+                print(f"Error processing file {file_path}: {e}")
         return images, labels
+    
+        # for idx in indices:
+        #     file_path, label = self._classed_items[idx]
+        #     content = s3utils.get_s3_object(self.s3_bucket_name, file_path)
+        #     img = Image.open(io.BytesIO(content))
+        #     if img.mode == "L":
+        #         img = img.convert("RGB")
+        #     images.append(img)
+        #     labels.append(label)
+        # return images, labels
     
 
     def apply_transformations(self, images, labels):
