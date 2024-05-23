@@ -121,8 +121,8 @@ class TorchLRUMappeedDataset(torch.utils.data.Dataset):
                 else:
                     data = Image.open(data_path) #get_local_sample
                 
-                if data.mode == "L":
-                    data = data.convert("RGB")
+                # if data.mode == "L":
+                data = data.convert("RGB")
 
                 if self.use_cache and self.cache_granularity == 'sample':
                     byte_stream = io.BytesIO()
