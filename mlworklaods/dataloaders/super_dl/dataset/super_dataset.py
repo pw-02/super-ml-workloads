@@ -45,6 +45,7 @@ class SUPERDataset(IterableDataset):
         super().__init__()
 
         super_client:SuperClient = SuperClient(super_addresss=super_address)
+        super_client.register_job(job_id, data_dir)
         dataset_info = super_client.get_dataset_details(data_dir)
         self.dataset_size = dataset_info.num_files
         self.dataset_chunked_size = dataset_info.num_chunks // world_size
@@ -182,7 +183,7 @@ class SUPERDataset(IterableDataset):
             cache_hit_count = 0
         
         fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
-        return torch_imgs, torch_labels, cache_hit_count, fetch_duration, transform_duration
+        return (torch_imgs, torch_labels), cache_hit_count, fetch_duration, transform_duration
      
     
     def fetch_from_cache(self, batch_id, max_attempts = 5):
