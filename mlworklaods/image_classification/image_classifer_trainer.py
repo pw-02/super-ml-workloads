@@ -208,6 +208,7 @@ class ImageClassificationTrainer():
                 f" compute time: {metrics['compute_time']:.2f} |"
                 f" fetch time: {metrics['fetch_time']:.2f} |"
                 f" transform time: {metrics['transform_time']:.2f} |"
+                f" elapsed time: {metrics['elapsed_time']:.2f} |"
 
                 # f"{' (step)' if not is_accumulating else ''}"
                 # f" remaining time: {timedelta(seconds=int(metrics['remaining_time']))!s}"
@@ -218,7 +219,7 @@ class ImageClassificationTrainer():
                 if self.max_steps is not None and self.global_step >= self.max_steps:
                     self.should_stop = True
                     break
-                if time.perf_counter() - self.train_start_time > 10000:
+                if time.perf_counter() - self.train_start_time > 1000:
                     print("Training time exceeded 10000 seconds. Exiting.")
                     self.should_stop = True
                     break
