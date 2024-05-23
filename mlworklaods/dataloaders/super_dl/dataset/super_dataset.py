@@ -164,7 +164,7 @@ class SUPERDataset(IterableDataset):
             if is_cached and self.cache_client is not None:
                 batch_data = self.fetch_from_cache(batch_id)
 
-            if batch_data is not None:
+            if batch_data is not None and (isinstance(batch_data, bytes) or isinstance(batch_data, str)):
                 tranform_start_time = time.perf_counter()
                 torch_imgs, torch_labels = self.deserialize_torch_batch(batch_data)
                 transform_duration =  time.perf_counter() - tranform_start_time
