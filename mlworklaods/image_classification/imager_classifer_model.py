@@ -37,7 +37,7 @@ class ImageClassifierModel(pl.LightningModule):
         logits = self.model(x)
 
         loss = self.loss_fn(logits, y)
-        top1 = accuracy(logits.argmax(-1), y, num_classes=self.nu, task="multiclass", top_k=1)
+        top1 = accuracy(logits.argmax(-1), y, num_classes=self.num_classes, task="multiclass", top_k=1)
         
         self.losses.update(loss.item())
         self.top1.update(top1.item())
