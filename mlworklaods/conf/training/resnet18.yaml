@@ -1,5 +1,5 @@
 model_name: resnet18
-max_epochs: 2
+max_epochs: 100000
 max_steps: null
 global_batch_size: 128 #Number of samples between optimizer steps across data-parallel ranks
 micro_batch_size: 128 #Number of samples per data-parallel rank
