@@ -122,7 +122,7 @@ class ImageClassificationTrainer():
         # reset for next fit call
         self.should_stop = False
         
-        self.fabric.logger.finalize()
+        self.fabric.logger.finalize(status='success')
 
         return model.losses.avg, model.top1.avg
 
