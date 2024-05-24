@@ -13,6 +13,9 @@ import base64
 import zlib
 from mlworklaods.utils import timer_decorator
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
+import concurrent.futures
+
 
 class TorchLRUMappeedDataset(torch.utils.data.Dataset):
     def __init__(self,data_dir:str, transform, cache_address:str = None, cache_granularity:str = 'sample'):
@@ -98,45 +101,93 @@ class TorchLRUMappeedDataset(torch.utils.data.Dataset):
     def random_true_or_false(self) -> bool:
         import random
         return random.choice([True, False])
+    
 
+    def get_data_sample(self, bucket_name, sample_idx):
+        sample_path, sample_label = self._classed_items[sample_idx]
+        content = s3utils.get_s3_object(bucket_name, sample_path)
+
+        img = Image.open(io.BytesIO(content))
+        img = img.convert("RGB")      
+        return img, sample_label
+
+    def fetch_batch_from_s3(self, indices: List[int]):
+        images = []
+        labels = []
+        cache_hits = 0
+        with ThreadPoolExecutor() as executor:
+            futures = {executor.submit(self.get_data_sample, self.s3_bucket_name, sample_idx): sample_idx for sample_idx in indices}
+            for future in concurrent.futures.as_completed(futures):
+                sample_idx = futures[future]
+                try:
+                    image_content, label = future.result()
+                    images.append(image_content)
+                    labels.append(label)
+                except Exception as e:
+                    print(f"Error processing sample {sample_idx}: {e}")
+                    
+        return images, labels, cache_hits
+    
     def fetch_batch_data(self,batch_indices):
         data_samples = []
         labels = []
-        cache_hits = 0
+
+        if self.is_s3:
+            return self.fetch_batch_from_s3(batch_indices)
+        else:
+            data_samples = []
+            labels = []
+            cache_hits = 0
+            
         for idx in batch_indices: 
             data = None
-            data_path, label = self._classed_items[idx] 
-            
-            if self.use_cache and self.cache_granularity == 'sample':
-                byte_data = self.fetch_from_cache(data_path)
-                if byte_data:
-                    byte_img_io = io.BytesIO(byte_data)
-                    data = Image.open(byte_img_io)
-                    cache_hits +=1
-                
-            if data is None:  #data not retrieved from cache, so get it from primary storage
-                if self.is_s3:
-                    data = s3utils.get_s3_object(self.bucket_name, data_path)
-                    data = Image.open(io.BytesIO(data))
-                else:
-                    data = Image.open(data_path) #get_local_sample
-                
-                # if data.mode == "L":
-                data = data.convert("RGB")
-
-                if self.use_cache and self.cache_granularity == 'sample':
-                    byte_stream = io.BytesIO()
-                    data.save(byte_stream, format=data.format)
-                    byte_stream.seek(0)
-                    try:
-                        self.cache_client.set(data_path, byte_stream.read())
-                    except:
-                        return None
-
+            data_path, label = self._classed_items[idx]  
+            data = Image.open(data_path) #get_local_sample
+            data = data.convert("RGB")
             data_samples.append(data)
             labels.append(label)
 
         return data_samples, labels, cache_hits
+        
+
+    # def fetch_batch_data(self,batch_indices):
+    #     data_samples = []
+    #     labels = []
+    #     cache_hits = 0
+    #     for idx in batch_indices: 
+    #         data = None
+    #         data_path, label = self._classed_items[idx] 
+            
+    #         if self.use_cache and self.cache_granularity == 'sample':
+    #             byte_data = self.fetch_from_cache(data_path)
+    #             if byte_data:
+    #                 byte_img_io = io.BytesIO(byte_data)
+    #                 data = Image.open(byte_img_io)
+    #                 cache_hits +=1
+                
+    #         if data is None:  #data not retrieved from cache, so get it from primary storage
+    #             if self.is_s3:
+    #                 data = s3utils.get_s3_object(self.bucket_name, data_path)
+    #                 data = Image.open(io.BytesIO(data))
+    #             else:
+    #                 data = Image.open(data_path) #get_local_sample
+                
+    #             # if data.mode == "L":
+    #             data = data.convert("RGB")
+
+    #             if self.use_cache and self.cache_granularity == 'sample':
+    #                 byte_stream = io.BytesIO()
+    #                 data.save(byte_stream, format=data.format)
+    #                 byte_stream.seek(0)
+    #                 try:
+    #                     self.cache_client.set(data_path, byte_stream.read())
+    #                 except:
+    #                     return None
+
+    #         data_samples.append(data)
+    #         labels.append(label)
+
+    #     return data_samples, labels, cache_hits
         
 
     def is_image_file(self, path: str):
