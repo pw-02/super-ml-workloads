@@ -116,7 +116,7 @@ class TorchLRUMappeedDataset(torch.utils.data.Dataset):
         labels = []
         cache_hits = 0
         with ThreadPoolExecutor() as executor:
-            futures = {executor.submit(self.get_data_sample, self.s3_bucket_name, sample_idx): sample_idx for sample_idx in indices}
+            futures = {executor.submit(self.get_data_sample, self.bucket_name, sample_idx): sample_idx for sample_idx in indices}
             for future in concurrent.futures.as_completed(futures):
                 sample_idx = futures[future]
                 try:
