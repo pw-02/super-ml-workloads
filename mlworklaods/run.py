@@ -60,6 +60,7 @@ def train_model(hydra_config):
             precision=get_default_supported_precision(True),
             devices=train_args.devices, 
             callbacks=None,
+            max_steps=train_args.max_steps,
             max_epochs=train_args.max_epochs,
             limit_train_batches=train_args.limit_train_batches, 
             limit_val_batches=train_args.limit_val_batches, 

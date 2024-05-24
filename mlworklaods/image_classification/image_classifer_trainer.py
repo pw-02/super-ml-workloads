@@ -222,10 +222,10 @@ class ImageClassificationTrainer():
                 if self.max_steps is not None and self.global_step >= self.max_steps:
                     self.should_stop = True
                     break
-                if time.perf_counter() - self.train_start_time > 1000:
-                    print("Training time exceeded 10000 seconds. Exiting.")
-                    self.should_stop = True
-                    break
+                # if time.perf_counter() - self.train_start_time > 1000:
+                #     print("Training time exceeded 10000 seconds. Exiting.")
+                #     self.should_stop = True
+                #     break
                 end = time.perf_counter()
 
             # self.fabric.call("on_train_epoch_end")
