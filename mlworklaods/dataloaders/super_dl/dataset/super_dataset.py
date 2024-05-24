@@ -222,8 +222,8 @@ class SUPERDataset(IterableDataset):
     #         cached_data = None
     #     return cached_data
     
-    def get_data_sample(self, bucket_name, data_sample):
-        sample_path, sample_label = data_sample
+    def get_data_sample(self, bucket_name, sample_idx):
+        sample_path, sample_label = self._classed_items[sample_idx]
         content = s3utils.get_s3_object(bucket_name, sample_path)
 
         img = Image.open(io.BytesIO(content))
@@ -235,7 +235,7 @@ class SUPERDataset(IterableDataset):
         labels = []
         
         with ThreadPoolExecutor() as executor:
-            futures = {executor.submit(self.get_data_sample, self.s3_bucket_name, sample): sample for sample in indices}
+            futures = {executor.submit(self.get_data_sample, self.s3_bucket_name, sample_idx): sample_idx for sample_idx in indices}
             for future in concurrent.futures.as_completed(futures):
                 file_path = futures[future]
             try:
