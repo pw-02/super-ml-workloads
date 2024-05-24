@@ -151,6 +151,7 @@ class ImageClassificationTrainer():
                 compute_start = time.perf_counter()
                 # check if optimizer should step in gradient accumulation
                 should_optim_step = self.global_step % self.grad_accum_steps == 0
+                torch.cuda.synchronize()
                 if should_optim_step:
                     # # currently only supports a single optimizer
                     # self.fabric.call("on_before_optimizer_step", optimizer, 0)
@@ -164,7 +165,7 @@ class ImageClassificationTrainer():
                 else:
                     # gradient accumulation -> no optimizer step
                     self.training_step(model=model, batch=batch, batch_idx=batch_idx)
-                
+                torch.cuda.synchronize()
                 compute_time = time.perf_counter() - compute_start
 
                 # only increase global step if optimizer stepped
