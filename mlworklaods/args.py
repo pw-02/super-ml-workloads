@@ -170,6 +170,7 @@ def prepare_args(config: DictConfig,expid):
         limit_train_batches = config.training.limit_train_batches,
         limit_val_batches=config.training.limit_val_batches,
         run_training = config.run_training,
+        max_steps = config.training.max_steps,
         run_evaluation = config.run_evaluation)
     
     data_args = DataArgs(

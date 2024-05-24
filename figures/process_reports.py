@@ -10,13 +10,13 @@ def convert_csv_to_dict(csv_file):
 def convert_all_csv_to_dict(folder_path):
     metrics = OrderedDict({
          "num_jobs": 0,
-         "elapsed_time(s)":0,
-         "aggregated_time(s)": 0,
-         "aggregated_batches": 0,
-         "aggregated_compute_time(s)": 0,
-         "aggregated_data_time(s)": 0,
-         "aggregated_transform_time(s)": 0,
-         "aggregated_cache_hits": 0
+         "total_bathces":0,
+         "total_samples":0,
+         "total_time(s)": 0,
+         "data_time(s)": 0,
+         "compute_time(s)": 0,
+         "transform_time(s)": 0,
+         "cache_hits": 0,
          })
 
     csv_data = {}
@@ -26,20 +26,24 @@ def convert_all_csv_to_dict(folder_path):
         if 'metrics.csv' in file_name:
             csv_data = convert_csv_to_dict(csv_file)
             metrics["num_jobs"] +=1
-            metrics["elapsed_time(s)"] = max(metrics["elapsed_time(s)"],csv_data['elapsed_time'][len(csv_data['elapsed_time'])-1])
-            metrics["aggregated_time(s)"] += sum(csv_data["batch_time"])
-            metrics["aggregated_batches"] += len(csv_data["batch_idx"])
-            metrics["aggregated_compute_time(s)"] += sum(csv_data["compute_time"])
-            metrics["aggregated_data_time(s)"] += sum(csv_data["data_time"])
-            metrics["aggregated_transform_time(s)"] += sum(csv_data["transform_time"])/4
-            metrics["aggregated_cache_hits"] += (sum(csv_data["cache_hits"])//csv_data["batch_size"][0])
-        
-    metrics["aggregated_data_time(s)"] = metrics["aggregated_data_time(s)"] -  metrics["aggregated_transform_time(s)"]
-    metrics["throughput(batches_per_second)"] = metrics["aggregated_batches"]/metrics["elapsed_time(s)"]
-    metrics["cache_hit%"] = metrics["aggregated_cache_hits"]/metrics["aggregated_batches"]
-    metrics["compute%"] = metrics["aggregated_compute_time(s)"]/metrics["aggregated_time(s)"]
-    metrics["data%"] = metrics["aggregated_data_time(s)"]/metrics["aggregated_time(s)"]
-    metrics["transform%"] = metrics["aggregated_transform_time(s)"]/metrics["aggregated_time(s)"]
+            metrics["total_bathces"] += len(csv_data["batch_idx"])
+            metrics["total_samples"] += sum(csv_data["batch_size"])
+            metrics["total_time(s)"] += sum(csv_data["batch_time"])
+            # metrics["total_time(s)"] += csv_data["elapsed_time(s)"][len(csv_data["elapsed_time(s)"])-1]
+            metrics["data_time(s)"] += sum(csv_data["data_time"])
+            metrics["compute_time(s)"] += sum(csv_data["compute_time"])
+            metrics["transform_time(s)"] += sum(csv_data["transform_time"])
+            metrics["cache_hits"] += sum(csv_data["cache_hits"])
+    
+
+    for key in ['total_time(s)',"data_time(s)", "compute_time(s)","transform_time(s)" ]:
+        metrics[key] = metrics[key] / metrics['num_jobs']
+    
+    metrics["throughput(batches_per_second)"] = metrics["total_bathces"]/metrics["total_time(s)"]
+    metrics["cache_hit%"] = metrics["cache_hits"]/metrics["total_bathces"]
+    metrics["compute%"] = metrics["compute_time(s)"]/metrics["total_time(s)"]
+    metrics["data%"] = metrics["data_time(s)"]/metrics["total_time(s)"]
+    metrics["transform%"] = metrics["transform_time(s)"]/metrics["total_time(s)"]
 
     return metrics
 
