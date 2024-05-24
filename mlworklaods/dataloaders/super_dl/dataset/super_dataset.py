@@ -228,22 +228,23 @@ class SUPERDataset(IterableDataset):
 
         img = Image.open(io.BytesIO(content))
         img = img.convert("RGB")      
-        return content, sample_label
+        return img, sample_label
 
-    def fetch_from_s3(self, indices:List[int]):
+    def fetch_from_s3(self, indices: List[int]):
         images = []
         labels = []
         
         with ThreadPoolExecutor() as executor:
             futures = {executor.submit(self.get_data_sample, self.s3_bucket_name, sample_idx): sample_idx for sample_idx in indices}
             for future in concurrent.futures.as_completed(futures):
-                file_path = futures[future]
-            try:
-                image_content, label = future.result()
-                images.append(image_content)
-                labels.append(label)
-            except Exception as e:
-                print(f"Error processing file {file_path}: {e}")
+                sample_idx = futures[future]
+                try:
+                    image_content, label = future.result()
+                    images.append(image_content)
+                    labels.append(label)
+                except Exception as e:
+                    print(f"Error processing sample {sample_idx}: {e}")
+                    
         return images, labels
     
         # for idx in indices:
