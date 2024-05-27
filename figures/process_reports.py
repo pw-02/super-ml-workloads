@@ -32,15 +32,25 @@ def convert_all_csv_to_dict(folder_path):
             # metrics["total_time(s)"] += csv_data["elapsed_time(s)"][len(csv_data["elapsed_time(s)"])-1]
             metrics["data_time(s)"] += sum(csv_data["data_time"])
             metrics["compute_time(s)"] += sum(csv_data["compute_time"])
-            metrics["transform_time(s)"] += sum(csv_data["transform_time"])
+            # metrics["transform_time(s)"] += sum(csv_data["transform_time"])
             metrics["cache_hits"] += sum(csv_data["cache_hits"])
-    
+
+            data_times = csv_data["data_time"]
+            transform_times = csv_data["transform_time"]
+
+            for idx, value in enumerate(data_times):
+                if value >=1:
+                    metrics["transform_time(s)"] += transform_times[idx]
+                pass
+
+    metrics["data_time(s)"] = metrics["data_time(s)"] - metrics["transform_time(s)"]
+
 
     for key in ['total_time(s)',"data_time(s)", "compute_time(s)","transform_time(s)" ]:
         metrics[key] = metrics[key] / metrics['num_jobs']
     
     metrics["throughput(batches_per_second)"] = metrics["total_bathces"]/metrics["total_time(s)"]
-    metrics["cache_hit%"] = metrics["cache_hits"]/metrics["total_bathces"]
+    metrics["cache_hit%"] = metrics["cache_hits"]/metrics["total_samples"]
     metrics["compute%"] = metrics["compute_time(s)"]/metrics["total_time(s)"]
     metrics["data%"] = metrics["data_time(s)"]/metrics["total_time(s)"]
     metrics["transform%"] = metrics["transform_time(s)"]/metrics["total_time(s)"]
@@ -62,6 +72,5 @@ if __name__ == "__main__":
     for subfolder in subfolders:
         csv_data = convert_all_csv_to_dict(subfolder)
         output_file = os.path.join(subfolder, "summary.csv")
-        csv_data = convert_all_csv_to_dict(subfolder)
         save_dict_to_csv(csv_data, output_file)
         print(csv_data)

@@ -1,21 +1,13 @@
 import math
 from typing import TypeVar, Optional, Iterator
-
 import torch
-from torch.utils.data import Sampler, Dataset  
+from torch.utils.data import Dataset, Sampler
 import torch.distributed as dist
-
 import numpy as np 
-from collections import defaultdict
 import random
 import redis
-import heapdict
-import PIL
-from collections import OrderedDict
-
-
+from rediscluster import RedisCluster
 T_co = TypeVar('T_co', covariant=True)
-
 
 class ShadeSampler(Sampler[T_co]):
 	r"""ShadeSampler that uses fine-grained rank-based importance and 
@@ -62,7 +54,7 @@ class ShadeSampler(Sampler[T_co]):
 
 	def __init__(self, dataset: Dataset, num_replicas: Optional[int] = None,
 				 rank: Optional[int] = None, shuffle: bool = True, PADS: bool = True, batch_size: int = 64,
-				 seed: int = 0, drop_last: bool = False, replacement = True, cache_address = None, rep_factor = 1, init_fac = 1, ls_init_fac = 1e-2 ) -> None:
+				 seed: int = 0, drop_last: bool = False, replacement = True, host_ip = None, port_num = None, rep_factor = 1, init_fac = 1, ls_init_fac = 1e-2 ) -> None:
 		if num_replicas is None:
 			if not dist.is_available():
 				raise RuntimeError("Requires distributed package to be available")
@@ -75,7 +67,7 @@ class ShadeSampler(Sampler[T_co]):
 			raise ValueError(
 				"Invalid rank {}, rank should be in the interval"
 				" [0, {}]".format(rank, num_replicas - 1))
-		if cache_address is None:
+		if host_ip is None:
 			raise RuntimeError("Requires Redis Host Node IP.")
 		# if port_num is None:
 		# 	raise RuntimeError("Requires Redis Port Number.")
@@ -106,19 +98,12 @@ class ShadeSampler(Sampler[T_co]):
 		self.batch_wts = torch.tensor(self.batch_wts)
 		self.ls_param = 0
 
-		self.cache_host, self.cache_port = None,None
-		if cache_address:
-			self.cache_host, self.cache_port = cache_address.split(":")
 		#starting the cache.
-
-		self.key_id_map = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
-	
-		# if host_ip == '0.0.0.0':
-		# 	self.key_id_map = redis.Redis()
-		# else:
-		# 	self.startup_nodes = [{"host": host_ip, "port": port_num}]
-		# 	#self.key_id_map = RedisCluster(startup_nodes=self.startup_nodes)
-		# 	self.key_id_map = redis.Redis()
+		if host_ip == '0.0.0.0':
+			self.key_id_map = redis.Redis()
+		else:
+			self.startup_nodes = [{"host": host_ip, "port": port_num}]
+			self.key_id_map = RedisCluster(startup_nodes=self.startup_nodes)
 
 		
 		# If the dataset length is evenly divisible by # of replicas, then there
@@ -180,9 +165,9 @@ class ShadeSampler(Sampler[T_co]):
 		#create the indices list for processing in the next epoch
 		self.indices = cache_hit_list + cache_miss_list[:num_miss_samps]
 
-		# print(f'hit_list_len: {len(cache_hit_list)}')
-		# print(f'miss_list_len: {len(cache_miss_list[:num_miss_samps])}')
-		# print(len(self.indices))
+		print(f'hit_list_len: {len(cache_hit_list)}')
+		print(f'miss_list_len: {len(cache_miss_list[:num_miss_samps])}')
+		print(len(self.indices))
 
 		#sanity check
 		self.indices = self.indices[:self.num_samples]
@@ -225,7 +210,6 @@ class ShadeSampler(Sampler[T_co]):
 		# Finding the actual indices in the dataset between 3:6 which is [5,4,7]
 		new_wts = torch.argsort(wts).cpu()
 		items = len(wts)
-		
 		self.updated_idx_list = self.idxes[self.item_curr_pos+new_wts]
 		self.weights[self.updated_idx_list] = self.batch_wts[0:items]
 		self.item_curr_pos += self.batch_size
@@ -297,8 +281,8 @@ class ShadeSampler(Sampler[T_co]):
 			hit_samps = len(hit_list) * r + len(hit_list)//2
 			miss_samps = len(self.indices) - hit_samps
 
-			# print(f'hit_samps: {hit_samps}')
-			# print(f'miss_samps: {miss_samps}')
+			print(f'hit_samps: {hit_samps}')
+			print(f'miss_samps: {miss_samps}')
 
 			art_hit_list = hit_list*r + hit_list[:len(hit_list)//2]
 			art_miss_list = miss_list
@@ -310,8 +294,8 @@ class ShadeSampler(Sampler[T_co]):
 			hit_samps = len(hit_list) * r
 			miss_samps = len(self.indices) - hit_samps
 
-			# print(f'hit_samps: {hit_samps}')
-			# print(f'miss_samps: {miss_samps}')
+			print(f'hit_samps: {hit_samps}')
+			print(f'miss_samps: {miss_samps}')
 
 			art_hit_list = hit_list*r 
 			art_miss_list = miss_list
@@ -320,5 +304,4 @@ class ShadeSampler(Sampler[T_co]):
 			random.shuffle(art_miss_list)
 
 		return art_hit_list,art_miss_list,miss_samps
-	
-	
+
