@@ -19,7 +19,8 @@ import json
 from utils import get_default_supported_precision
 from lightning import LightningModule
 from mlworklaods.utils import AverageMeter
-
+from torch.utils.data import DataLoader
+from  heapdict import heapdict
 
 class ImageClassificationTrainer():
     def __init__(
@@ -69,10 +70,11 @@ class ImageClassificationTrainer():
     
     def fit(self,
             model: LightningModule,
-            train_loader: torch.utils.data.DataLoader,
-            val_loader: torch.utils.data.DataLoader,
+            train_loader: DataLoader,
+            val_loader: DataLoader,
             ckpt_path: Optional[str] = None,
             seed:int = None,
+            using_shade:bool = False,
             ):
                 
         if seed:
@@ -106,6 +108,7 @@ class ImageClassificationTrainer():
         while not self.should_stop:
             self.train_loop(model, optimizer, train_loader, limit_batches=self.limit_train_batches)
 
+
             if self.should_validate:
                 self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
 
@@ -130,18 +133,22 @@ class ImageClassificationTrainer():
         self,
         model: LightningModule,
         optimizer: torch.optim.Optimizer,
-        train_loader: torch.utils.data.DataLoader,
+        train_loader: DataLoader,
         limit_batches: Union[int, float] = float("inf"),
+        using_shade:bool = False,
+        key_id_map = None,
+        batch_wts:List = []
     ):
         # self.fabric.call("on_train_epoch_start")
         # iterable = self.progbar_wrapper(
         #     train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         # )
+        total_loss_for_epoch = 0.
         with ResourceMonitor() as monitor:
             end = time.perf_counter()
             for batch_idx, (batch, cache_hits, fetch_time, transform_time) in enumerate(train_loader):
                 data_time = time.perf_counter() - end
-                
+
                 # end epoch if stopping training completely or max batches for this epoch reached
                 if self.should_stop or batch_idx >= limit_batches:
                     break
@@ -153,23 +160,56 @@ class ImageClassificationTrainer():
                 should_optim_step = self.global_step % self.grad_accum_steps == 0
                 torch.cuda.synchronize()
                 if should_optim_step:
-                    # # currently only supports a single optimizer
-                    # self.fabric.call("on_before_optimizer_step", optimizer, 0)
-
                     # optimizer step runs train step internally through closure
-                    optimizer.step(partial(self.training_step, model=model, batch=batch, batch_idx=batch_idx))
-                    # self.fabric.call("on_before_zero_grad", optimizer)
-
+                    loss, item_loss = self.training_step, model=model, batch=batch, batch_idx=batch_idx
+                    optimizer.step(partial(loss))
+                    # self.fabric.call("on_before_zero_grad", optimizer
                     optimizer.zero_grad()
-
                 else:
                     # gradient accumulation -> no optimizer step
-                    self.training_step(model=model, batch=batch, batch_idx=batch_idx)
+                    loss, item_loss = self.training_step, model=model, batch=batch, batch_idx=batch_idx
+
                 torch.cuda.synchronize()
+
                 compute_time = time.perf_counter() - compute_start
 
+                if using_shade and item_loss is not None:
+                    train_loader.sampler.pass_batch_important_scores(item_loss)
                 # only increase global step if optimizer stepped
                 self.global_step += int(should_optim_step)
+
+                if using_shade:
+                    sorted_img_indices = train_loader.sampler.get_sorted_index_list()
+                    track_batch_indx = 0
+
+                    PQ:heapdict = train_loader.dataset.get_PQ()
+                    ghost_cache = train_loader.dataset.get_ghost_cache()
+                    
+                    for indx in sorted_img_indices:
+                        if key_id_map.exists(indx.item()):
+                            if indx.item() in PQ:
+                                #print("Train_index: %d Importance_Score: %f Frequency: %d Time: %s N%dG%d" %(indx.item(),batch_loss,PQ[indx.item()][1]+1,insertion_time,args.nr+1,gpu+1))
+                                PQ[indx.item()] = (batch_wts[track_batch_indx],PQ[indx.item()][1]+1)
+                                ghost_cache[indx.item()] = (batch_wts[track_batch_indx],ghost_cache[indx.item()][1]+1)
+                                track_batch_indx+=1
+                            else:
+                                #print("Train_index: %d Importance_Score: %f Time: %s N%dG%d" %(indx.item(),batch_loss,insertion_time,args.nr+1,gpu+1))
+                                PQ[indx.item()] = (batch_wts[track_batch_indx],1)
+                                ghost_cache[indx.item()] = (batch_wts[track_batch_indx],1)
+                                track_batch_indx+=1
+                        else:
+                            if indx.item() in ghost_cache:
+                                ghost_cache[indx.item()] = (batch_wts[track_batch_indx],ghost_cache[indx.item()][1]+1)
+                                track_batch_indx+=1
+                            else:
+                                ghost_cache[indx.item()] = (batch_wts[track_batch_indx],1)
+                                track_batch_indx+=1
+                    train_loader.dataset.set_PQ(PQ)
+                    train_loader.dataset.set_ghost_cache(ghost_cache)
+                    train_loader.dataset.set_num_local_samples(key_id_map.dbsize())
+                                
+
+
 
                 metrics= OrderedDict({
                         "elapsed_time": time.perf_counter() - self.train_start_time,
@@ -188,6 +228,7 @@ class ImageClassificationTrainer():
                         "cpu_usge": json.dumps(monitor.resource_data["cpu_util"].summarize()),
                         "gpu_usge": json.dumps( monitor.resource_data["gpu_util"].summarize())   
                         })
+                total_loss_for_epoch +=self._current_train_return['loss']
 
                 self.fabric.log_dict(metrics,step=self.global_step)
 
@@ -229,6 +270,8 @@ class ImageClassificationTrainer():
                 end = time.perf_counter()
 
             # self.fabric.call("on_train_epoch_end")
+            if using_shade:
+                train_loader.sampler.on_epoch_end(total_loss_for_epoch/batch_idx+1)
 
     def val_loop(
         self,
@@ -281,14 +324,15 @@ class ImageClassificationTrainer():
     def training_step(self, model: L.LightningModule, batch: Any, batch_idx: int) -> torch.Tensor:
        
         outputs: Union[torch.Tensor, Mapping[str, Any]] = model.training_step(batch, batch_idx=batch_idx)
+        
         loss = outputs if isinstance(outputs, torch.Tensor) else outputs["loss"]
-        # self.fabric.call("on_before_backward", loss)
+        item_losss = outputs["item_loss"]
+
         self.fabric.backward(loss)
-        # self.fabric.call("on_after_backward")
-        # avoid gradients in stored/accumulated values -> prevents potential OOM
+
         self._current_train_return = apply_to_collection(outputs, dtype=torch.Tensor, function=lambda x: x.detach())
 
-        return loss
+        return loss, item_losss
 
     def step_scheduler(
         self,

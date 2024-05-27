@@ -103,10 +103,17 @@ class SUPERArgs:
     
 @dataclass
 class SHADEArgs:
+    from heapdict import heapdict
+
     num_pytorch_workers: int = 0
     cache_address: Optional[str] = None
     working_set_size: Optional[str] = None
     replication_factor: Optional[str] = None
+    key_counter:int = 0
+    ghost_cache:heapdict = heapdict()
+    pq:heapdict = heapdict()
+
+
 
 @dataclass
 class LRUTorchArgs:

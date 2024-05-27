@@ -395,6 +395,8 @@ def train(gpu, args):
 	for j in range(batch_size):
 		batch_wts.append(math.log(j+10))
 	
+
+
 	start = datetime.now()
 	startup_latency = (start - setup_start).total_seconds()*1000000
 	total_step = len(train_loader)
