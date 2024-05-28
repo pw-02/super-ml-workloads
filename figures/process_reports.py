@@ -65,12 +65,14 @@ def save_dict_to_csv(data_dict, output_file):
 
 
 if __name__ == "__main__":
-    # folder_path = "C:\\Users\\pw\\Desktop\\logs\\cifar10\\resnet18"
-    folder_path = "C:\\Users\\pw\\Desktop\\logs\\imagenet1k\\resnet50"
+    folder_path = "C:\\Users\\pw\\Desktop\\logs\\cifar10\\resnet18"
+    #folder_path = "C:\\Users\\pw\\Desktop\\logs\\imagenet1k\\resnet50"
 
     subfolders = glob.glob(os.path.join(folder_path, '*'))
     for subfolder in subfolders:
         csv_data = convert_all_csv_to_dict(subfolder)
-        output_file = os.path.join(subfolder, "summary.csv")
+        folder_name = os.path.basename(os.path.normpath(subfolder))
+
+        output_file = os.path.join(subfolder, f'{folder_name}_summary.csv')
         save_dict_to_csv(csv_data, output_file)
         print(csv_data)
