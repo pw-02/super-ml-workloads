@@ -142,6 +142,19 @@ class ImageClassificationTrainer():
         self.fabric.logger.finalize(status='success')
 
         return model.losses.avg, model.top1.avg
+    
+    def fetch_from_cache(self,key_id_map, key):
+        try:
+            return key_id_map.get(key)
+        except:
+             return None
+    def exits_in_cache(self, key_id_map, key):
+        data = self.fetch_from_cache(key_id_map, key)
+        if data is None:
+            return False
+        else:
+            return True
+    
 
     def train_loop(
         self,
@@ -192,6 +205,7 @@ class ImageClassificationTrainer():
                 compute_time = time.perf_counter() - compute_start
 
                 if self.is_using_shade() and item_loss is not None:
+                    total_loss_for_epoch += loss.item()
                     train_loader.sampler.pass_batch_important_scores(item_loss)
                 # only increase global step if optimizer stepped
                 self.global_step += int(should_optim_step)
@@ -205,7 +219,7 @@ class ImageClassificationTrainer():
                     key_id_map = train_loader.dataset.get_key_id_map()
 
                     for indx in sorted_img_indices:
-                        if key_id_map.exists(indx.item()):
+                        if self.exits_in_cache(key_id_map,indx.item()):
                             if indx.item() in PQ:
                                 #print("Train_index: %d Importance_Score: %f Frequency: %d Time: %s N%dG%d" %(indx.item(),batch_loss,PQ[indx.item()][1]+1,insertion_time,args.nr+1,gpu+1))
                                 PQ[indx.item()] = (self.batch_wts[track_batch_indx],PQ[indx.item()][1]+1)
@@ -225,7 +239,7 @@ class ImageClassificationTrainer():
                                 track_batch_indx+=1
                     train_loader.dataset.set_PQ(PQ)
                     train_loader.dataset.set_ghost_cache(ghost_cache)
-                    train_loader.dataset.set_num_local_samples(key_id_map.dbsize())
+                    # train_loader.dataset.set_num_local_samples(key_id_map.dbsize())
                                 
 
                 metrics= OrderedDict({
@@ -245,7 +259,7 @@ class ImageClassificationTrainer():
                         "cpu_usge": json.dumps(monitor.resource_data["cpu_util"].summarize()),
                         # "gpu_usge": json.dumps( monitor.resource_data["gpu_util"].summarize())   
                         })
-                total_loss_for_epoch +=self._current_train_return['loss']
+                # total_loss_for_epoch +=self._current_train_return['loss']
 
                 self.fabric.log_dict(metrics,step=self.global_step)
 

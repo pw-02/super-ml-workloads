@@ -82,6 +82,14 @@ class ShadeDatasetS3(Dataset):
             return self.key_id_map.get(key)
         except:
              return None
+    def exits_in_cache(self, key):
+        data = self.fetch_from_cache(key)
+        if data is None:
+            return False
+        else:
+            return True
+
+
 
     def __getitem__(self, idx):
         batch_id, batch_indices,  = idx
@@ -179,14 +187,16 @@ class ShadeDatasetS3(Dataset):
                 else:
                     data = Image.open(data_path) #get_local_sample
                 keys_cnt = self.key_counter + 50
+                
                 if(keys_cnt >= self.cache_portion):
                         try:
                             peek_item = self.PQ.peekitem()
                             if self.ghost_cache[idx] > peek_item[1]:
                               evicted_item = self.PQ.popitem() 
                             #   print("Evicting index: %d Weight: %.4f Frequency: %d" %(evicted_item[0], evicted_item[1][0], evicted_item[1][1]))
-                              if self.key_id_map.exists(evicted_item[0]):
-                                    self.key_id_map.delete(evicted_item[0])
+                              if self.exits_in_cache(evicted_item[0]):
+                                    # self.key_id_map.delete(evicted_item[0])
+                                    self.key_counter-=1
                                     keys_cnt-=1
                         except:
                             # print("Could not evict item or PQ was empty.")
@@ -198,6 +208,7 @@ class ShadeDatasetS3(Dataset):
                         byte_stream.seek(0)
                         try:
                             self.key_id_map.set(idx, byte_stream.read())
+                            self.key_counter+=1
                         except:
                             return None
                 data = data.convert("RGB")

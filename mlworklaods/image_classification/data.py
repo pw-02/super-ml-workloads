@@ -95,7 +95,7 @@ class BaseDataModule:
         
         batch_sampler = ShadeBatchSampler(sampler=base_sampler, batch_size=train_args.batch_size(world_size), drop_last=False)
 
-        return DataLoader(dataset=dataset, batch_size=None, shuffle=False, num_workers=0, pin_memory=True, sampler=batch_sampler)
+        return DataLoader(dataset=dataset, batch_size=None, shuffle=False, num_workers=shade_args.num_pytorch_workers, sampler=batch_sampler)
 
 
 

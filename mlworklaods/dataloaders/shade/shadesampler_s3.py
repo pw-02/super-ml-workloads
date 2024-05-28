@@ -116,7 +116,7 @@ class ShadeSamplerS3(Sampler[T_co]):
                         
                   self.indices = self.idxes.tolist()
                   if self.epoch == 0:
-                        # random.shuffle(self.indices)
+                        random.shuffle(self.indices)
                         pass
                   if self.epoch > 0 and self.curr_val_score > 0:
                         self.indices = self.pads_sort(self.indices)
@@ -236,17 +236,31 @@ class ShadeSamplerS3(Sampler[T_co]):
                   ce = self.epoch
                 #   print(f'epoch: {ce}, curr_val_score: {cvs}, so doing aggressive sampling.')
                   self.indices = self.indices[:self.num_samples]
-                #   random.shuffle(self.indices)
+                  random.shuffle(self.indices)
             else:
                   self.indices = self.indices[self.rank:self.total_size:self.num_replicas]
 
             return self.indices
+      
+      def fetch_from_cache(self, key):
+        try:
+            return self.key_id_map.get(key)
+        except:
+             return None
+        
+      def exits_in_cache(self, key):
+        data = self.fetch_from_cache(key)
+        if data is None:
+            return False
+        else:
+            return True
+
 
       def prepare_hits(self,r):
             hit_list = []
             miss_list = []
             for ind in self.indices:
-                  if self.key_id_map.exists(ind):
+                  if self.exits_in_cache(ind):
                         hit_list.append(ind)
                   else:
                         miss_list.append(ind)
@@ -267,8 +281,8 @@ class ShadeSamplerS3(Sampler[T_co]):
                   art_hit_list = hit_list*r + hit_list[:len(hit_list)//2]
                   art_miss_list = miss_list
 
-                #   random.shuffle(art_hit_list)
-                #   random.shuffle(art_miss_list)
+                  random.shuffle(art_hit_list)
+                  random.shuffle(art_miss_list)
             else:
                   r = int(r)
                   hit_samps = len(hit_list) * r
@@ -280,8 +294,8 @@ class ShadeSamplerS3(Sampler[T_co]):
                   art_hit_list = hit_list*r 
                   art_miss_list = miss_list
 
-                #   random.shuffle(art_hit_list)
-                #   random.shuffle(art_miss_list)
+                  random.shuffle(art_hit_list)
+                  random.shuffle(art_miss_list)
 
             return art_hit_list,art_miss_list,miss_samps
 
@@ -301,8 +315,8 @@ class ShadeBatchSampler(BatchSampler):
         def get_sorted_index_list(self):
             return self.sampler.get_sorted_index_list()
         
-        def on_epoch_end(self):
-              return self.sampler.on_epoch_end()
+        def on_epoch_end(self, metrics):
+              return self.sampler.on_epoch_end(metrics)
         
         def pass_batch_important_scores(self,raw_score):
               self.sampler.pass_batch_important_scores(raw_score)
