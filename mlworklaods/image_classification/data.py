@@ -63,7 +63,7 @@ class BaseDataModule:
     def make_shde_dataloaders(self, train_args: BaseTrainArgs, data_args: DataArgs, shade_args: SHADEArgs, world_size: int) -> Tuple[Optional[DataLoader], Optional[DataLoader]]:
 
         train_dataloader = self.create_shade_dataloader(train_args, data_args.train_data_dir, shade_args, world_size) if train_args.run_training else None
-        val_dataloader = self.create_super_dataloader(train_args, data_args.val_data_dir, shade_args, world_size) if train_args.run_evaluation else None
+        val_dataloader = self.create_shade_dataloader(train_args, data_args.val_data_dir, shade_args, world_size) if train_args.run_evaluation else None
         return train_dataloader, val_dataloader
 
     def create_shade_dataloader(self, train_args: BaseTrainArgs, data_dir: str, shade_args: SHADEArgs, world_size: int) -> DataLoader:

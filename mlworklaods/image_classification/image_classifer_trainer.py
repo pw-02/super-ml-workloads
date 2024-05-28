@@ -22,7 +22,7 @@ from mlworklaods.utils import AverageMeter
 from torch.utils.data import DataLoader
 from  heapdict import heapdict
 from mlworklaods.args import *
-
+import redis
 class ImageClassificationTrainer():
     def __init__(
         self,
@@ -143,19 +143,8 @@ class ImageClassificationTrainer():
 
         return model.losses.avg, model.top1.avg
     
-    def fetch_from_cache(self,key_id_map, key):
-        try:
-            return key_id_map.get(key)
-        except:
-             return None
-    def exits_in_cache(self, key_id_map, key):
-        data = self.fetch_from_cache(key_id_map, key)
-        if data is None:
-            return False
-        else:
-            return True
-    
 
+    
     def train_loop(
         self,
         model: LightningModule,
@@ -216,10 +205,10 @@ class ImageClassificationTrainer():
 
                     PQ:heapdict = train_loader.dataset.get_PQ()
                     ghost_cache = train_loader.dataset.get_ghost_cache()
-                    key_id_map = train_loader.dataset.get_key_id_map()
+                    key_id_map:redis.StrictRedis = train_loader.dataset.get_key_id_map()
 
                     for indx in sorted_img_indices:
-                        if self.exits_in_cache(key_id_map,indx.item()):
+                        if key_id_map.exists(indx.item()):
                             if indx.item() in PQ:
                                 #print("Train_index: %d Importance_Score: %f Frequency: %d Time: %s N%dG%d" %(indx.item(),batch_loss,PQ[indx.item()][1]+1,insertion_time,args.nr+1,gpu+1))
                                 PQ[indx.item()] = (self.batch_wts[track_batch_indx],PQ[indx.item()][1]+1)
@@ -239,7 +228,7 @@ class ImageClassificationTrainer():
                                 track_batch_indx+=1
                     train_loader.dataset.set_PQ(PQ)
                     train_loader.dataset.set_ghost_cache(ghost_cache)
-                    # train_loader.dataset.set_num_local_samples(key_id_map.dbsize())
+                    train_loader.dataset.set_num_local_samples(key_id_map.dbsize())
                                 
 
                 metrics= OrderedDict({

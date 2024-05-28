@@ -82,12 +82,13 @@ class ShadeDatasetS3(Dataset):
             return self.key_id_map.get(key)
         except:
              return None
-    def exits_in_cache(self, key):
-        data = self.fetch_from_cache(key)
-        if data is None:
-            return False
-        else:
-            return True
+        
+    # def exits_in_cache(self, key):
+    #     data = self.fetch_from_cache(key)
+    #     if data is None:
+    #         return False
+    #     else:
+    #         return True
 
 
 
@@ -192,12 +193,11 @@ class ShadeDatasetS3(Dataset):
                         try:
                             peek_item = self.PQ.peekitem()
                             if self.ghost_cache[idx] > peek_item[1]:
-                              evicted_item = self.PQ.popitem() 
+                                evicted_item = self.PQ.popitem() 
                             #   print("Evicting index: %d Weight: %.4f Frequency: %d" %(evicted_item[0], evicted_item[1][0], evicted_item[1][1]))
-                              if self.exits_in_cache(evicted_item[0]):
-                                    # self.key_id_map.delete(evicted_item[0])
-                                    self.key_counter-=1
-                                    keys_cnt-=1
+                                if self.key_id_map.exists(evicted_item[0]):
+                                    self.key_id_map.delete(evicted_item[0])
+                                keys_cnt-=1
                         except:
                             # print("Could not evict item or PQ was empty.")
                             pass

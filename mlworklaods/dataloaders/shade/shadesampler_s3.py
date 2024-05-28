@@ -242,25 +242,25 @@ class ShadeSamplerS3(Sampler[T_co]):
 
             return self.indices
       
-      def fetch_from_cache(self, key):
-        try:
-            return self.key_id_map.get(key)
-        except:
-             return None
+      # def fetch_from_cache(self, key):
+      #   try:
+      #       return self.key_id_map.get(key)
+      #   except:
+      #        return None
         
-      def exits_in_cache(self, key):
-        data = self.fetch_from_cache(key)
-        if data is None:
-            return False
-        else:
-            return True
+      # def exits_in_cache(self, key):
+      #   data = self.fetch_from_cache(key)
+      #   if data is None:
+      #       return False
+      #   else:
+      #       return True
 
 
       def prepare_hits(self,r):
             hit_list = []
             miss_list = []
             for ind in self.indices:
-                  if self.exits_in_cache(ind):
+                  if self.key_id_map.exists(ind):
                         hit_list.append(ind)
                   else:
                         miss_list.append(ind)
