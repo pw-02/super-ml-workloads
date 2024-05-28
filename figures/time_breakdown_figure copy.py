@@ -2,16 +2,17 @@ import matplotlib.pyplot as plt
 
 # Data
 data = {
-    'Pytorch': {'IO %': 55, 'Transformation %': 12, 'GPU %': 33},
+    'Basline': {'IO %': 55, 'Transformation %': 12, 'GPU %': 33},
     'SHADE': {'IO %': 40, 'Transformation %': 20, 'GPU %': 40},
+    'Oracle': {'IO %': 5, 'Transformation %': 5, 'GPU %': 90},
     'SUPER': {'IO %': 5, 'Transformation %': 5, 'GPU %': 90},
 }
 
 
 io_color ='#F1F1F2'  
-transformation_color = '#B2C6B6'   
-gpu_color = '#0B3041'   
-
+shade_color = '#767171'
+transformation_color = '#406474'   
+gpu_color = '#B2C6B6'    
 
 # Extract labels and values
 labels = list(data.keys())
@@ -37,11 +38,8 @@ plt.subplots_adjust(left=0.162, right=0.9, top=0.9, bottom=0.1)
 # Adding labels and title
 plt.ylabel('Percentage of Time (%)', fontsize=12)
 plt.xticks(fontsize=12, weight='normal')  # Adjust the font size as needed
-
-# Positioning legend along the top
-# plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=3)
-# plt.legend()
+plt.legend(['I/O', 'Transform', 'GPU'])
 
 # Show plot
 # plt.show()
-plt.savefig('figures/training_time_breakdown/resnet18_breakdown.png')
+plt.savefig('figures\eval_resnet18_cifar10\percentage_breakdown.png')
