@@ -65,7 +65,9 @@ def train_model(hydra_config):
             limit_train_batches=train_args.limit_train_batches, 
             limit_val_batches=train_args.limit_val_batches, 
             loggers=[logger],
-            use_distributed_sampler=True
+            use_distributed_sampler=True,
+            dataloader_args =dataloader_args
+
         )
 
         train_loader, val_loader = data_module.make_dataloaders(train_args, data_args, dataloader_args, trainer.fabric.world_size)

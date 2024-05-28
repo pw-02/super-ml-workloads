@@ -71,12 +71,15 @@ class ShadeDatasetS3(Dataset):
     def get_ghost_cache(self):
       return self.ghost_cache
     
+    def get_key_id_map(self):
+      return self.key_id_map
+    
     def __len__(self):
         return sum(len(class_items) for class_items in self.samples.values())
     
     def fetch_from_cache(self, key):
         try:
-            return self.cache_client.get(key)
+            return self.key_id_map.get(key)
         except:
              return None
 
@@ -165,39 +168,40 @@ class ShadeDatasetS3(Dataset):
             if self.use_cache and self.cache_granularity == 'sample':
                  byte_data = self.fetch_from_cache(idx)
                  if byte_data:
-                  byte_img_io = io.BytesIO(byte_data)
-                  data = Image.open(byte_img_io)
-                  cache_hits +=1
+                     byte_img_io = io.BytesIO(byte_data)
+                     data = Image.open(byte_img_io)
+                     cache_hits +=1
                 
             if data is None:  #data not retrieved from cache, so get it from primary storage
-                  if self.is_s3:
+                if self.is_s3:
                     data = s3utils.get_s3_object(self.bucket_name, data_path)
                     data = Image.open(io.BytesIO(data))
-                  else:
+                else:
                     data = Image.open(data_path) #get_local_sample
-                  data = data.convert("RGB")
-                  keys_cnt = self.key_counter + 50
-                  if(keys_cnt >= self.cache_portion):
+                keys_cnt = self.key_counter + 50
+                if(keys_cnt >= self.cache_portion):
                         try:
                             peek_item = self.PQ.peekitem()
                             if self.ghost_cache[idx] > peek_item[1]:
                               evicted_item = self.PQ.popitem() 
-                              print("Evicting index: %d Weight: %.4f Frequency: %d" %(evicted_item[0], evicted_item[1][0], evicted_item[1][1]))
+                            #   print("Evicting index: %d Weight: %.4f Frequency: %d" %(evicted_item[0], evicted_item[1][0], evicted_item[1][1]))
                               if self.key_id_map.exists(evicted_item[0]):
                                     self.key_id_map.delete(evicted_item[0])
                                     keys_cnt-=1
                         except:
-                            print("Could not evict item or PQ was empty.")
+                            # print("Could not evict item or PQ was empty.")
                             pass
 
-                  if self.use_cache and self.cache_granularity == 'sample' and keys_cnt < self.cache_portion:
+                if self.use_cache and self.cache_granularity == 'sample' and keys_cnt < self.cache_portion:
                         byte_stream = io.BytesIO()
                         data.save(byte_stream, format=data.format)
                         byte_stream.seek(0)
                         try:
-                            self.key_id_map.set(data_path, byte_stream.read())
+                            self.key_id_map.set(idx, byte_stream.read())
                         except:
                             return None
+                data = data.convert("RGB")
+                
             data_samples.append(data)
             labels.append(label)
 

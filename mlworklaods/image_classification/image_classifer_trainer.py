@@ -21,6 +21,7 @@ from lightning import LightningModule
 from mlworklaods.utils import AverageMeter
 from torch.utils.data import DataLoader
 from  heapdict import heapdict
+from mlworklaods.args import *
 
 class ImageClassificationTrainer():
     def __init__(
@@ -41,6 +42,7 @@ class ImageClassificationTrainer():
         use_distributed_sampler: bool = True,
         checkpoint_dir: str = "./checkpoints",
         checkpoint_frequency: int = 1000,
+        dataloader_args = None
     ) -> None:
         self.job_id = job_id
         self.global_step = 0
@@ -58,6 +60,8 @@ class ImageClassificationTrainer():
         self.checkpoint_dir = checkpoint_dir
         self.checkpoint_frequency = checkpoint_frequency
         self.train_start_time = time.perf_counter()
+        self.dataloader_args = dataloader_args
+  
 
         self.fabric = L.Fabric(
             accelerator=accelerator,
@@ -68,15 +72,25 @@ class ImageClassificationTrainer():
             loggers=loggers,
         )
     
+    def is_using_shade(self):
+        if isinstance(self.dataloader_args, SHADEArgs):
+            return True
+        else:
+            False
+    
     def fit(self,
             model: LightningModule,
             train_loader: DataLoader,
             val_loader: DataLoader,
             ckpt_path: Optional[str] = None,
             seed:int = None,
-            using_shade:bool = False,
             ):
-                
+        
+        if self.is_using_shade():
+            self.batch_wts = []
+            for j in range(train_loader.sampler.batch_size):
+                self.batch_wts.append(math.log(j+10))
+
         if seed:
             self.fabric.seed_everything(seed)
         
@@ -135,9 +149,9 @@ class ImageClassificationTrainer():
         optimizer: torch.optim.Optimizer,
         train_loader: DataLoader,
         limit_batches: Union[int, float] = float("inf"),
-        using_shade:bool = False,
-        key_id_map = None,
-        batch_wts:List = []
+        # using_shade:bool = False,
+        # key_id_map = None,
+        # batch_wts:List = []
     ):
         # self.fabric.call("on_train_epoch_start")
         # iterable = self.progbar_wrapper(
@@ -161,55 +175,58 @@ class ImageClassificationTrainer():
                 torch.cuda.synchronize()
                 if should_optim_step:
                     # optimizer step runs train step internally through closure
-                    loss, item_loss = self.training_step, model=model, batch=batch, batch_idx=batch_idx
-                    optimizer.step(partial(loss))
+                    loss, item_loss = self.training_step(model=model, batch=batch, batch_idx=batch_idx)
+                    
+                    # def get_loss():
+                    #     return loss
+                    
+                    optimizer.step()
                     # self.fabric.call("on_before_zero_grad", optimizer
                     optimizer.zero_grad()
                 else:
                     # gradient accumulation -> no optimizer step
-                    loss, item_loss = self.training_step, model=model, batch=batch, batch_idx=batch_idx
+                    loss, item_loss = self.training_step(model=model, batch=batch, batch_idx=batch_idx)
 
                 torch.cuda.synchronize()
 
                 compute_time = time.perf_counter() - compute_start
 
-                if using_shade and item_loss is not None:
+                if self.is_using_shade() and item_loss is not None:
                     train_loader.sampler.pass_batch_important_scores(item_loss)
                 # only increase global step if optimizer stepped
                 self.global_step += int(should_optim_step)
 
-                if using_shade:
+                if self.is_using_shade():
                     sorted_img_indices = train_loader.sampler.get_sorted_index_list()
                     track_batch_indx = 0
 
                     PQ:heapdict = train_loader.dataset.get_PQ()
                     ghost_cache = train_loader.dataset.get_ghost_cache()
-                    
+                    key_id_map = train_loader.dataset.get_key_id_map()
+
                     for indx in sorted_img_indices:
                         if key_id_map.exists(indx.item()):
                             if indx.item() in PQ:
                                 #print("Train_index: %d Importance_Score: %f Frequency: %d Time: %s N%dG%d" %(indx.item(),batch_loss,PQ[indx.item()][1]+1,insertion_time,args.nr+1,gpu+1))
-                                PQ[indx.item()] = (batch_wts[track_batch_indx],PQ[indx.item()][1]+1)
-                                ghost_cache[indx.item()] = (batch_wts[track_batch_indx],ghost_cache[indx.item()][1]+1)
+                                PQ[indx.item()] = (self.batch_wts[track_batch_indx],PQ[indx.item()][1]+1)
+                                ghost_cache[indx.item()] = (self.batch_wts[track_batch_indx],ghost_cache[indx.item()][1]+1)
                                 track_batch_indx+=1
                             else:
                                 #print("Train_index: %d Importance_Score: %f Time: %s N%dG%d" %(indx.item(),batch_loss,insertion_time,args.nr+1,gpu+1))
-                                PQ[indx.item()] = (batch_wts[track_batch_indx],1)
-                                ghost_cache[indx.item()] = (batch_wts[track_batch_indx],1)
+                                PQ[indx.item()] = (self.batch_wts[track_batch_indx],1)
+                                ghost_cache[indx.item()] = (self.batch_wts[track_batch_indx],1)
                                 track_batch_indx+=1
                         else:
                             if indx.item() in ghost_cache:
-                                ghost_cache[indx.item()] = (batch_wts[track_batch_indx],ghost_cache[indx.item()][1]+1)
+                                ghost_cache[indx.item()] = (self.batch_wts[track_batch_indx],ghost_cache[indx.item()][1]+1)
                                 track_batch_indx+=1
                             else:
-                                ghost_cache[indx.item()] = (batch_wts[track_batch_indx],1)
+                                ghost_cache[indx.item()] = (self.batch_wts[track_batch_indx],1)
                                 track_batch_indx+=1
                     train_loader.dataset.set_PQ(PQ)
                     train_loader.dataset.set_ghost_cache(ghost_cache)
                     train_loader.dataset.set_num_local_samples(key_id_map.dbsize())
                                 
-
-
 
                 metrics= OrderedDict({
                         "elapsed_time": time.perf_counter() - self.train_start_time,
@@ -226,7 +243,7 @@ class ImageClassificationTrainer():
                         "loss_train": self._current_train_return['loss'],
                         "accuracy_train": self._current_train_return['top1'],
                         "cpu_usge": json.dumps(monitor.resource_data["cpu_util"].summarize()),
-                        "gpu_usge": json.dumps( monitor.resource_data["gpu_util"].summarize())   
+                        # "gpu_usge": json.dumps( monitor.resource_data["gpu_util"].summarize())   
                         })
                 total_loss_for_epoch +=self._current_train_return['loss']
 
@@ -270,7 +287,7 @@ class ImageClassificationTrainer():
                 end = time.perf_counter()
 
             # self.fabric.call("on_train_epoch_end")
-            if using_shade:
+            if self.is_using_shade():
                 train_loader.sampler.on_epoch_end(total_loss_for_epoch/batch_idx+1)
 
     def val_loop(
@@ -323,7 +340,7 @@ class ImageClassificationTrainer():
 
     def training_step(self, model: L.LightningModule, batch: Any, batch_idx: int) -> torch.Tensor:
        
-        outputs: Union[torch.Tensor, Mapping[str, Any]] = model.training_step(batch, batch_idx=batch_idx)
+        outputs: Union[torch.Tensor, Mapping[str, Any]] = model.training_step(batch, batch_idx=batch_idx, is_shade=self.is_using_shade())
         
         loss = outputs if isinstance(outputs, torch.Tensor) else outputs["loss"]
         item_losss = outputs["item_loss"]

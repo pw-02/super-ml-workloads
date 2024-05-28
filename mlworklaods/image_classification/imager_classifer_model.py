@@ -19,14 +19,9 @@ class ImageClassifierModel(pl.LightningModule):
         self.model:nn.Module = torchvision.models.get_model(model_name,weights=None)
 
         # Modify the final fully connected layer to match the number of classes in CIFAR-10
-        num_ftrs = self.model.fc.in_features
-        self.is_shade = False
-      
+        num_ftrs = self.model.fc.in_features      
         self.model.fc = nn.Linear(num_ftrs, num_classes)
-        if self.is_shade:
-            self.loss_fn = torch.nn.CrossEntropyLoss()
-        else:
-            self.loss_fn = torch.nn.CrossEntropyLoss(reduce=False)
+        self.loss_fn = torch.nn.CrossEntropyLoss()
         self.optimizer = optimizer
         self.learning_rate = learning_rate
         self.losses =  AverageMeter("Loss", ":6.2f")
@@ -38,18 +33,23 @@ class ImageClassifierModel(pl.LightningModule):
     def forward(self, x):
         return self.model.forward(x)
 
-    def training_step(self, batch, batch_idx: int):
+    def training_step(self, batch, batch_idx: int, is_shade=False):
         x, y = batch
         logits = self.model(x)
-        if self.is_shade:
-            item_loss = self.loss_fn(logits, y)
+        if is_shade:
+            criterion = nn.CrossEntropyLoss(reduce = False)
+            item_loss = criterion(logits, y)
             loss = item_loss.mean()
+            # item_loss = self.loss_fn(logits, y)
+            # loss = item_loss.mean()
+            self.losses.update(loss.item())
         else:
             loss = self.loss_fn(logits, y)
+            self.losses.update(loss.item())
             item_loss = None
 
         top1 = accuracy(logits.argmax(-1), y, num_classes=self.num_classes, task="multiclass", top_k=1) 
-        self.losses.update(loss.item())
+        
         self.top1.update(top1.item())
         # calculating the cross entropy loss on the result
         return {"loss": loss, "item_loss": item_loss, "top1": top1}

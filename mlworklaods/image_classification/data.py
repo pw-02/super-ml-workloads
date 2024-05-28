@@ -78,7 +78,8 @@ class BaseDataModule:
             wss=shade_args.working_set_size
         )
         host_ip, port_num = shade_args.cache_address.split(":")
-        sampler = ShadeBatchSampler(
+
+        base_sampler = ShadeSamplerS3(
             dataset=dataset,
             num_replicas=world_size,
             seed=train_args.seed,
@@ -92,7 +93,9 @@ class BaseDataModule:
             init_fac=1,
             ls_init_fac=0.01)
         
-        return DataLoader(dataset=dataset, batch_size=train_args.batch_size(world_size), shuffle=False, num_workers=0, pin_memory=True, sampler=sampler)
+        batch_sampler = ShadeBatchSampler(sampler=base_sampler, batch_size=train_args.batch_size(world_size), drop_last=False)
+
+        return DataLoader(dataset=dataset, batch_size=None, shuffle=False, num_workers=0, pin_memory=True, sampler=batch_sampler)
 
 
 
