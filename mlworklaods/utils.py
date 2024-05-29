@@ -24,7 +24,7 @@ from typing import  Optional
 
 monitor_gpu = False
 if torch.cuda.is_available():
-    monitor_gpu = True
+    monitor_gpu = False
     nvmlInit()
 
 def timer_decorator(func):

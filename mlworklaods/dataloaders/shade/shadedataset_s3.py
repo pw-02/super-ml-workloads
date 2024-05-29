@@ -113,7 +113,7 @@ class ShadeDatasetS3(Dataset):
             if torch_imgs is not None and torch_labels is not None:
                 return (torch_imgs, torch_labels), cache_hits, fetch_duration, transform_duration
         
-        data_samples, labels, cache_hits = self.fetch_batch_data(batch_indices)
+        data_samples, labels, cache_hits = self.fetch_batch_data_ext(batch_indices)
 
         tranform_start_time = time.perf_counter()
         if self.transform is not None:
@@ -140,32 +140,74 @@ class ShadeDatasetS3(Dataset):
         return random.choice([True, False])
     
 
-    def get_data_sample(self, bucket_name, sample_idx):
-        sample_path, sample_label = self._classed_items[sample_idx]
-        content = s3utils.get_s3_object(bucket_name, sample_path)
 
-        img = Image.open(io.BytesIO(content))
-        img = img.convert("RGB")      
-        return img, sample_label
+    def get_data_sample(self, sample_idx):
+        data_path, label = self._classed_items[sample_idx]
+        data = None
+        cache_hit = False
+        if self.use_cache and self.cache_granularity == 'sample':
+            byte_data = self.fetch_from_cache(sample_idx)
+            if byte_data:
+                byte_img_io = io.BytesIO(byte_data)
+                data = Image.open(byte_img_io)
+                cache_hit = True
 
-    def fetch_batch_from_s3(self, indices: List[int]):
-        images = []
+            if data is None:  #data not retrieved from cache, so get it from primary storage
+                if self.is_s3:
+                    data = s3utils.get_s3_object(self.bucket_name, data_path)
+                    data = Image.open(io.BytesIO(data))
+                else:
+                    data = Image.open(data_path)
+                
+        return data, label, cache_hit, sample_idx
+
+    def fetch_batch_data_ext(self, indices: List[int]):
+        data_samples = []
         labels = []
         cache_hits = 0
         with ThreadPoolExecutor() as executor:
-            futures = {executor.submit(self.get_data_sample, self.bucket_name, sample_idx): sample_idx for sample_idx in indices}
+            futures = {executor.submit(self.get_data_sample, sample_idx): sample_idx for sample_idx in indices}
             for future in concurrent.futures.as_completed(futures):
                 sample_idx = futures[future]
                 try:
-                    image_content, label = future.result()
-                    images.append(image_content)
+                    data, label, cache_hit, idx = future.result()
+                    if cache_hit == True:
+                        cache_hits +=1
+                    else:
+                        keys_cnt = self.key_counter + 50
+            
+                        if(keys_cnt >= self.cache_portion):
+                                try:
+                                    peek_item = self.PQ.peekitem()
+                                    if self.ghost_cache[idx] > peek_item[1]:
+                                        evicted_item = self.PQ.popitem() 
+                                    #   print("Evicting index: %d Weight: %.4f Frequency: %d" %(evicted_item[0], evicted_item[1][0], evicted_item[1][1]))
+                                        if self.key_id_map.exists(evicted_item[0]):
+                                            self.key_id_map.delete(evicted_item[0])
+                                        keys_cnt-=1
+                                except:
+                                    # print("Could not evict item or PQ was empty.")
+                                    pass
+
+                        if self.use_cache and self.cache_granularity == 'sample' and keys_cnt < self.cache_portion:
+                                byte_stream = io.BytesIO()
+                                data.save(byte_stream, format=data.format)
+                                byte_stream.seek(0)
+                                try:
+                                    self.key_id_map.set(idx, byte_stream.read())
+                                    self.key_counter+=1
+                                except:
+                                    return None
+
+                    data = data.convert("RGB")
+                    data_samples.append(data)
                     labels.append(label)
                 except Exception as e:
                     print(f"Error processing sample {sample_idx}: {e}")
                     
-        return images, labels, cache_hits
-    
-    
+        return data_samples, labels, cache_hits
+
+
     def fetch_batch_data(self,batch_indices):
       data_samples = []
       labels = []
@@ -179,6 +221,7 @@ class ShadeDatasetS3(Dataset):
                  if byte_data:
                      byte_img_io = io.BytesIO(byte_data)
                      data = Image.open(byte_img_io)
+                     data = data.convert("RGB")     
                      cache_hits +=1
                 
             if data is None:  #data not retrieved from cache, so get it from primary storage
