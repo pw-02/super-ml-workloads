@@ -7,7 +7,7 @@ from datetime import timedelta
 from functools import partial
 from pathlib import Path
 from typing import Optional, Tuple, Union
-
+import json
 import lightning as L
 import torch
 import torch.nn as nn
@@ -174,7 +174,7 @@ class LLMPretrainer():
 
         with ResourceMonitor() as monitor:
             end = time.perf_counter()
-            for input_ids, targets, fetch_time, transform_time  in train_iterator:
+            for input_ids, targets, fetch_time, transform_time, cache_hits  in train_iterator:
                 if state["iter_num"] >= max_iters:
                     break
                 # print(transform_time)
@@ -236,6 +236,9 @@ class LLMPretrainer():
                         "compute_time": compute_times.sum,
                         "fetch_time": fetch_times.sum,
                         "transform_time": transform_times.sum,
+                        "cache_hits": cache_hits,
+                        "cpu_usge": json.dumps(monitor.resource_data["cpu_util"].summarize()),
+                        "gpu_usge": json.dumps( monitor.resource_data["gpu_util"].summarize()),   
                         "elapsed_time": time.perf_counter() - self.train_start_time
 
                     }

@@ -40,6 +40,7 @@ class TorchLRUTextDataset(Dataset):
         else:
             self.cache_client = None
             self.use_cache = False
+        self.cache_hit = False
 
     def fetch_from_cache(self, key):
         try:
@@ -67,8 +68,10 @@ class TorchLRUTextDataset(Dataset):
             transform_duration = time.perf_counter() - transform_start_time
             self.current_file_idx += 1
             self.current_position = 0
+            self.cache_hit = True
             return tokens, transform_duration
         
+        self.cache_hit = False
         if self.is_s3:
             text = s3utils.get_s3_object(self.bucket_name, file_path)
         else:
@@ -80,7 +83,7 @@ class TorchLRUTextDataset(Dataset):
             text = self.transform(text)  
         tokens = self.tokenizer(text, truncation=False, padding=False, return_tensors='pt').input_ids.squeeze()
         transform_duration = time.perf_counter() - transform_start_time
-         
+
         if self.use_cache:
             buffer = io.BytesIO()
             torch.save(tokens, buffer)
@@ -114,7 +117,12 @@ class TorchLRUTextDataset(Dataset):
         self.current_tokens = remaining_tokens[required_size:]
         fetch_duration = time.perf_counter() - fetch_start_time
 
-        return batch_tokens,fetch_duration, transform_duration
+        if self.cache_hit:
+            cache_hits = 1
+        else:
+            cache_hits = 0
+
+        return batch_tokens,fetch_duration, transform_duration, cache_hits
 
     def __len__(self):
         return len(self.file_list) * 1000  # Placeholder value
