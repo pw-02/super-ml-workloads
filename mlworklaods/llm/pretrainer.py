@@ -35,6 +35,8 @@ from mlworklaods.utils import (
     get_default_supported_precision
 )
 
+import torch._dynamo
+torch._dynamo.config.suppress_errors = True
 
 class LLMPretrainer():
     def __init__(
