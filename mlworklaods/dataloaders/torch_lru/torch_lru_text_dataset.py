@@ -128,13 +128,13 @@ class TorchLRUTextDataset(Dataset):
         return len(self.file_list) * 1000  # Placeholder value
 
     def __getitem__(self, idx):
-        batch_tokens, fetch_duration, transform_duration = self._get_next_batch()
+        batch_tokens, fetch_duration, transform_duration, cache_hits = self._get_next_batch()
         data = batch_tokens[:(self.block_size +1) * self.batch_size].reshape(self.batch_size, (self.block_size+1))
         
         input_ids = data[:, 0 : self.block_size].contiguous().long()
         targets = data[:, 1 : (self.block_size + 1)].contiguous().long()
 
-        return input_ids, targets, fetch_duration, transform_duration
+        return input_ids, targets, fetch_duration, transform_duration, cache_hits
 
 # Example transform function
 def example_transform(text: str) -> str:
