@@ -1,4 +1,4 @@
-model_name: pythia-14m
+model_name: pythia-70m
 max_tokens: 3e12  # 3 trillion
 global_batch_size: 16 #Number of samples between optimizer steps across data-parallel ranks
 micro_batch_size: 16 #Number of samples per data-parallel rank
