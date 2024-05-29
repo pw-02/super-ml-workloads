@@ -16,7 +16,7 @@ log_dir: logs
 checkpoint_interval: .inf
 run_training: True
 run_evaluation: False
-num_workers_per_job: 0
+num_workers_per_job: 2
 exp_id: multi_job
 job_id: 1
 

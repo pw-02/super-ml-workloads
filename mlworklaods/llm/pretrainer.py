@@ -12,7 +12,7 @@ import lightning as L
 import torch
 import torch.nn as nn
 from lightning.fabric.strategies import FSDPStrategy
-from lightning.fabric.utilities.throughput import  measure_flops
+from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flops
 from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
 from typing_extensions import Literal
@@ -136,7 +136,7 @@ class LLMPretrainer():
         else:
             val_loss = "n/a"
         
-        # throughput = ThroughputMonitor(self.fabric, window_size=5)
+        throughput = ThroughputMonitor(self.fabric, window_size=5)
 
         with torch.device("meta"):
             meta_model = GPT(model.config)
@@ -213,13 +213,13 @@ class LLMPretrainer():
                     loss = running_loss.compute().item()  # expensive device-to-host synchronization
                     
                     t1 = time.perf_counter()
-                    # throughput.update(
-                    #     time=(t1 - total_t0),
-                    #     flops=(measured_flops * log_iter_interval),
-                    #     batches=state["iter_num"],
-                    #     samples=(state["iter_num"] * self.train.micro_batch_size),
-                    #     lengths=(state["iter_num"] * self.train.micro_batch_size * model.max_seq_length),
-                    # )
+                    throughput.update(
+                        time=(t1 - total_t0),
+                        flops=(measured_flops * log_iter_interval),
+                        batches=state["iter_num"],
+                        samples=(state["iter_num"] * self.train.micro_batch_size),
+                        lengths=(state["iter_num"] * self.train.micro_batch_size * model.max_seq_length),
+                    )
                     metrics = {
                         "loss": loss,
                         "iter": state["iter_num"],
@@ -256,17 +256,17 @@ class LLMPretrainer():
                         # f" remaining time: {timedelta(seconds=int(metrics['remaining_time']))!s}"
                         )
 
-                    # self.fabric.print(
-                    #     f"Epoch {metrics['epoch']+1} | iter {metrics['iter']} step {metrics['step']} |"
-                    #     f" loss train: {metrics['loss']:.3f},"
-                    #     f" val: {val_loss} |"
-                    #     f" iter time: {metrics['iter_time'] * 1000:.2f} ms"
-                    #     f"{' (step)' if not is_accumulating else ''}"
-                    #     f" remaining time: {timedelta(seconds=int(metrics['remaining_time']))!s}"
-                    # )
+                    self.fabric.print(
+                        f"Epoch {metrics['epoch']+1} | iter {metrics['iter']} step {metrics['step']} |"
+                        f" loss train: {metrics['loss']:.3f},"
+                        f" val: {val_loss} |"
+                        f" iter time: {metrics['iter_time'] * 1000:.2f} ms"
+                        f"{' (step)' if not is_accumulating else ''}"
+                        f" remaining time: {timedelta(seconds=int(metrics['remaining_time']))!s}"
+                    )
 
-                    # throughput_metrics = throughput.compute()
-                    # metrics.update(throughput_metrics)
+                    throughput_metrics = throughput.compute()
+                    metrics.update(throughput_metrics)
                     self.fabric.log_dict(metrics, step=state["iter_num"] - 1)
                     data_load_times.reset()
                     compute_times.reset()
