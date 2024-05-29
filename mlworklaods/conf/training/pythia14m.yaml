@@ -1,10 +1,10 @@
 model_name: pythia-14m
 max_tokens: 3e12  # 3 trillion
-global_batch_size: 64 #Number of samples between optimizer steps across data-parallel ranks
+global_batch_size: 4 #Number of samples between optimizer steps across data-parallel ranks
 micro_batch_size: 4 #Number of samples per data-parallel rank
 lr_warmup_steps: 0
 lr_warmup_fraction: null
-max_steps: null
+max_steps: 10
 max_seq_length: 512
 tie_embeddings: False
 # Optimization args

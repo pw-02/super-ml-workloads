@@ -31,20 +31,22 @@ def train_model(hydra_config):
             data_module = OpenWebTextDataModule()
 
         trainer = LLMPretrainer(
+            job_id=hydra_config.job_id,
             train= train_args,
             accelerator=train_args.accelerator,
             precision=get_default_supported_precision(True),
             devices=train_args.devices, 
             loggers=[logger],
             model_name=train_args.model_name,
-            seed=train_args.seed
+            seed=train_args.seed,
+            max_iters=train_args.max_steps
         )
 
         model, optmizer = trainer.initialize_model_and_optimizer()  
         train_loader, val_loader = data_module.make_dataloaders(train_args, data_args, dataloader_args, model.max_seq_length)
         os.makedirs(logger.log_dir, exist_ok=True)
         save_hparams_to_yaml(os.path.join(logger.log_dir, "hparms.yaml"), hydra_config)
-        avg_loss, avg_acc = trainer.fit(model, optmizer, train_loader, val_loader)
+        trainer.fit(model, optmizer, train_loader, val_loader)
        
     elif isinstance(train_args, ImgClassifierTrainArgs):
         if 'cifar10' in data_args.dataset_name:

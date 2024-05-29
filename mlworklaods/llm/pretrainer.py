@@ -39,6 +39,7 @@ from mlworklaods.utils import (
 class LLMPretrainer():
     def __init__(
         self,
+        job_id,
         train:LLMTrainArgs,
         accelerator: Union[str, Accelerator] = "auto",
         strategy: Union[str, Strategy] = "auto",
@@ -47,7 +48,8 @@ class LLMPretrainer():
         loggers: Optional[Union[Logger, List[Logger]]] = None,
         model_name: Optional[str] = None,
         eval: EvalArgs = EvalArgs(interval=1000, max_iters=100),
-        seed: int = None
+        seed: int = None,
+        max_iters: int = None
     ) -> None:
     
         available_models = "\n".join(sorted(name_to_config))
@@ -65,13 +67,14 @@ class LLMPretrainer():
             precision=precision,
             loggers=loggers,
             )
+        self.max_iters = max_iters
         
         if seed:
             self.fabric.seed_everything(seed)
         
         self.fabric.launch()
         self.train_start_time = time.perf_counter()
-
+        self.job_id = job_id
         
 
     def initialize_model_and_optimizer(self):
@@ -142,9 +145,13 @@ class LLMPretrainer():
             self.fabric.print(f"Measured TFLOPs: {measured_flops * self.fabric.world_size / 1e12:.2f}")
             del meta_model, x
 
-        max_tokens_per_device = self.train.max_tokens // self.fabric.world_size
-        tokens_per_iter = self.train.micro_batch_size * model.max_seq_length
-        max_iters = max_tokens_per_device // tokens_per_iter
+        if self.max_iters is None:
+            max_tokens_per_device = self.train.max_tokens // self.fabric.world_size
+            tokens_per_iter = self.train.micro_batch_size * model.max_seq_length
+            max_iters = max_tokens_per_device // tokens_per_iter
+        else:
+            max_iters = self.max_iters
+
         log_iter_interval = self.train.log_interval * self.train.gradient_accumulation_iters(self.devices)
         initial_iter = state["iter_num"]
         train_iterator = CycleIterator(train_dataloader)
@@ -168,7 +175,7 @@ class LLMPretrainer():
             for input_ids, targets, fetch_time, transform_time  in train_iterator:
                 if state["iter_num"] >= max_iters:
                     break
-                print(transform_time)
+                # print(transform_time)
                 data_load_times.update(time.perf_counter() - end)
                 fetch_times.update(fetch_time)
                 transform_times.update(transform_time)
@@ -184,6 +191,7 @@ class LLMPretrainer():
                 compute_start = time.perf_counter()
 
                 is_accumulating = state["iter_num"] % self.train.gradient_accumulation_iters(self.devices) != 0
+                torch.cuda.synchronize()
                 with self.fabric.no_backward_sync(model, enabled=is_accumulating):
                     logits = model(input_ids)
                     loss = chunked_cross_entropy(logits, targets)
@@ -198,9 +206,10 @@ class LLMPretrainer():
                     state["step_count"] += 1
                 
                 compute_times.update(time.perf_counter() - compute_start)
-
+                torch.cuda.synchronize()
                 if state["iter_num"] % log_iter_interval == 0:
                     loss = running_loss.compute().item()  # expensive device-to-host synchronization
+                    
                     t1 = time.perf_counter()
                     throughput.update(
                         time=(t1 - total_t0),
@@ -230,15 +239,29 @@ class LLMPretrainer():
                     }
                     if isinstance(val_loss, float):
                         val_loss = f"{val_loss:.3f}"
-
+                    
                     self.fabric.print(
-                        f"Epoch {metrics['epoch']+1} | iter {metrics['iter']} step {metrics['step']} |"
-                        f" loss train: {metrics['loss']:.3f},"
-                        f" val: {val_loss} |"
-                        f" iter time: {metrics['iter_time'] * 1000:.2f} ms"
-                        f"{' (step)' if not is_accumulating else ''}"
-                        f" remaining time: {timedelta(seconds=int(metrics['remaining_time']))!s}"
-                    )
+                        f"{self.job_id} | Epoch {metrics['epoch']+1} | iter {metrics['iter']}/{max_iters} |"
+                        f" loss train: {metrics['loss']:.3f} |"
+                        # f" val: {val_loss} |"
+                        f" iter time: {metrics['iter_time']:.2f} |"
+                        f" data time: {metrics['data_time']:.2f} |"
+                        f" compute time: {metrics['compute_time']:.2f} |"
+                        f" fetch time: {metrics['fetch_time']:.2f} |"
+                        f" transform time: {metrics['transform_time']:.2f} |"
+                        f" elapsed time: {metrics['elapsed_time']:.2f} |"
+                        # f"{' (step)' if not is_accumulating else ''}"
+                        # f" remaining time: {timedelta(seconds=int(metrics['remaining_time']))!s}"
+                        )
+
+                    # self.fabric.print(
+                    #     f"Epoch {metrics['epoch']+1} | iter {metrics['iter']} step {metrics['step']} |"
+                    #     f" loss train: {metrics['loss']:.3f},"
+                    #     f" val: {val_loss} |"
+                    #     f" iter time: {metrics['iter_time'] * 1000:.2f} ms"
+                    #     f"{' (step)' if not is_accumulating else ''}"
+                    #     f" remaining time: {timedelta(seconds=int(metrics['remaining_time']))!s}"
+                    # )
 
                     throughput_metrics = throughput.compute()
                     metrics.update(throughput_metrics)
@@ -258,6 +281,10 @@ class LLMPretrainer():
                     metrics = {"val_loss": val_loss, "val_ppl": math.exp(val_loss)}
                     self.fabric.log_dict(metrics, step=state["iter_num"] - 1)
                     self.fabric.barrier()
+
+                # if self.max_steps is not None and self.global_step >= self.max_steps:
+                #     self.should_stop = True
+                #     break
                 end = time.perf_counter()
                 
 

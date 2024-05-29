@@ -1,6 +1,16 @@
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 
-# Data
+# # Data resnet 50
+# data = {
+#     'Basline': {'IO %': 72, 'Transformation %': 14, 'GPU %': 14},
+#     'SHADE': {'IO %': 46, 'Transformation %': 23, 'GPU %': 27},
+#     'Oracle': {'IO %': 24, 'Transformation %': 3, 'GPU %': 74},
+#     'SUPER': {'IO %': 38, 'Transformation %': 14, 'GPU %': 48},
+# }
+
+
+# Data resnet18
 data = {
     'Basline': {'IO %': 96, 'Transformation %': 1, 'GPU %': 2},
     'SHADE': {'IO %': 93, 'Transformation %': 1, 'GPU %': 6},
@@ -38,9 +48,17 @@ plt.subplots_adjust(left=0.162, right=0.9, top=0.9, bottom=0.1)
 # Adding labels and title
 plt.ylabel('Percentage of Time (%)', fontsize=12)
 plt.xticks(fontsize=12, weight='normal')  # Adjust the font size as needed
-# plt.legend(['I/O', 'Transform', 'GPU'])
+plt.legend(['I/O%', 'Transform%', 'GPU%'], loc='upper center', bbox_to_anchor=(0.5, 1.1), ncol=3)
 # Adjust layout to avoid overlap
-plt.tight_layout()
+# plt.tight_layout()
 # Show plot
 # plt.show()
+# pass
+# Formatter function to add percentage sign
+def percent_formatter(x, pos):
+    return f'{int(x)}%'
+
+# Apply the formatter to the y-axis
+plt.gca().yaxis.set_major_formatter(FuncFormatter(percent_formatter))
+
 plt.savefig('figures\eval_resnet18_cifar10\percentage_breakdown.png')

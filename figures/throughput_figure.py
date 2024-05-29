@@ -1,10 +1,10 @@
 import matplotlib.pyplot as plt
 
 data = {
-    'Baseline': 4.13688431219181,
-    'SHADE': 13.8218243663058,
-    'Oracle': 68.6356083667513,
-    'SUPER': 42.5324474846663,
+    'Baseline': 2.78696508415782,
+    'SHADE': 3.13318390260257,
+    'Oracle': 8.6356083667513,
+    'SUPER': 5.65832064020547,
 }
 
 pytorch_color ='#F1F1F2'  
@@ -43,4 +43,4 @@ plt.xticks(fontsize=12, weight='normal')  # Adjust the font size as needed
 plt.legend(bar, data.keys())
 
 # plt.show()
-plt.savefig('figures/eval_resnet18_cifar10/throughput.png')
+plt.savefig('figures/eval_resnet50_cifar10/throughput.png')

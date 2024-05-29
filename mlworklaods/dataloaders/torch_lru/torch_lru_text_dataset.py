@@ -9,10 +9,13 @@ import mlworklaods.s3utils as s3utils
 from mlworklaods.s3utils import S3Url
 import glob
 import time
-
+import redis
+import io
+import base64
+import zlib
 class TorchLRUTextDataset(Dataset):
 
-    def __init__(self, data_dir: str, tokenizer: PreTrainedTokenizer, transform, block_size: int, batch_size: int):
+    def __init__(self, data_dir: str, tokenizer: PreTrainedTokenizer, transform, block_size: int, batch_size: int, cache_address:str = None):
 
         self.data_dir = data_dir
         self.tokenizer = tokenizer
@@ -29,35 +32,67 @@ class TorchLRUTextDataset(Dataset):
         else:
             self.file_list = glob.glob(f'{self.data_dir}/*.txt')
         self.current_tokens = None #self._load_next_file()
+        self.cache_host, self.cache_port = None,None
+        if cache_address:
+            self.cache_host, self.cache_port = cache_address.split(":")
+            self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
+            self.use_cache = True
+        else:
+            self.cache_client = None
+            self.use_cache = False
 
+    def fetch_from_cache(self, key):
+        try:
+            return self.cache_client.get(key)
+        except:
+             return None
+        
     def _load_next_file(self):
         if self.current_file_idx >= len(self.file_list):
             # Reset to start reading files from the beginning
             self.current_file_idx = 0
             # raise StopIteration("No more files to read.")
-
         file_path = self.file_list[self.current_file_idx]
+        
+        data = None
+        if self.use_cache:
+            data = self.fetch_from_cache(file_path)
 
+        if data:
+            transform_start_time = time.perf_counter()
+            decoded_data = base64.b64decode(data) # Decode base64
+            decoded_data = zlib.decompress(decoded_data)
+            buffer = io.BytesIO(decoded_data)
+            tokens = torch.load(buffer)
+            transform_duration = time.perf_counter() - transform_start_time
+            self.current_file_idx += 1
+            self.current_position = 0
+            return tokens, transform_duration
+        
         if self.is_s3:
             text = s3utils.get_s3_object(self.bucket_name, file_path)
         else:
             with open(file_path, 'r', encoding='utf-8') as f:
                 text = f.read()
-                    # Apply transform if provided
+        # Apply transform if provided
         transform_start_time = time.perf_counter()
-
         if self.transform:
-            try:
-                text = self.transform(text)
-            except:
-                
-                text = self.transform(text)
-
+            text = self.transform(text)  
+        tokens = self.tokenizer(text, truncation=False, padding=False, return_tensors='pt').input_ids.squeeze()
         transform_duration = time.perf_counter() - transform_start_time
+         
+        if self.use_cache:
+            buffer = io.BytesIO()
+            torch.save(tokens, buffer)
+            token_data = zlib.compress(buffer.getvalue()) #use_compression:
+            token_data = base64.b64encode(token_data).decode('utf-8')
+            try:
+                self.cache_client.set(file_path, token_data)
+            except:
+                pass
 
         self.current_file_idx += 1
         self.current_position = 0
-        tokens = self.tokenizer(text, truncation=False, padding=False, return_tensors='pt').input_ids.squeeze()
         return tokens, transform_duration
 
     def _get_next_batch(self):

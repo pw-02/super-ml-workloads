@@ -226,7 +226,8 @@ class BaseDataModule:
                 tokenizer=self.tokenizer,
                 transform=self.transform,
                 block_size=model_max_seq_length,
-                batch_size=train_args.micro_batch_size
+                batch_size=train_args.micro_batch_size,
+                cache_address=lru_torch_args.cache_address
             )
             train_dataloader = DataLoader(dataset=train_dataset, batch_size=None, num_workers=lru_torch_args.num_pytorch_workers)
         
@@ -236,7 +237,9 @@ class BaseDataModule:
                 tokenizer=self.tokenizer,
                 transform=self.transform,
                 block_size=model_max_seq_length,
-                batch_size=train_args.micro_batch_size
+                batch_size=train_args.micro_batch_size,
+                cache_address=lru_torch_args.cache_address
+
             )
             val_dataloader = DataLoader(dataset=val_dataset, batch_size=None, num_workers=lru_torch_args.num_pytorch_workers)
         
@@ -251,4 +254,4 @@ class OpenWebTextDataModule(BaseDataModule):
         check_and_download_nltk_resource('wordnet')
         text_transformer = TextTransformations()
         transform_func = text_transformer.normalize
-        super().__init__(transform=transform_func, tokenizer=GPT2Tokenizer.from_pretrained('gpt2'))
+        super().__init__(transform=None, tokenizer=GPT2Tokenizer.from_pretrained('gpt2'))
