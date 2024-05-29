@@ -57,7 +57,8 @@ class TorchLRUTextDataset(Dataset):
         
         data = None
         if self.use_cache:
-            data = self.fetch_from_cache(file_path)
+            pass
+            # data = self.fetch_from_cache(file_path)
 
         if data:
             transform_start_time = time.perf_counter()
