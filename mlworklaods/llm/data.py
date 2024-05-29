@@ -254,4 +254,4 @@ class OpenWebTextDataModule(BaseDataModule):
         check_and_download_nltk_resource('wordnet')
         text_transformer = TextTransformations()
         transform_func = text_transformer.normalize
-        super().__init__(transform=None, tokenizer=GPT2Tokenizer.from_pretrained('gpt2'))
+        super().__init__(transform=transform_func, tokenizer=GPT2Tokenizer.from_pretrained('gpt2'))
