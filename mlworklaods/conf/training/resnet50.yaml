@@ -1,6 +1,6 @@
 model_name: resnet50
 max_epochs: 100000
-max_steps: 1250
+max_steps: 1000
 global_batch_size: 128 #Number of samples between optimizer steps across data-parallel ranks
 micro_batch_size: 128 #Number of samples per data-parallel rank
 limit_train_batches: .inf

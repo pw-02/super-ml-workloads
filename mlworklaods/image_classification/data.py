@@ -39,7 +39,7 @@ class BaseDataModule:
             cache_granularity=lru_torch_args.cache_granularity
         )
         base_sampler = RandomSampler(data_source=dataset, generator=torch.Generator().manual_seed(train_args.seed)) if lru_torch_args.shuffle else SequentialSampler(data_source=dataset)
-        batch_sampler = RandomBatchSamplerWithID(sampler=base_sampler, batch_size=train_args.batch_size(world_size), drop_last=False)
+        batch_sampler = BatchSamplerWithID(sampler=base_sampler, batch_size=train_args.batch_size(world_size), drop_last=False)
         return DataLoader(dataset=dataset, sampler=batch_sampler, batch_size=None, num_workers=lru_torch_args.num_pytorch_workers)
 
     def make_super_dataloaders(self, train_args: BaseTrainArgs, data_args: DataArgs, super_args: SUPERArgs, world_size: int) -> Tuple[Optional[DataLoader], Optional[DataLoader]]:
