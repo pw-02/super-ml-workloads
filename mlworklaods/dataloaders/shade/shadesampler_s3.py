@@ -139,18 +139,18 @@ class ShadeSamplerS3(Sampler[T_co]):
             # take repetitive samples based on loss/val_accuracy.
             self.indices = self.score_based_rep()
 
-            #increase hit rates through PADS
-            cache_hit_list, cache_miss_list, num_miss_samps = self.prepare_hits(self.rep_factor)
+            # #increase hit rates through PADS
+            # cache_hit_list, cache_miss_list, num_miss_samps = self.prepare_hits(self.rep_factor)
             
-            #create the indices list for processing in the next epoch
-            self.indices = cache_hit_list + cache_miss_list[:num_miss_samps]
+            # #create the indices list for processing in the next epoch
+            # self.indices = cache_hit_list + cache_miss_list[:num_miss_samps]
 
-            # print(f'hit_list_len: {len(cache_hit_list)}')
-            # print(f'miss_list_len: {len(cache_miss_list[:num_miss_samps])}')
-            # print(len(self.indices))
+            # # print(f'hit_list_len: {len(cache_hit_list)}')
+            # # print(f'miss_list_len: {len(cache_miss_list[:num_miss_samps])}')
+            # # print(len(self.indices))
 
-            #sanity check
-            self.indices = self.indices[:self.num_samples]
+            # #sanity check
+            # self.indices = self.indices[:self.num_samples]
 
             assert len(self.indices) == self.num_samples
             self.indices_for_process = self.indices
