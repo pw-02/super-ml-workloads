@@ -141,8 +141,8 @@ class LLMPretrainer():
             x = torch.randint(0, 1, (self.train.micro_batch_size, meta_model.max_seq_length))
             model_fwd = lambda: meta_model(x)
             model_loss = lambda y: chunked_cross_entropy(y, x, chunk_size=0)
-            measured_flops = measure_flops(meta_model, model_fwd, model_loss)
-            self.fabric.print(f"Measured TFLOPs: {measured_flops * self.fabric.world_size / 1e12:.2f}")
+            # measured_flops = measure_flops(meta_model, model_fwd, model_loss)
+            # self.fabric.print(f"Measured TFLOPs: {measured_flops * self.fabric.world_size / 1e12:.2f}")
             del meta_model, x
 
         if self.max_iters is None:
@@ -213,7 +213,7 @@ class LLMPretrainer():
                     t1 = time.perf_counter()
                     throughput.update(
                         time=(t1 - total_t0),
-                        flops=(measured_flops * log_iter_interval),
+                        flops=( 0.83 * log_iter_interval),
                         batches=state["iter_num"],
                         samples=(state["iter_num"] * self.train.micro_batch_size),
                         lengths=(state["iter_num"] * self.train.micro_batch_size * model.max_seq_length),
