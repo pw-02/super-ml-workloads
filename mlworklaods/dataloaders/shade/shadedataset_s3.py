@@ -197,7 +197,7 @@ class ShadeDatasetS3(Dataset):
                                     self.key_id_map.set(idx, byte_stream.read())
                                     self.key_counter+=1
                                 except:
-                                    return None
+                                    pass
 
                     data = data.convert("RGB")
                     data_samples.append(data)
