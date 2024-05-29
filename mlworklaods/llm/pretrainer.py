@@ -259,14 +259,14 @@ class LLMPretrainer():
                         # f" remaining time: {timedelta(seconds=int(metrics['remaining_time']))!s}"
                         )
 
-                    self.fabric.print(
-                        f"Epoch {metrics['epoch']+1} | iter {metrics['iter']} step {metrics['step']} |"
-                        f" loss train: {metrics['loss']:.3f},"
-                        f" val: {val_loss} |"
-                        f" iter time: {metrics['iter_time'] * 1000:.2f} ms"
-                        f"{' (step)' if not is_accumulating else ''}"
-                        f" remaining time: {timedelta(seconds=int(metrics['remaining_time']))!s}"
-                    )
+                    # self.fabric.print(
+                    #     f"Epoch {metrics['epoch']+1} | iter {metrics['iter']} step {metrics['step']} |"
+                    #     f" loss train: {metrics['loss']:.3f},"
+                    #     f" val: {val_loss} |"
+                    #     f" iter time: {metrics['iter_time'] * 1000:.2f} ms"
+                    #     f"{' (step)' if not is_accumulating else ''}"
+                    #     f" remaining time: {timedelta(seconds=int(metrics['remaining_time']))!s}"
+                    # )
 
                     throughput_metrics = throughput.compute()
                     metrics.update(throughput_metrics)
