@@ -18,7 +18,7 @@ class TorchLRUTextDataset(Dataset):
     def __init__(self, data_dir: str, tokenizer: PreTrainedTokenizer, transform, block_size: int, batch_size: int, cache_address:str = None):
 
         self.data_dir = data_dir
-        self.tokenizer = tokenizer
+        self.tokenizer:GPT2Tokenizer = tokenizer
         self.block_size = block_size
         self.batch_size = batch_size
         self.transform = transform
@@ -97,7 +97,8 @@ class TorchLRUTextDataset(Dataset):
         self.current_file_idx += 1
         self.current_position = 0
         return tokens, transform_duration
-
+    
+    
     def _get_next_batch(self):
         
         fetch_start_time = time.perf_counter()
