@@ -17,6 +17,7 @@ from mlworklaods.dataloaders.super_dl.super_client import SuperClient
 from torch.utils.data import SequentialSampler, IterableDataset, RandomSampler, DataLoader, get_worker_info
 from transformers import PreTrainedTokenizer
 import logging
+import functools
 
 def configure_logger():
     # Set the log levels for specific loggers to WARNING
@@ -32,26 +33,26 @@ def configure_logger():
 
 logger = configure_logger()
 
-class TorchLRUTextDataset(IterableDataset):
+class SUPERTextDataset(IterableDataset):
 
     def __init__(self,
                 job_id:int,
-                 data_dir: str, 
-                 tokenizer: PreTrainedTokenizer, 
-                 transform, 
-                 block_size: int, 
-                 batch_size: int, 
-                 super_address:str,
-                 world_size:int,
-                 cache_address:str = None,
-                 simulate_delay = None):
-
+                data_dir: str, 
+                tokenizer: PreTrainedTokenizer, 
+                transform, 
+                block_size: int, 
+                batch_size: int, 
+                super_address:str,
+                world_size:int,
+                cache_address:str = None,
+                simulate_delay = None):
         super().__init__()
         super_client:SuperClient = SuperClient(super_addresss=super_address)
         super_client.register_job(job_id, data_dir)
         dataset_info = super_client.get_dataset_details(data_dir)
         self.dataset_size = dataset_info.num_files
         self.dataset_chunked_size = dataset_info.num_chunks // world_size
+        self.samples: Dict[str, List[str]] = s3utils.load_paired_s3_object_keys(data_dir, False, False)
         self.job_id = job_id
         self.data_dir = data_dir
         self.s3_bucket_name = s3utils.S3Url(data_dir).bucket
@@ -65,18 +66,22 @@ class TorchLRUTextDataset(IterableDataset):
             self.cache_host, self.cache_port = cache_address.split(":")
         if self.cache_host:
             self.setup_cache_client()
-
         self.super_client = None
         self.tokenizer:PreTrainedTokenizer = tokenizer
         self.block_size = block_size
         self.is_s3: bool = data_dir.startswith("s3://")
-        if self.is_s3:
-            self.file_list: Dict[str, List[str]] = s3utils.load_unpaired_s3_object_keys(data_dir, False, True)
-            self.bucket_name = S3Url(data_dir).bucket
-        else:
-            self.file_list = glob.glob(f'{self.data_dir}/*.txt')
-            
+        # if self.is_s3:
+        #     self.file_list: Dict[str, List[str]] = s3utils.load_unpaired_s3_object_keys(data_dir, False, True)
+        #     self.bucket_name = S3Url(data_dir).bucket
+        # else:
+        #     self.file_list = glob.glob(f'{self.data_dir}/*.txt')
 
+    @functools.cached_property
+    def _classed_items(self) -> List[Tuple[str, int]]:
+        return [(blob, class_index)
+                for class_index, blob_class in enumerate(self.samples)
+                for blob in self.samples[blob_class]
+                ]        
     def setup_cache_client(self):
         self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
 
@@ -104,7 +109,6 @@ class TorchLRUTextDataset(IterableDataset):
 
         while current_file_idx < num_files:
             fetch_start_time = time.perf_counter()
-
             if current_tokens is None:
                 current_tokens, transform_duration, cache_hit = self._load_next_file(super_client)
                 current_file_idx +=1
@@ -121,36 +125,45 @@ class TorchLRUTextDataset(IterableDataset):
             batch_tokens = remaining_tokens[:required_size]
             current_position += required_size
             current_tokens = remaining_tokens[required_size:]
-            fetch_duration = time.perf_counter() - fetch_start_time
+            # fetch_duration = time.perf_counter() - fetch_start_time
             
             if cache_hit:
                 cache_hits = 1
             else:
                 cache_hits = 0
 
-            yield batch_tokens,fetch_duration, transform_duration, cache_hits
+            data = batch_tokens[:(self.block_size +1) * self.batch_size].reshape(self.batch_size, (self.block_size+1))
+            input_ids = data[:, 0 : self.block_size].contiguous().long()
+            targets = data[:, 1 : (self.block_size + 1)].contiguous().long()
+            fetch_duration = time.perf_counter() - fetch_start_time
+            yield input_ids, targets, fetch_duration, transform_duration, cache_hits
+
+            # yield batch_tokens,fetch_duration, transform_duration, cache_hits
 
         current_file_idx = 0
     
     def _load_next_file(self, super_client:SuperClient):
-        next_file = super_client.get_next_batch(self.job_id)
-        
-        if not next_file:
+        next_data = super_client.get_next_batch(self.job_id)
+
+        if not next_data:
             raise ValueError("Empty file returned by super_client.")
         
-        file_path, is_cached = next_file.file_path, next_file.is_cached
+        next_data = next_data[0]
+        data_id = next_data.batch_id
+        data_path, label = self._classed_items[next_data.indicies[0]]
+        is_cached = next_data.is_cached
         data = None
-        
+
         if self.simulate_delay:
             time.sleep(self.simulate_delay)
-            tokens = torch.empty(len(self.block_size), 3, 32, 32)
+            tokens = torch.empty(len(self.block_size*self.batch_size))
             transform_duration = 0
             cache_hit = True
             return tokens, transform_duration, cache_hit
         else:
             data = None
             if is_cached and self.cache_client is not None:
-                data = self.fetch_from_cache(file_path)
+                data = self.fetch_from_cache(data_id)
 
             if data is not None and (isinstance(data, bytes) or isinstance(data, str)):
                 transform_start_time = time.perf_counter()
@@ -159,15 +172,11 @@ class TorchLRUTextDataset(IterableDataset):
                 buffer = io.BytesIO(decoded_data)
                 tokens = torch.load(buffer)
                 transform_duration = time.perf_counter() - transform_start_time
+                cache_hit = True
                 return tokens, transform_duration, cache_hit
             else:
                 cache_hit = False
-                if self.is_s3:
-                    text = s3utils.get_s3_object(self.bucket_name, file_path)
-                else:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        text = f.read()
-                 # Apply transform if provided
+                text = s3utils.get_s3_object(self.s3_bucket_name, data_path)
                 transform_start_time = time.perf_counter()
                 if self.transform:
                     text = self.transform(text)  
@@ -175,19 +184,18 @@ class TorchLRUTextDataset(IterableDataset):
                 transform_duration = time.perf_counter() - transform_start_time
                 return tokens, transform_duration, cache_hit
 
-
-    def fetch_from_cache(self, batch_id, max_attempts = 5):
+    def fetch_from_cache(self, data_id, max_attempts = 5):
         response = None
         attempts = 0
          # Try fetching from cache initially
-        response = self.cache_get(batch_id)
+        response = self.cache_get(data_id)
         if response is not None and not isinstance(response, Exception):
             return response
         else:
             # Retry fetching from cache for a specified number of attempts
             while attempts < max_attempts:
-                logger.error(f"Error fetching batch '{batch_id}' from cache: {response}. Retrying (attempt {attempts}).")
-                response = self.cache_get(batch_id)
+                logger.error(f"Error fetching batch '{data_id}' from cache: {response}. Retrying (attempt {attempts}).")
+                response = self.cache_get(data_id)
                 if response is not None and not isinstance(response, Exception):
                     break
                 else:
@@ -195,8 +203,33 @@ class TorchLRUTextDataset(IterableDataset):
                 attempts += 1
         return response
     
-    def cache_get(self, batch_id, max_attempts = 1):     
+    def cache_get(self, data_id, max_attempts = 1):     
         try:
-            return self.cache_client.get(batch_id)
+            return self.cache_client.get(data_id)
         except Exception as e:
              return e
+
+# Example Usage
+if __name__ == "__main__":
+    from transformers import GPT2Tokenizer
+    from mlworklaods.llm.data import TextTransformations
+
+    data_dir = 's3://openwebtxt/owt/train/'  # Adjust the path to your .txt files
+    tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+    block_size = 512
+    batch_size = 4
+
+    transformations = TextTransformations()
+
+
+    dataset = TorchLRUTextDataset(data_dir, tokenizer, None, block_size, batch_size)
+    dataloader = DataLoader(dataset, batch_size=None, shuffle=False, num_workers=0)
+
+    for input_ids, targets, fetch, transform in dataloader:
+        print(f"Input IDs: {input_ids.shape}")
+        print(f"targets: {targets.shape}")
+
+        print(f"fetch: {fetch}")
+        print(f"transform: {transform}")
+
+        # break

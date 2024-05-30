@@ -16,7 +16,9 @@ from nltk.tokenize import word_tokenize
 
 from mlworklaods.s3utils import S3Url
 from mlworklaods.dataloaders.torch_lru.torch_lru_text_dataset import TorchLRUTextDataset
-from mlworklaods.args import LLMTrainArgs, DataArgs, SUPERArgs, LRUTorchArgs
+from mlworklaods.dataloaders.super_dl.dataset.super_text_dataset import SUPERTextDataset
+
+from mlworklaods.args import * 
 
 # Check and download NLTK data if not already available
 def check_and_download_nltk_resource(resource_name: str):
@@ -207,16 +209,58 @@ class BaseDataModule:
         self.transform = transform
         self.tokenizer = tokenizer
 
-    def make_dataloaders(self, train_args: LLMTrainArgs, data_args: DataArgs, dataloader_args, model_max_seq_length: int) -> Tuple[Optional[DataLoader], Optional[DataLoader]]:
-        if isinstance(dataloader_args, SUPERArgs):
-            pass
+    def make_dataloaders(self, train_args: LLMTrainArgs, data_args: DataArgs, dataloader_args, 
+                         model_max_seq_length: int, world_size: int) -> Tuple[Optional[DataLoader], Optional[DataLoader]]:
+        
+        if isinstance(dataloader_args, SUPERArgs):      
+            return self.make_super_dataloaders(train_args, data_args, dataloader_args, model_max_seq_length, world_size)
             # return self.make_super_dataloaders(train_args, data_args, dataloader_args, world_size)
         elif isinstance(dataloader_args, LRUTorchArgs):
-            return self.make_lru_torch_dataloaders(train_args, data_args, dataloader_args, model_max_seq_length)
+            return self.make_lru_torch_dataloaders(train_args, data_args, dataloader_args, model_max_seq_length, world_size)
+        
         else:
-            raise Exception(f"Unknown dataloader_kind {train_args.dataloader_kind}")
+            raise Exception(f"Unknown dataloader_kind {train_args.dataloader.name}")
+        
+    # def create_super_dataloader(self, train_args: LLMTrainArgs, data_dir: str, super_args: SUPERArgs, world_size: int) -> DataLoader:
+    def make_super_dataloaders(self, train_args: BaseTrainArgs, data_args: DataArgs, super_args: SUPERArgs, 
+                               model_max_seq_length: int, world_size: int) -> Tuple[Optional[DataLoader], Optional[DataLoader]]:
+        train_dataloader = None
+        val_dataloader = None
 
-    def make_lru_torch_dataloaders(self, train_args: LLMTrainArgs, data_args: DataArgs, lru_torch_args: LRUTorchArgs, model_max_seq_length: int) -> Tuple[Optional[DataLoader], Optional[DataLoader]]:
+        if train_args.run_training:
+            train_dataset = SUPERTextDataset(
+                job_id=train_args.job_id,
+                data_dir=data_args.train_data_dir,
+                tokenizer=self.tokenizer,
+                transform=self.transform,
+                block_size=model_max_seq_length,
+                batch_size=train_args.batch_size(world_size),
+                super_address=super_args.super_address,
+                world_size=world_size,
+                cache_address=super_args.cache_address,
+                simulate_delay=super_args.simulate_data_delay
+            )
+            train_dataloader = DataLoader(dataset=train_dataset, batch_size=None, num_workers=super_args.num_pytorch_workers)
+        
+        if train_args.run_evaluation:
+            train_dataset = SUPERTextDataset(
+                job_id=train_args.job_id,
+                data_dir=data_args.val_data_dir,
+                tokenizer=self.tokenizer,
+                transform=self.transform,
+                block_size=model_max_seq_length,
+                batch_size=train_args.batch_size(world_size),
+                super_address=super_args.super_address,
+                world_size=world_size,
+                cache_address=super_args.cache_address,
+                simulate_delay=super_args.simulate_data_delay
+            )
+            val_dataloader = DataLoader(dataset=train_dataset, batch_size=None, num_workers=super_args.num_pytorch_workers)
+        
+        return train_dataloader, val_dataloader
+
+    def make_lru_torch_dataloaders(self, train_args: LLMTrainArgs, data_args: DataArgs, lru_torch_args: LRUTorchArgs,
+                                    model_max_seq_length: int, world_size: int) -> Tuple[Optional[DataLoader], Optional[DataLoader]]:
         train_dataloader = None
         val_dataloader = None
         
@@ -226,7 +270,7 @@ class BaseDataModule:
                 tokenizer=self.tokenizer,
                 transform=self.transform,
                 block_size=model_max_seq_length,
-                batch_size=train_args.micro_batch_size,
+                batch_size=train_args.batch_size(world_size),
                 cache_address=lru_torch_args.cache_address
             )
             train_dataloader = DataLoader(dataset=train_dataset, batch_size=None, num_workers=lru_torch_args.num_pytorch_workers)
@@ -237,7 +281,7 @@ class BaseDataModule:
                 tokenizer=self.tokenizer,
                 transform=self.transform,
                 block_size=model_max_seq_length,
-                batch_size=train_args.micro_batch_size,
+                batch_size=train_args.batch_size(world_size),
                 cache_address=lru_torch_args.cache_address
 
             )
@@ -247,7 +291,6 @@ class BaseDataModule:
 
 class OpenWebTextDataModule(BaseDataModule):
 
-    
     def __init__(self):
         """Data module for OpenWebText dataset."""
         check_and_download_nltk_resource('stopwords')

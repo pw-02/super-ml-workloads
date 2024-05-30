@@ -1,4 +1,3 @@
-import functools
 import torch
 import mlworklaods.s3utils as s3utils
 from typing import List, Tuple, Dict
