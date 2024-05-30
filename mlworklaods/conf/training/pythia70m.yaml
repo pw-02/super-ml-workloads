@@ -4,7 +4,7 @@ global_batch_size: 4 #Number of samples between optimizer steps across data-para
 micro_batch_size: 4 #Number of samples per data-parallel rank
 lr_warmup_steps: 0
 lr_warmup_fraction: null
-max_steps: 1000
+max_steps: 500
 max_seq_length: 2048
 tie_embeddings: False
 # Optimization args
