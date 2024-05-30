@@ -221,6 +221,7 @@ class LLMPretrainer():
                         lengths=(state["iter_num"] * self.train.micro_batch_size * model.max_seq_length),
                     )
                     metrics = {
+                        "batch_time": time.perf_counter() - end,
                         "loss": loss,
                         "iter": state["iter_num"],
                         "step": state["step_count"],
