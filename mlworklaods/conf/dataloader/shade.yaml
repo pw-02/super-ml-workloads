@@ -1,4 +1,8 @@
 name: shade
 working_set_size: 0.80 #%percentage of dataset to be cached
 replication_factor: 3 #number of times data in cache will be repeated.
-cache_address: shade.rdior4.ng.0001.usw2.cache.amazonaws.com:6379 #shade.rdior4.ng.0001.usw2.cache.amazonaws.com:6379 #'127.0.0.1:6379' #null #test-0001-001.rdior4.0001.usw2.cache.amazonaws.com:6379  #127.0.0.1:6379
+cache_address: shade.rdior4.ng.0001.usw2.cache.amazonaws.com:6379
+
+#shade.rdior4.ng.0001.usw2.cache.amazonaws.com:6379
+
+#shade.rdior4.ng.0001.usw2.cache.amazonaws.com:6379 #'127.0.0.1:6379' #null #test-0001-001.rdior4.0001.usw2.cache.amazonaws.com:6379  #127.0.0.1:6379
