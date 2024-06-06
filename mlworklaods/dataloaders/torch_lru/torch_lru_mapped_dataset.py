@@ -190,7 +190,7 @@ class TorchLRUMappeedDataset(torch.utils.data.Dataset):
             data_samples.append(data)
             labels.append(label)
             
-            return data_samples, labels, cache_hits
+        return data_samples, labels, cache_hits
         
 
     def is_image_file(self, path: str):

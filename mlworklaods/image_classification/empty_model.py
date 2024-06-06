@@ -62,7 +62,7 @@ class EmptyModel(pl.LightningModule):
     def make_dataloaders(self, train_args, data_args,dataloader_args, world_size):
         if 'super' in train_args.dataloader_kind:
             return self.make_super_dataloaders(train_args, data_args,dataloader_args, world_size)
-        elif 'torch_lru' in train_args.dataloader_kind:
+        elif 'torch_lru' in train_args.dataloader_kind or 'baseline' in train_args.dataloader_kind:
            return self.make_lru_torch_datalaoders(train_args, data_args,dataloader_args, world_size)
         else:
             raise Exception(f"Unknown dataloader_kind {train_args.dataloader_kind}")

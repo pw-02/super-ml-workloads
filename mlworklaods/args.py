@@ -203,7 +203,7 @@ def prepare_args(config: DictConfig,expid):
             replication_factor=config.dataloader.replication_factor)
         return train_args, data_args, shade_args
 
-    elif 'torch_lru' in train_args.dataloader_name:
+    elif 'torch_lru' in train_args.dataloader_name or 'baseline' in train_args.dataloader_name:
         torchlru_args = LRUTorchArgs(
             num_pytorch_workers=config.num_workers_per_job,
             cache_address=config.dataloader.cache_address,
