@@ -2,7 +2,7 @@
 defaults:
   - _self_
   - dataloader: shade #shade, baseline, torch_lru, super
-  - dataset: cifar10  #imagenet, cifar10, openwebtext
+  - dataset: imagenet  #imagenet, cifar10, openwebtext
   - training: resnet18 #resnet18,resnet50, pythia14m, pythia160m, pythia70m
   - override hydra/job_logging: disabled
   - override hydra/hydra_logging: disabled  
