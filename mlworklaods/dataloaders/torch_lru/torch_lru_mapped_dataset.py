@@ -57,26 +57,29 @@ class TorchLRUMappeedDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         batch_id, batch_indices,  = idx
+
         fetch_start_time = time.perf_counter()
 
         batch_data = None
 
         if self.use_cache and self.cache_granularity == 'batch':
             batch_data = self.fetch_from_cache(batch_id)
-            
+
         if batch_data:
+            fetch_duration = time.perf_counter() - fetch_start_time
             # Convert JSON batch to torch format
             tranform_start_time = time.perf_counter()
             torch_imgs, torch_labels = self.deserialize_torch_batch(batch_data)
             transform_duration =  time.perf_counter() - tranform_start_time
             # print('data returned') 
             cache_hits = len(batch_indices)
-            fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
-            
+            # fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
+                   
             if torch_imgs is not None and torch_labels is not None:
                 return (torch_imgs, torch_labels), cache_hits, fetch_duration, transform_duration
         
         data_samples, labels, cache_hits = self.fetch_batch_data(batch_indices)
+        fetch_duration = time.perf_counter() - fetch_start_time
 
         tranform_start_time = time.perf_counter()
         if self.transform is not None:
@@ -95,7 +98,7 @@ class TorchLRUMappeedDataset(torch.utils.data.Dataset):
                 self.cache_client.set(batch_id, minibatch)
             except:
                 pass
-        fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
+        # fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
         return (torch.stack(data_samples), torch.tensor(labels)), cache_hits, fetch_duration, transform_duration
     
     def random_true_or_false(self) -> bool:
@@ -128,7 +131,7 @@ class TorchLRUMappeedDataset(torch.utils.data.Dataset):
                     
         return images, labels, cache_hits
     
-    def fetch_batch_data(self,batch_indices):
+    def fetch_batch_data_multithreaded(self,batch_indices):
         data_samples = []
         labels = []
 
@@ -150,44 +153,44 @@ class TorchLRUMappeedDataset(torch.utils.data.Dataset):
         return data_samples, labels, cache_hits
         
 
-    # def fetch_batch_data(self,batch_indices):
-    #     data_samples = []
-    #     labels = []
-    #     cache_hits = 0
-    #     for idx in batch_indices: 
-    #         data = None
-    #         data_path, label = self._classed_items[idx] 
+    def fetch_batch_data(self,batch_indices: List[int]):
+        data_samples = []
+        labels = []
+        cache_hits = 0
+        for idx in batch_indices: 
+            data = None
+            data_path, label = self._classed_items[idx] 
+
+            if self.use_cache and self.cache_granularity == 'sample':
+                byte_data = self.fetch_from_cache(data_path)
+                if byte_data:
+                    byte_img_io = io.BytesIO(byte_data)
+                    data = Image.open(byte_img_io)
+                    cache_hits +=1
+                
+            if data is None:  #data not retrieved from cache, so get it from primary storage
+                if self.is_s3:
+                    data = s3utils.get_s3_object(self.bucket_name, data_path)
+                    data = Image.open(io.BytesIO(data))
+                else:
+                    data = Image.open(data_path) #get_local_sample
+                
+                # if data.mode == "L":
+                data = data.convert("RGB")
+
+                if self.use_cache and self.cache_granularity == 'sample':
+                    byte_stream = io.BytesIO()
+                    data.save(byte_stream, format=data.format)
+                    byte_stream.seek(0)
+                    try:
+                        self.cache_client.set(data_path, byte_stream.read())
+                    except:
+                        return None
+
+            data_samples.append(data)
+            labels.append(label)
             
-    #         if self.use_cache and self.cache_granularity == 'sample':
-    #             byte_data = self.fetch_from_cache(data_path)
-    #             if byte_data:
-    #                 byte_img_io = io.BytesIO(byte_data)
-    #                 data = Image.open(byte_img_io)
-    #                 cache_hits +=1
-                
-    #         if data is None:  #data not retrieved from cache, so get it from primary storage
-    #             if self.is_s3:
-    #                 data = s3utils.get_s3_object(self.bucket_name, data_path)
-    #                 data = Image.open(io.BytesIO(data))
-    #             else:
-    #                 data = Image.open(data_path) #get_local_sample
-                
-    #             # if data.mode == "L":
-    #             data = data.convert("RGB")
-
-    #             if self.use_cache and self.cache_granularity == 'sample':
-    #                 byte_stream = io.BytesIO()
-    #                 data.save(byte_stream, format=data.format)
-    #                 byte_stream.seek(0)
-    #                 try:
-    #                     self.cache_client.set(data_path, byte_stream.read())
-    #                 except:
-    #                     return None
-
-    #         data_samples.append(data)
-    #         labels.append(label)
-
-    #     return data_samples, labels, cache_hits
+            return data_samples, labels, cache_hits
         
 
     def is_image_file(self, path: str):
