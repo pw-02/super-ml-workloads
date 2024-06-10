@@ -176,12 +176,22 @@ class SUPERTextDataset(IterableDataset):
                 return tokens, transform_duration, cache_hit
             else:
                 cache_hit = False
-                text = s3utils.get_s3_object(self.s3_bucket_name, data_path)
+                chunk_text = s3utils.get_s3_object(self.s3_bucket_name, data_path)
                 transform_start_time = time.perf_counter()
                 if self.transform:
-                    text = self.transform(text)  
-                tokens = self.tokenizer(text, truncation=False, padding=False, return_tensors='pt').input_ids.squeeze()
-                transform_duration = time.perf_counter() - transform_start_time
+                    chunk_text = self.transform(chunk_text)
+                
+                documents = chunk_text.split('\n')  # Split based on the specified delimiter 
+                eos_token_id = tokenizer.eos_token_id
+                all_tokens = []
+                for doc in documents:
+                    encoded_input = tokenizer(doc, truncation=False, padding=False, return_tensors='pt')
+                    input_ids_with_eos = torch.cat([encoded_input.input_ids, torch.tensor([[eos_token_id]])], dim=1)            
+                    # Append the input_ids_with_eos to the list
+                    all_tokens.append(input_ids_with_eos)
+                    # tokens = self.tokenizer(text, truncation=False, padding=False, return_tensors='pt').input_ids.squeeze()
+                tokens = torch.cat(all_tokens, dim=0)
+                transform_duration = time.perf_counter() - transform_start_time     
                 return tokens, transform_duration, cache_hit
 
     def fetch_from_cache(self, data_id, max_attempts = 5):
@@ -222,7 +232,7 @@ if __name__ == "__main__":
     transformations = TextTransformations()
 
 
-    dataset = TorchLRUTextDataset(data_dir, tokenizer, None, block_size, batch_size)
+    dataset = SUPERTextDataset(data_dir, tokenizer, None, block_size, batch_size)
     dataloader = DataLoader(dataset, batch_size=None, shuffle=False, num_workers=0)
 
     for input_ids, targets, fetch, transform in dataloader:

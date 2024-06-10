@@ -13,7 +13,8 @@ import redis
 import io
 import base64
 import zlib
-class TorchLRUTextDataset(Dataset):
+
+class BaselineTextDataset(Dataset):
 
     def __init__(self, data_dir: str, tokenizer: PreTrainedTokenizer, transform, block_size: int, batch_size: int, cache_address:str = None):
 
@@ -82,6 +83,8 @@ class TorchLRUTextDataset(Dataset):
         if self.transform:
             text = self.transform(text)  
         tokens = self.tokenizer(text, truncation=False, padding=False, return_tensors='pt').input_ids.squeeze()
+        # tokens = self.tokenizer(text, truncation=False, padding=False, return_tensors='pt')
+
         transform_duration = time.perf_counter() - transform_start_time
 
         if self.use_cache:

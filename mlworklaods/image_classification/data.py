@@ -1,11 +1,11 @@
 from torch.utils.data import DataLoader, SequentialSampler, RandomSampler
 from torchvision import transforms
-from mlworklaods.dataloaders.torch_lru.batch_sampler_with_id import BatchSamplerWithID
-from mlworklaods.dataloaders.torch_lru.random_batch_sampler_with_id import RandomBatchSamplerWithID
+from mlworklaods.dataloaders.baseline.batch_sampler_with_id import BatchSamplerWithID
+from mlworklaods.dataloaders.baseline.random_batch_sampler_with_id import RandomBatchSamplerWithID
 from mlworklaods.dataloaders.shade.shadedataset_s3 import ShadeDatasetS3
 from mlworklaods.dataloaders.shade.shadesampler_s3 import ShadeSamplerS3, ShadeBatchSampler
-from mlworklaods.dataloaders.torch_lru.torch_lru_mapped_dataset import TorchLRUMappeedDataset
-from mlworklaods.dataloaders.super_dl.dataset.super_dataset import SUPERDataset
+from mlworklaods.dataloaders.baseline.baseline_mapped_dataset import BaselineMappeedDataset
+from mlworklaods.dataloaders.super_dl.super_dataset import SUPERDataset
 from typing import Tuple, Optional
 from mlworklaods.args import * 
 import torch
@@ -32,7 +32,7 @@ class BaseDataModule:
         return train_dataloader, val_dataloader
 
     def create_lru_dataloader(self, train_args: BaseTrainArgs, data_dir: str, lru_torch_args: LRUTorchArgs, world_size: int) -> DataLoader:
-        dataset = TorchLRUMappeedDataset(
+        dataset = BaselineMappeedDataset(
             data_dir=data_dir,
             transform=self.transform,
             cache_address=lru_torch_args.cache_address,

@@ -15,10 +15,11 @@ from nltk.corpus import stopwords, wordnet
 from nltk.tokenize import word_tokenize
 
 from mlworklaods.s3utils import S3Url
-from mlworklaods.dataloaders.torch_lru.torch_lru_text_dataset import TorchLRUTextDataset
-from mlworklaods.dataloaders.super_dl.dataset.super_text_dataset import SUPERTextDataset
+from mlworklaods.dataloaders.baseline.baseline_text_dataset import BaselineTextDataset
+from mlworklaods.dataloaders.super_dl.super_text_dataset import SUPERTextDataset
 
 from mlworklaods.args import * 
+from transformers import AutoTokenizer
 
 # Check and download NLTK data if not already available
 def check_and_download_nltk_resource(resource_name: str):
@@ -265,7 +266,7 @@ class BaseDataModule:
         val_dataloader = None
         
         if train_args.run_training:
-            train_dataset = TorchLRUTextDataset(
+            train_dataset = BaselineTextDataset(
                 data_dir=data_args.train_data_dir,
                 tokenizer=self.tokenizer,
                 transform=self.transform,
@@ -276,7 +277,7 @@ class BaseDataModule:
             train_dataloader = DataLoader(dataset=train_dataset, batch_size=None, num_workers=lru_torch_args.num_pytorch_workers)
         
         if train_args.run_evaluation:
-            val_dataset = TorchLRUTextDataset(
+            val_dataset = BaselineTextDataset(
                 data_dir=data_args.val_data_dir,
                 tokenizer=self.tokenizer,
                 transform=self.transform,
@@ -297,4 +298,6 @@ class OpenWebTextDataModule(BaseDataModule):
         check_and_download_nltk_resource('wordnet')
         text_transformer = TextTransformations()
         transform_func = text_transformer.normalize
-        super().__init__(transform=transform_func, tokenizer=GPT2Tokenizer.from_pretrained('gpt2'))
+        tokenizer_name = "EleutherAI/pythia-14m"
+        # super().__init__(transform=transform_func, tokenizer=GPT2Tokenizer.from_pretrained('gpt2'))
+        super().__init__(transform=transform_func, tokenizer= AutoTokenizer.from_pretrained(tokenizer_name))
