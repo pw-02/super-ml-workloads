@@ -23,6 +23,7 @@ from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 from lightning.fabric.accelerators import Accelerator
 from lightning.fabric.strategies import Strategy
 from mlworklaods.utils import ResourceMonitor, AverageMeter
+import numpy as np
 
 # from data.tiny_llama import TinyLlama
 from mlworklaods.llm.model import GPT, Block, CausalSelfAttention, Config, LLaMAMLP
@@ -50,7 +51,7 @@ class LLMPretrainer():
         model_name: Optional[str] = None,
         eval: EvalArgs = EvalArgs(interval=1000, max_iters=100),
         seed: int = None,
-        max_iters: int = None
+        max_iters: int = np.inf
     ) -> None:
     
         available_models = "\n".join(sorted(name_to_config))
@@ -146,12 +147,11 @@ class LLMPretrainer():
             self.fabric.print(f"Measured TFLOPs: {measured_flops * self.fabric.world_size / 1e12:.2f}")
             del meta_model, x
 
-        if self.max_iters is None:
             max_tokens_per_device = self.train.max_tokens // self.fabric.world_size
             tokens_per_iter = self.train.micro_batch_size * model.max_seq_length
             max_iters = max_tokens_per_device // tokens_per_iter
-        else:
-            max_iters = self.max_iters
+
+            max_iters = min(self.max_iters,max_iters)
 
         log_iter_interval = self.train.log_interval * self.train.gradient_accumulation_iters(self.devices)
         initial_iter = state["iter_num"]
