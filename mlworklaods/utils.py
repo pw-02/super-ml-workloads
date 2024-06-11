@@ -86,7 +86,7 @@ class ResourceMonitor:
     """
 
     def __init__(
-        self, sleep_time_s: float = 0.05, gpu_device: int = 0, chunk_size: int = 25_000
+        self, sleep_time_s: float = 0.5, gpu_device: int = 0, chunk_size: int = 25_000
     ):
         self.monitor_thread = None
         self._utilization = defaultdict(lambda: Distribution(chunk_size))
@@ -340,14 +340,36 @@ class CycleIterator:
     def __iter__(self) -> Self:
         return self
 
-
+def cpu_intensive_task(duration: int):
+    """A simple function that increases CPU usage over time."""
+    end_time = time.time() + duration
+    while time.time() < end_time:
+        # Perform a CPU-intensive calculation
+        for _ in range(1000000):
+            _ = 2**10  # Any simple calculation to keep CPU busy
 
 if __name__ == "__main__":
-    with ResourceMonitor() as monitor:
-        # Monitor for a specified time
-        time.sleep(5)
-        # Access the resource data
-        resource_data = monitor.resource_data
-        # Print CPU utilization distribution
-        print("CPU Utilization Distribution:")
-        print(monitor._utilization["cpu_util"])
+    with ResourceMonitor(sleep_time_s=1, gpu_device=0) as monitor:
+        print("Monitoring resources... Press Ctrl+C to stop.")
+        try:
+            while True:
+                # Create threads for CPU-intensive tasks that start at different times
+                for i in range(10):
+                    threading.Thread(target=cpu_intensive_task, args=(10 + i,)).start()
+                    time.sleep(1)  # Stagger the start times
+                
+                # Print the collected data
+                data = {
+                    "cpu_usage": json.dumps(monitor.resource_data["cpu_util"].summarize()),
+                    "gpu_usage": json.dumps(monitor.resource_data["gpu_util"].summarize()),
+                    "mem_usage": json.dumps(monitor.resource_data["cpu_mem"].summarize())   
+                }
+                print(data)
+
+                # Sleep for a while before creating more threads and reporting again
+                time.sleep(5)
+
+        except KeyboardInterrupt:
+            print("Stopping monitoring.")
+
+

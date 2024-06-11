@@ -246,7 +246,9 @@ class ImageClassificationTrainer():
                         "loss_train": self._current_train_return['loss'],
                         "accuracy_train": self._current_train_return['top1'],
                         "cpu_usge": json.dumps(monitor.resource_data["cpu_util"].summarize()),
-                        "gpu_usge": json.dumps( monitor.resource_data["gpu_util"].summarize())   
+                        "gpu_usge": json.dumps( monitor.resource_data["gpu_util"].summarize()),
+                        "mem_usge": json.dumps( monitor.resource_data["cpu_mem"].summarize())   
+   
                         })
                 # total_loss_for_epoch +=self._current_train_return['loss']
 
