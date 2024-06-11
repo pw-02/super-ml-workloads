@@ -101,17 +101,19 @@ class BaseDataModule:
 
 class CIFAR10DataModule(BaseDataModule):
     def __init__(self):
-        transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ])
         # transform = transforms.Compose([
-        # transforms.Resize(256),                    # Resize the image to 256x256 pixels
-        # transforms.RandomResizedCrop(224),   # Randomly crop a 224x224 patch
-        # transforms.,(), # Randomly flip the image horizontally
-        # transforms.ToTensor(),  # Convert the image to a PyTorch tensor
-        # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        #     transforms.ToTensor(),
+        #     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         # ])
+        
+        transform = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),  # Randomly crop the image with padding
+            transforms.RandomHorizontalFlip(),     # Randomly flip the image horizontally
+            transforms.ToTensor(),                 # Convert the image to a PyTorch tensor
+            transforms.Normalize((0.5, 0.5, 0.5),  # Normalize the image
+                                (0.5, 0.5, 0.5))  # Normalize the image
+        ])
+
         super().__init__(transform, num_classes=10)
 
 

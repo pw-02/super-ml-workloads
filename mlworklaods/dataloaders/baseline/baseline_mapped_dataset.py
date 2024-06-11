@@ -78,7 +78,7 @@ class BaselineMappeedDataset(torch.utils.data.Dataset):
             if torch_imgs is not None and torch_labels is not None:
                 return (torch_imgs, torch_labels), cache_hits, fetch_duration, transform_duration
         
-        data_samples, labels, cache_hits = self.fetch_batch_data(batch_indices)
+        data_samples, labels, cache_hits = self.fetch_batch_from_s3(batch_indices)
         fetch_duration = time.perf_counter() - fetch_start_time
 
         tranform_start_time = time.perf_counter()
