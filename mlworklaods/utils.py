@@ -78,17 +78,7 @@ class Distribution:
         summary_str = json.dumps(self.summarize())
         return "Distribution({0})".format(summary_str)
 
-# @dataclass(frozen=True)
-# class ExperimentResult:
-#     elapsed_time: float
-#     volume: float
-#     utilization: Dict[str, Distribution] = None
 
-#     @cached_property
-#     def throughput(self):
-#         return self.volume / self.elapsed_time
-    
-    
 class ResourceMonitor:
     """
     Monitors CPU, GPU usage and memory.
@@ -353,4 +343,11 @@ class CycleIterator:
 
 
 if __name__ == "__main__":
-    pass
+    with ResourceMonitor() as monitor:
+        # Monitor for a specified time
+        time.sleep(5)
+        # Access the resource data
+        resource_data = monitor.resource_data
+        # Print CPU utilization distribution
+        print("CPU Utilization Distribution:")
+        print(monitor._utilization["cpu_util"])
