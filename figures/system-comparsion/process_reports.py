@@ -28,6 +28,8 @@ def process_reprot(folder_path, is_language, folder_name):
          "io%": 0,
          "transform%": 0,
          "cache_hit%": 0,
+         "cpu_usge": None,
+         "gpu_usge": None,
          })
 
     csv_data = {}
@@ -58,7 +60,9 @@ def process_reprot(folder_path, is_language, folder_name):
             metrics["fetch_time(s)"] += sum(csv_data["fetch_time"])
             metrics["transform_time(s)"] += sum(csv_data["transform_time"])
             metrics["cache_hits"] += sum(csv_data["cache_hits"])
-    
+            metrics["cpu_usge"] = csv_data["cpu_usge"][-1]
+            metrics["gpu_usge"] = csv_data["gpu_usge"][-1]
+
     metrics["dataloading_time(s)"] = metrics["fetch_time(s)"] + metrics["transform_time(s)"]
     
     for key in ['total_time(s)',"dataloading_delay_time(s)", "fetch_time(s)","dataloading_time(s)","compute_time(s)","transform_time(s)" ]:
@@ -104,7 +108,7 @@ if __name__ == "__main__":
          "C:\\Users\\pw\\Desktop\\reports\\imagenet1k\\resnet50",
         "C:\\Users\\pw\\Desktop\\reports\\openwebtext\\pythia-14m",
         "C:\\Users\\pw\\Desktop\\reports\\openwebtext\\pythia-70m",
-        "C:\\Users\\pw\\Desktop\\reports\\openwebtext\\pythia-160m",
+        # "C:\\Users\\pw\\Desktop\\reports\\openwebtext\\pythia-160m",
 
     ]
     combined_files_paths = []
