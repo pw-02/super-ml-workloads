@@ -40,7 +40,7 @@ for i, workload in enumerate(workloads):
         hatch = '/' if label.lower() == 'baseline' else '.' if label.lower() == 'shade' or label.lower() == 'litdata' else '-'  # Custom hatches
         if label.lower() == 'super':
             label = r'$\bf{SUPER}$'  # Set 'super' label to bold
-        axs[i].bar(label, values[j], color=color, width=0.7, edgecolor='black', hatch=hatch, alpha=1)
+        axs[i].bar(label, values[j], color=color, width=0.5, edgecolor='black', hatch=hatch, alpha=1)
     
     # Add gridlines
     axs[i].grid(axis='y', linestyle='--', alpha=0.7)
@@ -65,10 +65,12 @@ for i, workload in enumerate(workloads):
 
     # Set font size for x-axis labels
     axs[i].tick_params(axis='x', labelsize=12)
+    axs[i].legend(labels,fontsize=10, loc='upper left')
 
 # Adjust layout
 plt.tight_layout()
-
+# fig.patch.set_edgecolor('black')
+# fig.patch.set_linewidth(1.5)
 # Save the combined figure
 plt.savefig('figures/system-comparsion/aggregated_throughput/combined_throughput.png')
 plt.show()
