@@ -1,4 +1,5 @@
-from figures.cost_analysis.constants import *
+from constants import *
+import json
 
 def calculate_s3_read_request_cost(num_requests):
 
@@ -42,8 +43,11 @@ def cacluate_serverless_cache_costs(num_files, batch_size, duration_hours, keep_
     total_cost = create_batches_lmabda_cost + keep_alive_cost + proxy_cost
     return total_cost
 
-def caclaute_aws_redis_cache_cost(num_files, duration_hours, redis_instacne ='cache.m5.12xlarge'):
-    cache_cost = elasticache_redis_prices_per_hour[redis_instacne] * duration_hours
+def caclaute_aws_redis_cache_cost(num_files, duration_hours, data_size_gb):
+
+    best_redis_instance = find_redis_node(data_size_gb)
+
+    cache_cost = best_redis_instance['cost_per_hour_usd'] * duration_hours
     s3_read_requests_costs = calculate_s3_read_request_cost(num_files)
     return cache_cost  + s3_read_requests_costs
 
@@ -117,39 +121,91 @@ def calculate_cost_savings(severless_cost, aws_redis_cost):
     percentage_savings = (savings / aws_redis_cost) * 100
 
     return percentage_savings
-def main():
+
+def impact_of_differnt_batch_sizes():
+    dataset = 'imagenet'
+    batch_sizes = [4,8,16,32,64,128,256,512]
+    duration_hours = 730
+    cache_proxy = 'c5n.xlarge'
+
+    results = []
+
+    #for percentage in range(10, 110, 10):
+    for batch_size in  batch_sizes:
+
+        num_files = dataset_info[dataset]['num_files']
+        data_size_gb = dataset_info[dataset]['size_gb']
+
+        estimated_severless_cost = cacluate_serverless_cache_costs(
+            num_files=num_files,
+            batch_size=batch_size,
+            duration_hours=duration_hours,
+            ec2_instance_type=cache_proxy
+        )
+
+        results.append(
+            {'batch_size': batch_size,
+             "cost": estimated_severless_cost})
+    
+    return results
+
+
+def system_comaprsion():
     dataset = 'imagenet'
     batch_size = 128
     duration_hours = 730
     cache_proxy = 'c5n.xlarge'
-    estimated_severless_cost = cacluate_serverless_cache_costs (num_files = dataset_info[dataset]['num_files'], batch_size = batch_size, duration_hours = duration_hours, ec2_instance_type=cache_proxy )
-    estimated_aws_redis_cost = caclaute_aws_redis_cache_cost(num_files= dataset_info[dataset]['num_files'], duration_hours=duration_hours,redis_instacne='cache.m5.12xlarge')
-    estimated_elasticache_serverless = caclaute_aws_elasticache_serverless_cache_cost(
-        data_size_gb=dataset_info[dataset]['size_gb'],
-        duration_hours= duration_hours
-    )
-    estimated_gp3_volume_cost = calculate_ebs_cost(
-        volume_size_gb=dataset_info[dataset]['size_gb'],
-        provisioned_iops=3000,
-        provisioned_throughput_mbps=125,
-        snapshot_size_gb=3,
-        snapshot_count = 59.83
-    )
 
-    print(f"Estimated Severless cost: ${estimated_severless_cost:.8f}")
-    print(f"Estimated EasltiCache cost: ${estimated_aws_redis_cost:.8f}")
-    print(f"Estimated EasltiCache Serverless cost: ${estimated_elasticache_serverless:.8f}")
-    print(f"Estimated EBS cost: ${estimated_gp3_volume_cost:.8f}")
+    results = []
 
-    print(f"Cost savings v EasltiCache Redis: {calculate_cost_savings(estimated_severless_cost, estimated_aws_redis_cost):.2f}%")
-    print(f"Cost savings v EasltiCache Serverless: {calculate_cost_savings(estimated_severless_cost, estimated_elasticache_serverless):.2f}%")
-    print(f"Cost losses v EBS: {calculate_cost_savings(estimated_gp3_volume_cost,estimated_severless_cost ):.2f}%")
+    #for percentage in range(10, 110, 10):
+    for percentage in [15, 25, 40, 55, 70, 85, 100]:
 
-   
+        num_files = int(dataset_info[dataset]['num_files'] * (percentage / 100))
+        data_size_gb = dataset_info[dataset]['size_gb'] * (percentage / 100)
 
+        estimated_severless_cost = cacluate_serverless_cache_costs(
+            num_files=num_files,
+            batch_size=batch_size,
+            duration_hours=duration_hours,
+            ec2_instance_type=cache_proxy
+        )
+        estimated_aws_redis_cost = caclaute_aws_redis_cache_cost(
+            num_files=num_files,
+            duration_hours=duration_hours,
+            data_size_gb=data_size_gb
+        )
+        estimated_elasticache_serverless = caclaute_aws_elasticache_serverless_cache_cost(
+            data_size_gb=data_size_gb,
+            duration_hours=duration_hours
+        )
+        estimated_gp3_volume_cost = calculate_ebs_cost(
+            volume_size_gb=data_size_gb,
+            provisioned_iops=3000,
+            provisioned_throughput_mbps=125,
+            snapshot_size_gb=3,
+            snapshot_count=59.83
+        )
+
+        result = {
+            "percentage": percentage,
+            "aws_redis_cost": estimated_aws_redis_cost,
+            "elasticache_serverless_cost": estimated_elasticache_serverless,
+            "severless_cost": estimated_severless_cost,
+
+            # "gp3_volume_cost": estimated_gp3_volume_cost,
+            # "savings_vs_aws_redis": calculate_cost_savings(estimated_severless_cost, estimated_aws_redis_cost),
+            # "savings_vs_elasticache_serverless": calculate_cost_savings(estimated_severless_cost, estimated_elasticache_serverless),
+            # "losses_vs_gp3_volume": calculate_cost_savings(estimated_gp3_volume_cost, estimated_severless_cost)
+        }
+
+        results.append(result)
+
+    # # Write results to a JSON file
+    # with open('cost_analysis_results.json', 'w') as json_file:
+    #     json.dump(results, json_file, indent=4)
+    # print(results)
+    # print("Cost analysis results have been saved to 'cost_analysis_results.json'.")
+    return results
 if __name__ == "__main__":
-    main()
-
-# print(f"Estimated Lambda cost: ${estimated_cost:.2f}")
-
-
+    impact_of_differnt_batch_sizes()
