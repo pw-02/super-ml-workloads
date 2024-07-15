@@ -36,7 +36,7 @@ def cacluate_serverless_cache_costs(num_files, batch_size, duration_hours, keep_
 
     num_keep_alive_requests = (duration_hours *  60)/keep_alive_interval_mins * num_batches
     keep_alive_cost = calculate_lambda_cost(invocation_count=num_keep_alive_requests, 
-                                                       execution_duration_ms=500,
+                                                       execution_duration_ms=40,
                                                        memory_allocation_mb=1048)
     #cost of running ec2 instnace 
     proxy_cost = ec2_on_demand_cost_per_hour[ec2_instance_type] * duration_hours
@@ -149,8 +149,7 @@ def impact_of_differnt_batch_sizes():
     
     return results
 
-
-def system_comaprsion():
+def system_comaprsion_inc_batch_sizes():
     dataset = 'imagenet'
     batch_size = 128
     duration_hours = 730
@@ -163,10 +162,128 @@ def system_comaprsion():
 
         num_files = int(dataset_info[dataset]['num_files'] * (percentage / 100))
         data_size_gb = dataset_info[dataset]['size_gb'] * (percentage / 100)
+        
+        estimated_severless_cost_8_batch_size = cacluate_serverless_cache_costs(
+            num_files=num_files,
+            batch_size=8,
+            duration_hours=duration_hours,
+            ec2_instance_type=cache_proxy
+        )
+        estimated_severless_cost_64_batch_size = cacluate_serverless_cache_costs(
+            num_files=num_files,
+            batch_size=64,
+            duration_hours=duration_hours,
+            ec2_instance_type=cache_proxy
+        )
+        
+        estimated_severless_cost_128_batch_size = cacluate_serverless_cache_costs(
+            num_files=num_files,
+            batch_size=128,
+            duration_hours=duration_hours,
+            ec2_instance_type=cache_proxy
+        )
+        
+        estimated_severless_cost_256_batch_size = cacluate_serverless_cache_costs(
+            num_files=num_files,
+            batch_size=256,
+            duration_hours=duration_hours,
+            ec2_instance_type=cache_proxy
+        )
+
+     
+        estimated_aws_redis_cost = caclaute_aws_redis_cache_cost(
+            num_files=num_files,
+            duration_hours=duration_hours,
+            data_size_gb=data_size_gb
+        )
+       
+        result = {
+        
+            "percentage": percentage,
+            "aws_redis_cost": estimated_aws_redis_cost,
+            # "elasticache_serverless_cost": estimated_elasticache_serverless,
+            "severless_cost_8_batch_size": estimated_severless_cost_8_batch_size,
+            "severless_cost_64_batch_size": estimated_severless_cost_64_batch_size,
+            "severless_cost_128_batch_size": estimated_severless_cost_128_batch_size,
+            # "severless_cost_256_batch_size": estimated_severless_cost_256_batch_size,
+         }
+
+        results.append(result)
+    return results
+
+# def system_comaprsion():
+#     dataset = 'imagenet'
+#     dataset_num_files = dataset_info[dataset]['num_files']
+#     dataset_size_gb = dataset_info[dataset]['size_gb']
+#     batch_size_files = 128
+#     batch_size_gb = dataset_size_gb //batch_size_files
+#     duration_hours = 730 #one month
+#     cache_proxy = 'c5n.xlarge'
+#     results = []
+#     #for percentage in range(10, 110, 10):
+#     # for percentage in [15, 25, 40, 55, 70, 85, 100]:
+#     # for percentage in [100]:
+#     for lookahead_distance in [50, 100, 200,400, 600, 800,1000]:
+        
+#         num_files = int(dataset_info[dataset]['num_files'] * (percentage / 100))
+#         data_size_gb = dataset_info[dataset]['size_gb'] * (percentage / 100)
+
+#         estimated_severless_cost = cacluate_serverless_cache_costs(
+#             num_files=num_files,
+#             batch_size=batch_size,
+#             duration_hours=duration_hours,
+#             ec2_instance_type=cache_proxy
+#         )
+#         estimated_aws_redis_cost = caclaute_aws_redis_cache_cost(
+#             num_files=num_files,
+#             duration_hours=duration_hours,
+#             data_size_gb=data_size_gb
+#         )
+#         estimated_elasticache_serverless = caclaute_aws_elasticache_serverless_cache_cost(
+#             data_size_gb=data_size_gb,
+#             duration_hours=duration_hours
+#         )
+#         estimated_gp3_volume_cost = calculate_ebs_cost(
+#             volume_size_gb=data_size_gb,
+#             provisioned_iops=3000,
+#             provisioned_throughput_mbps=125,
+#             snapshot_size_gb=3,
+#             snapshot_count=59.83
+#         )
+
+#         result = {
+#             "percentage": percentage,
+#             "aws_redis_cost": estimated_aws_redis_cost,
+#             "elasticache_serverless_cost": estimated_elasticache_serverless,
+#             "severless_cost": estimated_severless_cost,
+#             }
+
+#         results.append(result)
+#     return results
+
+
+def system_comaprsion():
+
+    dataset = 'imagenet'
+    dataset_num_files = dataset_info[dataset]['num_files']
+    dataset_size_gb = dataset_info[dataset]['size_gb']
+    batch_size_files = 128
+    batch_size_gb = dataset_size_gb /(dataset_num_files//batch_size_files)
+    duration_hours = 730 #one month
+    cache_proxy = 'c5n.xlarge'
+    results = []
+    #for percentage in range(10, 110, 10):
+    # for percentage in [15, 25, 40, 55, 70, 85, 100]:
+    # for percentage in [100]:
+    for minibatch_lookahead_distance in [1000,2500,5000,7500,10000,12500]:
+        num_files = minibatch_lookahead_distance * batch_size_files
+        # num_files = int(dataset_info[dataset]['num_files'] * (percentage / 100))
+        # data_size_gb = dataset_info[dataset]['size_gb'] * (percentage / 100)
+        data_size_gb = minibatch_lookahead_distance * batch_size_gb
 
         estimated_severless_cost = cacluate_serverless_cache_costs(
             num_files=num_files,
-            batch_size=batch_size,
+            batch_size=batch_size_files,
             duration_hours=duration_hours,
             ec2_instance_type=cache_proxy
         )
@@ -188,24 +305,38 @@ def system_comaprsion():
         )
 
         result = {
-            "percentage": percentage,
+            "percentage": minibatch_lookahead_distance,
             "aws_redis_cost": estimated_aws_redis_cost,
             "elasticache_serverless_cost": estimated_elasticache_serverless,
             "severless_cost": estimated_severless_cost,
+            "ebs_cost": estimated_gp3_volume_cost,
 
-            # "gp3_volume_cost": estimated_gp3_volume_cost,
-            # "savings_vs_aws_redis": calculate_cost_savings(estimated_severless_cost, estimated_aws_redis_cost),
-            # "savings_vs_elasticache_serverless": calculate_cost_savings(estimated_severless_cost, estimated_elasticache_serverless),
-            # "losses_vs_gp3_volume": calculate_cost_savings(estimated_gp3_volume_cost, estimated_severless_cost)
-        }
+            }
 
         results.append(result)
-
-    # # Write results to a JSON file
-    # with open('cost_analysis_results.json', 'w') as json_file:
-    #     json.dump(results, json_file, indent=4)
-    # print(results)
-    # print("Cost analysis results have been saved to 'cost_analysis_results.json'.")
+        print(results)
     return results
+
+def cost_of_training_jobs_serverless(num_jobs, num_epochs, num_files, batch_size, keep_alive_interval_mins = 15, ec2_instance_type ='c5n.2xlarge'):
+    
+    num_batches = num_files // batch_size
+
+    #cacluate initial cost of populating the cache. Invoke fucntion that loads a batch worth of data from S3 and adds it to the cache
+    create_batches_lmabda_cost = calculate_lambda_cost(invocation_count=num_batches, execution_duration_ms=3500, memory_allocation_mb=2048)
+    s3_read_requests_costs = calculate_s3_read_request_cost(num_files)
+    create_batches_lmabda_cost = (create_batches_lmabda_cost + s3_read_requests_costs) * num_epochs
+    num_requests = (num_batches * num_jobs) * num_jobs
+    keep_alive_cost = calculate_lambda_cost(invocation_count=num_requests, execution_duration_ms=500, memory_allocation_mb=1048)
+    #cost of running ec2 instnace 
+    proxy_cost = ec2_on_demand_cost_per_hour[ec2_instance_type] * duration_hours
+    total_cost = create_batches_lmabda_cost + keep_alive_cost + proxy_cost
+    
+    return total_cost
+
+
+
+
+
+
 if __name__ == "__main__":
-    impact_of_differnt_batch_sizes()
+    system_comaprsion()

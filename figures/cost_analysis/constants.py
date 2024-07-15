@@ -59,5 +59,5 @@ elasticache_redis_instances = [
 elasticache_serverless_prices_per_gb_hour =  0.125
 
 dataset_info = {
-    'imagenet': {"num_files": 10963020, 'size_gb': 122.3}
+    'imagenet': {"num_files": 1096302, 'size_gb': 122.3}
     }
