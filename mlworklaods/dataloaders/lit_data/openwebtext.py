@@ -141,7 +141,7 @@ class OpenWebText(DataModule):
 if __name__ == "__main__":
     from transformers import AutoTokenizer
 
-    data_path = Path('data/openwebtext/litdata_example')
+    data_path = Path('s3://litdataowt/train/')
     batch_size = 32
     # tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
     # Specify the tokenizer name

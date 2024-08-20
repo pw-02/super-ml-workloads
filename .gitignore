@@ -10,3 +10,4 @@ openwebtext_chunks/
 *png
 figures/cost_analysis/__pycache__/constants.cpython-310.pyc
 figures/cost_analysis/__pycache__/storage_costs_calculations.cpython-310.pyc
+figures

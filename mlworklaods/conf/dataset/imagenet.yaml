@@ -1,3 +1,4 @@
 name: imagenet1k
-train_dir: s3://imagenet1k-sdl/train/
-val_dir: s3://imagenet1k-sdl/val/
+s3_bucket: imagenet1k-sdl
+s3_train_prefix: train/
+s3_val_prefix: val/
