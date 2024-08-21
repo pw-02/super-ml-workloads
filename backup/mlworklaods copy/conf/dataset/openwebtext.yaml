@@ -1,9 +1,0 @@
-name: openwebtext
-# train_dir: data/openwebtext/test/train
-# val_dir: data/openwebtext/test/val
-
-# train_dir: datasets/openwebtext/val.bin
-# val_dir: datasets/openwebtext/val.bin
-
-train_dir: s3://owtchunks/train/ #data/openwebtext/openwebtext_chunks/train #s3://owtchunks/train/ #s3://openwebtxt/owt/train/
-val_dir: null

@@ -22,7 +22,6 @@ RUN apt update \
                    curl \
                    ca-certificates \
                    wget \
-                   #redis-server \ 
     && rm -rf /var/lib/apt/lists/*
 
 # Install Miniconda and create main env
@@ -33,7 +32,7 @@ RUN /bin/bash miniconda3.sh -b -p /opt/conda \
        python=$PYTHON_VERSION \
     && /opt/conda/bin/conda clean -ya
 
-
+    
 # Install requirements
 COPY requirements-dev.txt /tmp/
 RUN pip install --no-cache-dir -r /tmp/requirements-dev.txt \

@@ -76,7 +76,9 @@ class S3MappedDataset(Dataset):
         return sum(len(class_items) for class_items in self.samples.values())
     
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, float, float]:
-        batch_indices = self._classed_items[idx][0]  # Simplified for demonstration
+        batch_id, batch_indices = idx
+        # batch_indices = self._classed_items[idx][0]  # Simplified for demonstration
+        
         fetch_start_time = time.perf_counter()
 
         data_samples, labels = self.fetch_batch_from_s3(batch_indices)
@@ -89,17 +91,18 @@ class S3MappedDataset(Dataset):
                 data_samples[i] = self.transform(data_samples[i])
         transform_duration =  time.perf_counter() - transform_start_time
 
-        return (torch.stack(data_samples), torch.tensor(labels)), fetch_duration, transform_duration
+        return (torch.stack(data_samples), torch.tensor(labels)), fetch_duration, transform_duration, False
 
     def fetch_batch_from_s3(self, batch_indices: List[str]) -> Tuple[List[torch.Tensor], List[int]]:
         data_samples = []
         labels = []
         for idx in batch_indices:
-            obj = self.s3_client.get_object(Bucket=self.s3_bucket, Key=idx)
+            data_path, label = self._classed_items[idx]
+            obj = self.s3_client.get_object(Bucket=self.s3_bucket, Key=data_path)
             img_data = obj['Body'].read()
             image = Image.open(io.BytesIO(img_data)).convert('RGB')
             data_samples.append(image)
-            labels.append(int(idx.split('/')[0]))  # Simplified; adjust based on your label extraction
+            labels.append(label)  # Simplified; adjust based on your label extraction
         return data_samples, labels
 
 

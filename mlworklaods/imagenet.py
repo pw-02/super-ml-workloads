@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
-import torchmetrics
 import hydra
 from omegaconf import DictConfig
 from lightning.fabric import Fabric, seed_everything
@@ -15,24 +14,9 @@ from torch.utils.data import RandomSampler, SequentialSampler
 import time
 import os
 from collections import OrderedDict
-import psutil
-import subprocess
 import numpy as np
-
-def get_cpu_usage(self):
-    return psutil.cpu_percent(interval=1)
-
-def get_gpu_usage(self):
-        try:
-            result = subprocess.run(
-                ['nvidia-smi', '--query-gpu=utilization.gpu', '--format=csv,noheader,nounits'],
-                capture_output=True, text=True
-            )
-            return int(result.stdout.strip())
-        except Exception as e:
-            print(f"Error retrieving GPU usage: {e}")
-            return 0
-        
+from resource_monitor import ResourceMonitor
+  
 def run_imagenet(config: DictConfig):
     # Initialize TorchFabric
     fabric = Fabric(
@@ -46,7 +30,7 @@ def run_imagenet(config: DictConfig):
     
     model = get_model(name=config.workload.model_architecture, weights=None, num_classes=config.workload.num_classes)
     optimizer = optim.Adam(model.parameters(), lr=config.workload.learning_rate)
-    # model, optimizer = fabric.setup(model, optimizer)
+    model, optimizer = fabric.setup(model, optimizer)
 
     # Set up data transforms for ImageNet
     train_transform = transforms.Compose([
@@ -80,7 +64,7 @@ def run_imagenet(config: DictConfig):
                 drop_last=False
                 )
             train_dataloader = DataLoader(train_dataset, batch_size=None, sampler=train_sampler, num_workers=config.workload.num_pytorch_workers)
-        
+            train_dataloader = fabric.setup_dataloaders(train_dataloader)
         if config.workload.run_validation:
             val_dataset = S3MappedDataset(s3_bucket=config.workload.s3_bucket, s3_prefix=config.workload.s3_val_prefix, transform=val_transform)
             val_sampler = BatchSamplerWithID(
@@ -90,11 +74,11 @@ def run_imagenet(config: DictConfig):
                 )
 
             val_dataloader =  DataLoader(val_dataset, batch_size=None, sampler=val_sampler, num_workers=config.workload.num_pytorch_workers)
-    
-    # Set up objects
-    model = fabric.setup(model, optimizer)
-    train_dataloader, val_dataloader = fabric.setup_dataloaders(train_dataloader, val_dataloader)
-    
+            val_dataloader = fabric.setup_dataloaders(val_dataloader)
+
+    # Start training
+    metric_collector = ResourceMonitor(interval=1, flush_interval=10, file_path= f'{ fabric.loggers[0].log_dir}/resource_usage_metrics.json')
+    metric_collector.start()
     global_step_count = 0
     current_epoch=0
     should_stop = False
@@ -114,7 +98,7 @@ def run_imagenet(config: DictConfig):
                                        max_steps = config.workload.max_steps,
                                        limit_train_batches = config.workload.limit_train_batches)
         
-        if current_epoch % config.workload.validation_frequency == 0:
+        if val_dataloader is not None and current_epoch % config.workload.validation_frequency == 0:
             validate_loop(fabric, model, val_dataloader)
 
         if current_epoch % config.workload.checkpoint_frequency == 0:
@@ -130,6 +114,7 @@ def run_imagenet(config: DictConfig):
 
     elapsed_time = time.perf_counter() - train_start_time
     fabric.print(f"Training completed in {elapsed_time:.2f} seconds")
+    metric_collector.stop()
 
 
 def train_loop(fabric, model, optimizer, train_dataloader, train_start_time, current_epoch, global_step_count, max_steps = None, limit_train_batches = np.inf, criterion=nn.CrossEntropyLoss()):
@@ -145,6 +130,7 @@ def train_loop(fabric, model, optimizer, train_dataloader, train_start_time, cur
 
         # Synchronize to ensure previous GPU operations are finished
         torch.cuda.synchronize()
+
         # Forward pass
         gpu_processing_started = time.perf_counter()
         outputs  = model(inputs)
@@ -152,7 +138,7 @@ def train_loop(fabric, model, optimizer, train_dataloader, train_start_time, cur
         train_acc = (outputs.argmax(dim=1) == labels).float().mean().item()
         train_loss = loss.item()
 
-         # Backpropagation and optimization
+        # Backpropagation and optimization
         fabric.backward(loss)
         optimizer.step()
         optimizer.zero_grad()
@@ -171,8 +157,8 @@ def train_loop(fabric, model, optimizer, train_dataloader, train_start_time, cur
                         "Data Fetch Time (s)": data_fetch_time,
                         "Transformation Time (s)": transformation_time,
                         "Cache Hit/Miss": 1 if cache_hit else 0,
-                        "CPU Usage (%)": get_cpu_usage(),
-                        "GPU Usage (%)": get_gpu_usage(),
+                        # "cpu (%)": get_cpu_usage(),
+                        # "gpu (%)": get_gpu_usage(),
                         "Train Loss": train_loss,
                         "Train Accuracy": train_acc,
                         "Validation  Loss": 0,
@@ -181,15 +167,18 @@ def train_loop(fabric, model, optimizer, train_dataloader, train_start_time, cur
         fabric.log_dict(metrics,step=global_step_count)
         
         fabric.print(
-                f"Epoch {metrics['epoch']} | iter {metrics['batch_idx']}/{min(len(train_dataloader),limit_train_batches)} |"
-                f" loss train: {metrics['loss_train']:.3f} |"
+                f"Epoch {metrics['Epoch Index']} ({metrics['Batch Index']}/{min(len(train_dataloader),limit_train_batches)}) |"
+                # f" loss train: {metrics['Train Loss']:.3f} |"
                 # f" val: {val_loss} |"
                 f" iter time: {metrics['Total Iteration Time (s)']:.2f} |"
-                f" data time: {metrics['Data Loading Time (s)']:.2f} |"
+                f" dataload time: {metrics['Data Loading Time (s)']:.2f} |"
                 f" gpu time: {metrics['GPU Processing Time (s)']:.2f} |"
-                f" fetch time: {metrics['Data Fetch Time (s)']:.2f} |"
-                f" transform time: {metrics['Transformation Time (s)']:.2f} |"
+                # f" fetch time: {metrics['Data Fetch Time (s)']:.2f} |"
+                # f" transform time: {metrics['Transformation Time (s)']:.2f} |"
+                # f" CPU Usage (%): {metrics['CPU Usage (%)']:.2f} |"
+                # f" GPU Usage (%): {metrics['GPU Usage (%)']:.2f} |"
                 f" elapsed time: {metrics['Elapsed Time (s)']:.2f} |"
+
                 )
 
         # stopping criterion on step level
