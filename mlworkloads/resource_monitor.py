@@ -81,7 +81,7 @@ class ResourceMonitor:
             return 0
 
     def flush_metrics(self):
-        # if os.path.exists(os.path.dirname(self.file_path)):
+        if os.path.exists(os.path.dirname(self.file_path)):
             if os.path.exists(self.file_path):
                 with open(self.file_path, 'a') as f:
                     for metric in self.metrics:

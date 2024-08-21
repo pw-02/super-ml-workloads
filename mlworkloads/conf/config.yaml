@@ -7,7 +7,7 @@ defaults:
   - override hydra/hydra_logging: disabled  
 
 seed: 42 # Seed for reproducibility
-accelerator: 'gpu' # 'cpu', 'gpu', 'tpu'
+accelerator: 'cpu' # 'cpu', 'gpu', 'tpu'
 devices: 1 # Number of devices to use for training (e.g. GPUs) per job
 log_interval: 1 # Log every N steps
 log_dir: logs # Directory to save logs

@@ -20,7 +20,7 @@ for i in "${!gpu_indices[@]}"; do
     gpu_index=${gpu_indices[$i]}
     lr=${learning_rates[$i]}
     echo "Starting job on GPU $gpu_index with learning rate $lr and exp_id $expid"
-    CUDA_VISIBLE_DEVICES="$gpu_index" python mlworklaods/run.py training.learning_rate="$lr" exp_id="$expid" job_id="$gpu_index" &
+    CUDA_VISIBLE_DEVICES="$gpu_index" python mlworkloads/image_classifer.py workload.learning_rate="$lr" exp_id="$expid" job_id="$gpu_index" &
     sleep 2  # Wait for 1 second
 done
 

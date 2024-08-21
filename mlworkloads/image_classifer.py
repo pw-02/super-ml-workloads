@@ -17,6 +17,7 @@ from collections import OrderedDict
 import numpy as np
 from resource_monitor import ResourceMonitor
 import datetime
+from lightning.pytorch.core.saving import save_hparams_to_yaml
 
 def train_image_classifer(config: DictConfig):
     # Initialize TorchFabric
@@ -85,6 +86,7 @@ def train_image_classifer(config: DictConfig):
         current_epoch += 1
 
         global_train_step_count = train_loop(fabric, 
+                                      config.job_id,
                                        train_logger,
                                        model, 
                                        optimizer,
@@ -97,6 +99,7 @@ def train_image_classifer(config: DictConfig):
         
         if val_dataloader is not None and current_epoch % config.workload.validation_frequency == 0:
             global_val_step_count=  validate_loop(fabric, 
+                                        config.job_id,
                                         val_logger,
                                        model, 
                                        val_dataloader,
@@ -119,6 +122,8 @@ def train_image_classifer(config: DictConfig):
     elapsed_time = time.perf_counter() - train_start_time
     fabric.print(f"Training completed in {elapsed_time:.2f} seconds")
     metric_collector.stop()
+    save_hparams_to_yaml(os.path.join(log_dir, "hparms.yaml"), config)
+
 
 
 def get_transforms(workload_name):
@@ -155,7 +160,7 @@ def get_transforms(workload_name):
         raise ValueError(f"Invalid workload: {workload_name}")
     return train_transform, val_transform
 
-def train_loop(fabric, train_logger:CSVLogger, model, optimizer, train_dataloader, train_start_time, current_epoch, global_step_count, max_steps = None, limit_train_batches = np.inf, criterion=nn.CrossEntropyLoss()):
+def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, train_dataloader, train_start_time, current_epoch, global_step_count, max_steps = None, limit_train_batches = np.inf, criterion=nn.CrossEntropyLoss()):
     model.train()
 
     total_samples = 0
@@ -182,7 +187,8 @@ def train_loop(fabric, train_logger:CSVLogger, model, optimizer, train_dataloade
         fabric.backward(loss)  # Perform backpropagation
         optimizer.step()  # Update weights
          # Synchronize after the backward pass and optimization
-        torch.cuda.synchronize()
+        if fabric.device.type == 'gpu':
+            torch.cuda.synchronize()
         gpu_processing_time = time.perf_counter() - gpu_processing_started
 
         train_acc = (outputs.argmax(dim=1) == labels).float().mean().item()
@@ -216,7 +222,7 @@ def train_loop(fabric, train_logger:CSVLogger, model, optimizer, train_dataloade
         train_logger.log_metrics(metrics,step=global_step_count)
         
         fabric.print(
-                f"Epoch {metrics['Epoch Index']} ({metrics['Batch Index']}/{min(len(train_dataloader),limit_train_batches)}) |"
+                f" Job {job_id} | Epoch: {metrics['Epoch Index']}({metrics['Batch Index']}/{min(len(train_dataloader),limit_train_batches)}) |"
                 # f" loss train: {metrics['Train Loss']:.3f} |"
                 # f" val: {val_loss} |"
                 f" iter time: {metrics['Total Iteration Time (s)']:.2f} |"
@@ -237,7 +243,7 @@ def train_loop(fabric, train_logger:CSVLogger, model, optimizer, train_dataloade
     return  global_step_count
 
 
-def validate_loop(fabric,val_logger:CSVLogger, model, dataloader, val_start_time, current_epoch, global_step_count, limit_val_batches=np.inf, criterion=nn.CrossEntropyLoss()):
+def validate_loop(fabric,job_id, val_logger:CSVLogger, model, dataloader, val_start_time, current_epoch, global_step_count, limit_val_batches=np.inf, criterion=nn.CrossEntropyLoss()):
     model.eval()
     end = time.perf_counter()
 
@@ -288,7 +294,7 @@ def validate_loop(fabric,val_logger:CSVLogger, model, dataloader, val_start_time
         val_logger.log_metrics(metrics, step=global_step_count)
 
         fabric.print(
-            f"Epoch {metrics['Epoch Index']} ({metrics['Batch Index']}/{min(len(dataloader), limit_val_batches)}) |"
+            f" Job {job_id} | Epoch {metrics['Epoch Index']}({metrics['Batch Index']}/{min(len(dataloader), limit_val_batches)}) |"
             f" iter time: {metrics['Total Iteration Time (s)']:.2f} |"
             f" dataload time: {metrics['Data Fetch Time (s)']:.2f} |"
             f" gpu time: {metrics['Data Fetch Time (s)']:.2f} |"
