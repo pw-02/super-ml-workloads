@@ -4,7 +4,7 @@ import time
 import psutil
 import subprocess
 import threading
-
+import numpy as np
 class ResourceMonitor:
     def __init__(self, interval=1, flush_interval=10, file_path='resource_usage_metrics.json'):
         self.interval = interval
@@ -81,8 +81,7 @@ class ResourceMonitor:
             return 0
 
     def flush_metrics(self):
-        if self.metrics:
-            # Append metrics to the file
+        # if os.path.exists(os.path.dirname(self.file_path)):
             if os.path.exists(self.file_path):
                 with open(self.file_path, 'a') as f:
                     for metric in self.metrics:
@@ -93,3 +92,56 @@ class ResourceMonitor:
                         f.write(json.dumps(metric) + "\n")
             # Clear the metrics list after flushing
             self.metrics.clear()
+
+def cpu_stress_task(size):
+       while True:
+        # Perform matrix multiplication
+        a = np.random.rand(size, size)
+        b = np.random.rand(size, size)
+        _ = np.dot(a, b)
+
+def cpu_stress_test(thread_count, size, duration):
+    threads = []
+    end_time = time.time() + duration
+
+    # Start multiple threads
+    for _ in range(thread_count):
+        thread = threading.Thread(target=cpu_stress_task, args=(size,))
+        thread.start()
+        threads.append(thread)
+
+    # Run the stress test for the specified duration
+    while time.time() < end_time:
+        time.sleep(1)  # Sleep briefly to avoid high CPU usage by the main thread
+
+    # Optionally, you can try to stop the threads gracefully (not always straightforward in Python)
+    for thread in threads:
+        thread.join(timeout=1)  # Wait for threads to complete
+
+def test_cpu_load():
+    
+    thread_count = 1  # Number of threads to start
+    matrix_size = 500  # Size of the matrix for matrix multiplication
+    duration = 30  # Duration of the stress test in seconds
+
+  # Start CPU stress test in a separate thread
+    stress_thread = threading.Thread(target=cpu_stress_test, args=(thread_count, matrix_size, duration))
+    stress_thread.start()
+
+    # Run resource monitor alongside
+    from resource_monitor import ResourceMonitor  # Adjust import based on file name
+    monitor = ResourceMonitor(interval=1, flush_interval=5, file_path='resource_usage_metrics.json')
+
+    print("Starting Resource Monitor and CPU Stress Test...")
+    monitor.start()
+    
+    # Wait for the stress test to complete
+    stress_thread.join()
+
+    print("Stopping Resource Monitor...")
+    monitor.stop()
+
+    print("Test complete. Check 'resource_usage_metrics.json' for collected metrics.")
+
+if __name__ == "__main__":
+    test_cpu_load()

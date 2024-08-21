@@ -16,7 +16,6 @@ class S3MappedDataset(Dataset):
         self.transform = transform
         
         # Initialize S3 client
-        self.s3_client = boto3.client('s3')
 
         # List all files in the S3 bucket under the specified prefix
         self.samples = self.get_sample_list_from_s3()
@@ -28,19 +27,21 @@ class S3MappedDataset(Dataset):
             for blob in self.samples[blob_class]]
 
     def get_sample_list_from_s3(self, use_index_file=True, images_only=True) -> Dict[str, List[str]]:
+        s3_client = boto3.client('s3')
+
         index_file_key = f"{self.s3_prefix}_paired_index.json"
         paired_samples = {}
 
         if use_index_file:
             try:
-                index_object = self.s3_client.get_object(Bucket=self.s3_bucket, Key=index_file_key)
+                index_object = s3_client.get_object(Bucket=self.s3_bucket, Key=index_file_key)
                 file_content = index_object['Body'].read().decode('utf-8')
                 paired_samples = json.loads(file_content)
                 return paired_samples
             except Exception as e:
                 print(f"Error reading index file '{index_file_key}': {e}")
 
-        paginator = self.s3_client.get_paginator('list_objects_v2')
+        paginator = s3_client.get_paginator('list_objects_v2')
         for page in paginator.paginate(Bucket=self.s3_bucket, Prefix=self.s3_prefix):
             for blob in page.get('Contents', []):
                 blob_path = blob.get('Key')
@@ -64,7 +65,7 @@ class S3MappedDataset(Dataset):
                 paired_samples[blob_class].append(blob_path)
 
         if use_index_file and paired_samples:
-            self.s3_client.put_object(
+            s3_client.put_object(
                 Bucket=self.s3_bucket,
                 Key=index_file_key,
                 Body=json.dumps(paired_samples, indent=4).encode('utf-8')
@@ -94,11 +95,13 @@ class S3MappedDataset(Dataset):
         return (torch.stack(data_samples), torch.tensor(labels)), fetch_duration, transform_duration, False
 
     def fetch_batch_from_s3(self, batch_indices: List[str]) -> Tuple[List[torch.Tensor], List[int]]:
+        s3_client = boto3.client('s3')
+
         data_samples = []
         labels = []
         for idx in batch_indices:
             data_path, label = self._classed_items[idx]
-            obj = self.s3_client.get_object(Bucket=self.s3_bucket, Key=data_path)
+            obj = s3_client.get_object(Bucket=self.s3_bucket, Key=data_path)
             img_data = obj['Body'].read()
             image = Image.open(io.BytesIO(img_data)).convert('RGB')
             data_samples.append(image)

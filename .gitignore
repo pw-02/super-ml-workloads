@@ -11,3 +11,5 @@ openwebtext_chunks/
 figures/cost_analysis/__pycache__/constants.cpython-310.pyc
 figures/cost_analysis/__pycache__/storage_costs_calculations.cpython-310.pyc
 figures
+mlworklaods/__pycache__/resource_monitor.cpython-310.pyc
+mlworklaods/custom_torch_datasets/__pycache__/s3_mapped_dataset.cpython-310.pyc

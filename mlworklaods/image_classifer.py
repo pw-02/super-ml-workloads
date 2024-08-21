@@ -22,10 +22,10 @@ def train_image_classifer(config: DictConfig):
     # Initialize TorchFabric
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     log_dir = f"{config.log_dir}/{config.workload.name.replace('/','_')}/{timestamp}".lower()
-    os.makedirs(log_dir, exist_ok=True)
+    # os.makedirs(log_dir, exist_ok=True)
     train_logger = CSVLogger(root_dir=log_dir, name="train", prefix='', flush_logs_every_n_steps=config.log_interval)
     val_logger = CSVLogger(root_dir=log_dir, name="val", prefix='', flush_logs_every_n_steps=config.log_interval)
-    
+
     fabric = Fabric(
         accelerator=config.accelerator, 
         devices=config.devices, 
@@ -57,7 +57,7 @@ def train_image_classifer(config: DictConfig):
                 drop_last=False
                 )
             train_dataloader = DataLoader(train_dataset, batch_size=None, sampler=train_sampler, num_workers=config.workload.num_pytorch_workers)
-            train_dataloader = fabric.setup_dataloaders(train_dataloader)
+            train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
         
         if config.workload.run_validation:
             val_dataset = S3MappedDataset(s3_bucket=config.workload.s3_bucket, s3_prefix=config.workload.s3_val_prefix, transform=val_transform)
@@ -68,7 +68,7 @@ def train_image_classifer(config: DictConfig):
                 )
 
             val_dataloader =  DataLoader(val_dataset, batch_size=None, sampler=val_sampler, num_workers=config.workload.num_pytorch_workers)
-            val_dataloader = fabric.setup_dataloaders(val_dataloader)
+            val_dataloader = fabric.setup_dataloaders(val_dataloader,move_to_device=True)
 
     # Start training
     metric_collector = ResourceMonitor(interval=1, flush_interval=10, file_path= f'{log_dir}/resource_usage_metrics.json')
@@ -162,8 +162,8 @@ def train_loop(fabric, train_logger:CSVLogger, model, optimizer, train_dataloade
     correct_preds = 0
 
     end = time.perf_counter()
-
     for batch_idx, (batch, data_fetch_time, transformation_time, cache_hit) in enumerate(train_dataloader):
+
         data_load_time = time.perf_counter() - end
                         # end epoch if stopping training completely or max batches for this epoch reached
         if batch_idx >= limit_train_batches:   
@@ -171,21 +171,21 @@ def train_loop(fabric, train_logger:CSVLogger, model, optimizer, train_dataloade
         inputs, labels = batch
 
         # Synchronize to ensure previous GPU operations are finished
-        torch.cuda.synchronize()
-
         # Forward pass
         gpu_processing_started = time.perf_counter()
         outputs  = model(inputs)
         loss = criterion(outputs, labels)
-        train_acc = (outputs.argmax(dim=1) == labels).float().mean().item()
         train_loss = loss.item()
-
         # Backpropagation and optimization
-        fabric.backward(loss)
-        optimizer.step()
-        optimizer.zero_grad()
+        optimizer.zero_grad()  # Clear previous gradients
+        fabric.backward(loss)  # Perform backpropagation
+        optimizer.step()  # Update weights
+         # Synchronize after the backward pass and optimization
         torch.cuda.synchronize()
         gpu_processing_time = time.perf_counter() - gpu_processing_started
+
+        train_acc = (outputs.argmax(dim=1) == labels).float().mean().item()
+    
 
         # Metrics calculation
         total_train_loss += train_loss * inputs.size(0)  # accumulate total loss
@@ -221,10 +221,8 @@ def train_loop(fabric, train_logger:CSVLogger, model, optimizer, train_dataloade
                 f" iter time: {metrics['Total Iteration Time (s)']:.2f} |"
                 f" dataload time: {metrics['Data Loading Time (s)']:.2f} |"
                 f" gpu time: {metrics['GPU Processing Time (s)']:.2f} |"
-                # f" fetch time: {metrics['Data Fetch Time (s)']:.2f} |"
-                # f" transform time: {metrics['Transformation Time (s)']:.2f} |"
-                # f" CPU Usage (%): {metrics['CPU Usage (%)']:.2f} |"
-                # f" GPU Usage (%): {metrics['GPU Usage (%)']:.2f} |"
+                f" fetch time: {metrics['Data Fetch Time (s)']:.2f} |"
+                f" transform time: {metrics['Transformation Time (s)']:.2f} |"
                 f" elapsed time: {metrics['Elapsed Time (s)']:.2f} |"
 
                 )
