@@ -1,0 +1,24 @@
+name: ResNet50/ImageNet
+
+#dataloading configuration
+s3_bucket: imagenet1k-sdl
+s3_train_prefix: train/
+s3_val_prefix: val/
+num_pytorch_workers: 0
+#model configuration
+model_architecture: resnet50
+learning_rate: 6e-4
+weight_decay: 1e-1
+precision: 32 # 16, 32, 64
+num_classes: 1000
+
+#training configuration
+run_training: True
+run_validation: False
+validation_frequency: 1 #every n epochs
+checkpoint_frequency: .inf #every n epochs
+max_epochs: 100000
+max_steps: 500
+batch_size: 128 #Number of samples between optimizer steps across data-parallel ranks
+limit_train_batches: .inf
+limit_val_batches: .inf

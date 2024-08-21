@@ -1,0 +1,4 @@
+kind: s3_image_mapped
+sampler_kind: classic_pytorch
+num_pytorch_workers: 0
+shuffle: True

@@ -1,27 +1,47 @@
-torch
 torchvision
 lightning
-jsonargparse
+# jsonargparse
 boto3
-grpcio-tools
-super-client
-redis
 pandas
-awscli
-xlsxwriter
-tiktoken
-transformers
+# xlsxwriter
+# redis
+# grpcio-tools
+# datasets
+# tiktoken
+# transformers
+# nltk
 hydra-core
 psutil
 pynvml
-heapdict
-litdata
-"ray[tune]"
-# nltk
-# redis-py-cluster
-#nlp workload
-#tiktoken
-#datasets
-#wandb
-#transformers
-#export PYTHONPATH=/workspaces/super-dl
+# heapdict
+# litdata
+# "ray[tune]"
+awscli
+
+# torch
+# torchvision
+# lightning
+# jsonargparse
+# boto3
+# grpcio-tools
+# super-client
+# redis
+# pandas
+# awscli
+# xlsxwriter
+# tiktoken
+# transformers
+# hydra-core
+# psutil
+# pynvml
+# heapdict
+# litdata
+# "ray[tune]"
+# # nltk
+# # redis-py-cluster
+# #nlp workload
+# #tiktoken
+# #datasets
+# #wandb
+# #transformers
+# #export PYTHONPATH=/workspaces/super-dl

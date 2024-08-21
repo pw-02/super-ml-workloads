@@ -1,0 +1,41 @@
+#env
+num_workers: 0
+devices: 8
+accelerator: 'gpu'
+training_seed: 1
+workload_type: 'language'
+
+#model
+arch: gpt2-medium #'gpt2' (124M), 'gpt2-medium' (350M), 'gpt2-large' (774m), 'gpt2-xl' (1558M)
+weight_decay: 0.1
+lr: 0.0006
+momentum: 0.875
+optimizer: sgd
+grad_acc_steps: null
+
+#data
+dataloader_backend: classic_pytorch
+train_data_dir: s3://openwebtxt/owt/train/  #s3://sdl-tiny-imagenet-200/train/
+eval_data_dir: s3://openwebtxt/owt/val/ #s3://sdl-tiny-imagenet-200/test/
+epochs: 1
+batch_size: 8
+block_size: 1024
+max_minibatches_per_epoch: 10000 #this number is global. Per device minibatches= max_minibatches_per_epoch/num_workers
+shuffle: False
+drop_last: False
+
+#expiement/logging
+exp_name: gpt2-medium-8gpus
+print_freq: 10
+flush_logs_every_n_steps: 25
+run_training: True
+run_evaluate: False
+save_checkpoints: False
+save_checkpoint_dir: models
+report_dir: language/reports
+profile: True
+
+#only used when super is thed datalaoder backend or caching is enabled for some other data loader that supports it
+cache_adress: null #localhost:6379
+superdl_address: localhost:50051
+superdl_prefetch_lookahead: 5

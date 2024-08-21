@@ -1,0 +1,21 @@
+name: ResNet18/Cifar-10
+
+#dataloading configuration
+s3_bucket: sdl-cifar10
+s3_train_prefix: train/
+s3_val_prefix: test/
+
+#model configuration
+model_architecture: resnet18
+learning_rate: 6e-4
+weight_decay: 1e-1y
+
+#training configuration
+run_training: True
+run_evaluation: False
+max_epochs: 100000
+max_steps: 500
+global_batch_size: 128 #Number of samples between optimizer steps across data-parallel ranks
+micro_batch_size: 128 #Number of samples per data-parallel rank
+limit_train_batches: .inf
+limit_val_batches: .inf

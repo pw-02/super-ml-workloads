@@ -1,20 +1,19 @@
-torch
 torchvision
 lightning
-jsonargparse
+# jsonargparse
 boto3
 pandas
-xlsxwriter
-redis
-grpcio-tools
-datasets
-tiktoken
-transformers
-nltk
-redis-py-cluster
+# xlsxwriter
+# redis
+# grpcio-tools
+# datasets
+# tiktoken
+# transformers
+# nltk
 hydra-core
 psutil
 pynvml
-heapdict
-litdata
+# heapdict
+# litdata
 # "ray[tune]"
+awscli

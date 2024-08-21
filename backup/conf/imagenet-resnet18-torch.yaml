@@ -1,0 +1,39 @@
+#env
+num_workers: 1
+devices: 4
+accelerator: 'gpu'
+training_seed: 1
+
+#model
+arch: resnet18
+weight_decay: 1.0e-4
+lr: 0.896
+momentum: 0.875
+optimizer: sgd
+grad_acc_steps: null
+
+#data
+dataloader_backend: classic_pytorch
+train_data_dir: s3://sdl-tiny-imagenet-200/train/
+eval_data_dir: s3://sdl-tiny-imagenet-200/val/
+epochs: 1
+batch_size: 128
+max_minibatches_per_epoch: null
+shuffle: False
+drop_last: False
+
+#expiement/logging
+exp_name: imagenet-resnet18-pytorch
+print_freq: 10
+flush_logs_every_n_steps: 25
+run_training: True
+run_evaluate: False
+save_checkpoints: False
+save_checkpoint_dir: models
+report_dir: classification/reports
+profile: True
+
+#only used when super is thed datalaoder backend or caching is enabled for some other data loader that supports it
+cache_adress: null #localhost:6379
+superdl_address: localhost:50051
+superdl_prefetch_lookahead: 5

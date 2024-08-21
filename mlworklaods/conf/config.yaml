@@ -1,21 +1,20 @@
 
 defaults:
   - _self_
-  - dataloader: baseline #shade, baseline, torch_lru, super
-  - dataset: imagenet  #imagenet, cifar10, openwebtext
-  - training: resnet50 #resnet18,resnet50, pythia14m, pythia160m, pythia70m, nanogpt
+  - dataloader: pytorch #pytorch, super, dali
+  - workload: imagenet_resnet50  #imagenet, cifar10, openwebtext
   - override hydra/job_logging: disabled
   - override hydra/hydra_logging: disabled  
 
-num_devices_per_job: 1
-seed: 42
-accelerator: 'gpu'
-log_interval: 1
-log_dir: logs
-checkpoint_interval: .inf
-run_training: True
-run_evaluation: False
-num_workers_per_job: 0
+seed: 42 # Seed for reproducibility
+accelerator: 'gpu' # 'cpu', 'gpu', 'tpu'
+devices: 1 # Number of devices to use for training (e.g. GPUs) per job
+log_interval: 1 # Log every N steps
+log_dir: logs # Directory to save logs
+checkpoint_dir: checkpoints # Save a checkpoint every N steps
+precision: 32 # 16, 32, 64
+
+# num_workers_per_job: 0 # Number of workers per job
 exp_id: multi_job
 job_id: 1
 
