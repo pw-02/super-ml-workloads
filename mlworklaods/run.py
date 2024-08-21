@@ -2,7 +2,7 @@ from omegaconf import DictConfig, OmegaConf
 import hydra
 from lightning.fabric.loggers import CSVLogger
 from datetime import datetime
-from mlworklaods.imagenet import run_imagenet
+from mlworklaods.image_classifer import run_imagenet
 
 @hydra.main(version_base=None, config_path="./conf", config_name="config")
 def main(config: DictConfig):

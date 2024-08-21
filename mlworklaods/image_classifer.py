@@ -17,7 +17,7 @@ from collections import OrderedDict
 import numpy as np
 from resource_monitor import ResourceMonitor
   
-def run_imagenet(config: DictConfig):
+def train_image_classifer(config: DictConfig):
     # Initialize TorchFabric
     fabric = Fabric(
         accelerator=config.accelerator, 
@@ -31,21 +31,8 @@ def run_imagenet(config: DictConfig):
     model = get_model(name=config.workload.model_architecture, weights=None, num_classes=config.workload.num_classes)
     optimizer = optim.Adam(model.parameters(), lr=config.workload.learning_rate)
     model, optimizer = fabric.setup(model, optimizer)
-
-    # Set up data transforms for ImageNet
-    train_transform = transforms.Compose([
-        transforms.RandomResizedCrop(224),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
     
-    val_transform = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
+    train_transform, val_transform = get_transforms(config.workload.name)
 
     train_dataloader = None
     val_dataloader = None
@@ -116,6 +103,40 @@ def run_imagenet(config: DictConfig):
     fabric.print(f"Training completed in {elapsed_time:.2f} seconds")
     metric_collector.stop()
 
+
+def get_transforms(workload_name):
+    if workload_name == 'ResNet50/ImageNet':
+        # Set up data transforms for ImageNet
+        train_transform = transforms.Compose([
+            transforms.Resize(256), 
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
+        
+        val_transform = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
+    elif workload_name == 'ResNet18/Cifar-10':
+          # Set up data transforms for ImageNet
+        train_transform = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),    # Random crop with padding
+            transforms.RandomHorizontalFlip(),        # Random horizontal flip
+            transforms.ToTensor(),                    # Convert to tensor
+            transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])  # Normalize
+        ])
+        
+        val_transform = transforms.Compose([
+            transforms.ToTensor(),                    # Convert to tensor
+            transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])  # Normalize
+       ])
+    else:
+        raise ValueError(f"Invalid workload: {workload_name}")
+    return train_transform, val_transform
 
 def train_loop(fabric, model, optimizer, train_dataloader, train_start_time, current_epoch, global_step_count, max_steps = None, limit_train_batches = np.inf, criterion=nn.CrossEntropyLoss()):
     model.train()
@@ -200,7 +221,7 @@ def validate_loop(fabric, model, dataloader):
 
 @hydra.main(version_base=None, config_path="./conf", config_name="config")
 def main(config: DictConfig):
-    run_imagenet(config)
+    train_image_classifer(config)
 
 
 if __name__ == "__main__":
