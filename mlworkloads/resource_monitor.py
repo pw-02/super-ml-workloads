@@ -17,8 +17,21 @@ class ResourceMonitor:
         self.total_gpu_usage = 0
         self.count = 0
         self.last_flush_time = self.start_time
+        self.gpu_available = self.check_gpu_availability()
         self.thread = threading.Thread(target=self.collect_metrics, daemon=True)
-
+        
+    def check_gpu_availability(self):
+        try:
+            result = subprocess.run(
+                ['nvidia-smi', '--list-gpus'],
+                capture_output=True, text=True
+            )
+            # If any GPUs are listed, we assume GPU is available
+            return "GPU" in result.stdout
+        except Exception as e:
+            print(f"Error checking GPU availability: {e}")
+            return False
+        
     def start(self):
         self.thread.start()
     
@@ -39,7 +52,7 @@ class ResourceMonitor:
     def collect_metrics(self):
         while self.running:
             cpu_usage = psutil.cpu_percent(interval=self.interval)
-            gpu_usage = self.get_gpu_usage()
+            gpu_usage = self.get_gpu_usage() if self.gpu_available else 0
             
             # Update totals and count
             self.total_cpu_usage += cpu_usage
