@@ -20,8 +20,9 @@ import datetime
 
 def train_image_classifer(config: DictConfig):
     # Initialize TorchFabric
-    timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    log_dir = f"{config.log_dir}/{config.workload.name.replace('/','_')}/{timestamp}".lower()
+    # timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    # log_dir = f"{config.log_dir}/{config.workload.name.replace('/','_')}/{timestamp}".lower()
+    log_dir = f"{config.log_dir}/{config.workload.name.replace('/','_')}/{config.exp_id}/{config.job_id}".lower()
     # os.makedirs(log_dir, exist_ok=True)
     train_logger = CSVLogger(root_dir=log_dir, name="train", prefix='', flush_logs_every_n_steps=config.log_interval)
     val_logger = CSVLogger(root_dir=log_dir, name="val", prefix='', flush_logs_every_n_steps=config.log_interval)
