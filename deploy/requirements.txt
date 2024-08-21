@@ -1,22 +1,31 @@
 torchvision
 lightning
-# jsonargparse
 boto3
 pandas
-# xlsxwriter
-# redis
-# grpcio-tools
-# datasets
-# tiktoken
-# transformers
-# nltk
 hydra-core
 psutil
 pynvml
-# heapdict
-# litdata
-# "ray[tune]"
 awscli
+
+# torchvision
+# lightning
+# # jsonargparse
+# boto3
+# pandas
+# # xlsxwriter
+# # redis
+# # grpcio-tools
+# # datasets
+# # tiktoken
+# # transformers
+# # nltk
+# hydra-core
+# psutil
+# pynvml
+# # heapdict
+# # litdata
+# # "ray[tune]"
+# awscli
 
 # torch
 # torchvision
