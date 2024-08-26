@@ -12,7 +12,7 @@ gpu_time = np.random.randint(1, 10, num_mini_batches)  # Random data for GPU tim
 end_times = start_times + io_time + transform_time + gpu_time
 
 # Plotting the Gantt chart
-plt.figure(figsize=(4, 3))
+plt.figure(figsize=(6, 3.5))
 
 # Plot I/O time
 plt.barh(np.arange(1, num_mini_batches + 1), io_time, left=start_times, color='#007E7E', label='I/O Time')
@@ -30,6 +30,6 @@ plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.xlabel('Time', fontsize=10)
 plt.ylabel('Mini-batch Index')
 plt.legend()
-
+plt.show()
 # Show plot
-plt.savefig('gant.png')
+# plt.savefig('gant.png')

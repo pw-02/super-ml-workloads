@@ -1,4 +1,6 @@
 import torch
+import sys
+print(sys.path)
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms, models
@@ -8,8 +10,14 @@ from omegaconf import DictConfig
 from lightning.fabric import Fabric, seed_everything
 from lightning.fabric.loggers import CSVLogger
 from torchvision.models import get_model
-from custom_torch_datasets.s3_mapped_dataset import S3MappedDataset
-from custom_torch_samplers.batch_sampler import BatchSamplerWithID
+from datalaoding.s3.s3_mapped_dataset import S3MappedDataset
+from datalaoding.super.super_sampler import SUPERSampler
+from datalaoding.super.super_mapped_dataset import SUPERMappedDataset
+from datalaoding.s3.batch_sampler import BatchSamplerWithID
+# from mlworkloads.datalaoding.s3.s3_mapped_dataset import S3MappedDataset
+# from mlworkloads.datalaoding.super.super_sampler import SUPERSampler
+# from mlworkloads.datalaoding.super.super_mapped_dataset import SUPERMappedDataset
+# from mlworkloads.datalaoding.s3.batch_sampler import BatchSamplerWithID
 from torch.utils.data import RandomSampler, SequentialSampler
 import time
 import os
@@ -46,8 +54,29 @@ def train_image_classifer(config: DictConfig):
     val_dataloader = None
 
     if config.dataloader.name == 'super':
-        pass
-    
+        if config.workload.run_training:
+            train_dataset = SUPERMappedDataset(s3_data_dir=config.workload.s3_train_prefix, transform=train_transform)
+
+            train_sampler = SUPERSampler(
+                dataset=train_dataset,
+                grpc_server_address=config.dataloader.grpc_server_address,
+                batch_size=config.workload.batch_size
+                )
+            train_dataloader = DataLoader(train_dataset, batch_size=None, sampler=train_sampler, num_workers=config.workload.num_pytorch_workers)
+            train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
+        
+        if config.workload.run_validation:
+            val_dataset = SUPERMappedDataset(s3_data_dir=config.workload.s3_val_prefix, transform=val_transform)
+
+            val_sampler = SUPERSampler(
+                dataset=val_dataset,
+                grpc_server_address=config.dataloader.grpc_server_address,
+                batch_size=config.workload.batch_size
+                )
+            val_dataloader =  DataLoader(val_dataset, batch_size=None, sampler=val_sampler, num_workers=config.workload.num_pytorch_workers)
+            val_dataloader = fabric.setup_dataloaders(val_dataloader,move_to_device=True)
+
+
     elif config.dataloader.name == 'pytorch':
         # PyTorch DataLoader
         if config.workload.run_training:

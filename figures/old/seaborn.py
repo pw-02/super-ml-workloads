@@ -78,5 +78,4 @@ for workload, data in result_data.items():
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=3)
 
    
-    plt.savefig(f'figures/system-comparsion/{workload}/percentage_breakdown.png')
-    plt.close()
+plt.show()

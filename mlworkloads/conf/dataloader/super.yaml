@@ -1,6 +1,3 @@
 name: super
-use_cache: true
-num_workers: 1
-cache_address: 10.0.24.192:6378 
-super_address: 10.0.24.192:50051
-simulate_data_delay: null
+grpc_server_address: localhost:50051
+cache_address: null
