@@ -9,6 +9,9 @@ from typing import List, Dict, Tuple
 import functools
 import time
 from urllib.parse import urlparse
+import base64
+import zlib
+import redis
 
 class S3Url(object):
     def __init__(self, url):
@@ -31,12 +34,25 @@ class S3Url(object):
 
 
 class SUPERMappedDataset(Dataset):
-    def __init__(self, s3_data_dir: str, transform=None):
+    def __init__(self, s3_data_dir: str, transform=None, simulate_mode=False, cache_address= None, simulate_time_for_cache_miss=4, simulate_time_for_cache_hit=0.01):
         self.s3_bucket = S3Url(s3_data_dir).bucket
         self.s3_prefix = S3Url(s3_data_dir).key
         self.s3_data_dir = s3_data_dir
         self.transform = transform
         self.samples = self._get_sample_list_from_s3()
+        self.simulate_mode = simulate_mode
+        self._simlute_time_for_cache_miss = simulate_time_for_cache_miss
+        self._simlute_time_for_cache_hit = simulate_time_for_cache_hit
+
+        if cache_address is not None:
+            self.cache_host, self.cache_port = cache_address.split(":")
+            self.cache_port = int(self.cache_port)
+            self.use_cache = True
+        else:
+            self.use_cache = False
+
+        self.cache_client = None
+
     
     @functools.cached_property
     def _classed_items(self) -> List[Tuple[str, int]]:
@@ -98,23 +114,47 @@ class SUPERMappedDataset(Dataset):
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, float, float]:
         batch_id, batch_indices, is_cached = idx
 
-        if not is_cached:
+        if is_cached and self.use_cache:
             fetch_start_time = time.perf_counter()
-            
+            cached_minibacth = self.fetch_from_cache(batch_id)
+            fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
+
+        if cached_minibacth is not None and (isinstance(cached_minibacth, bytes) or isinstance(cached_minibacth, str)):
+            tranform_start_time = time.perf_counter()
+            data_samples, labels = self.decode_cached_minibacth(cached_minibacth)
+            transform_duration =  time.perf_counter() - tranform_start_time
+            cache_hit = True
+        else:
+            fetch_start_time = time.perf_counter()
             data_samples, labels = self.fetch_batch_from_s3(batch_indices)
-            
-            fetch_duration = time.perf_counter() - fetch_start_time
-            
+            fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
+
             transform_start_time = time.perf_counter()
             if self.transform is not None:
                 for i in range(len(data_samples)):
-                    data_samples[i] = self.transform(data_samples[i])
-                    
+                    data_samples[i] = self.transform(data_samples[i])        
             transform_duration =  time.perf_counter() - transform_start_time
+            cache_hit = False
 
-            return (torch.stack(data_samples), torch.tensor(labels)), fetch_duration, transform_duration, False
-            # return  batch_id, fetch_duration, transform_duration, False
+        return (torch.stack(data_samples), torch.tensor(labels)), fetch_duration, transform_duration, cache_hit
 
+
+    def decode_cached_minibacth(self, cached_minibacth):
+        decoded_data = base64.b64decode(cached_minibacth) # Decode base64
+        decoded_data = zlib.decompress(decoded_data)
+        buffer = io.BytesIO(decoded_data)
+        batch_samples, batch_labels = torch.load(buffer)
+        return  batch_samples, batch_labels
+
+
+    def fetch_from_cache(self, batch_id):
+        try:
+            if self.cache_client is None:
+                self.cache_client:redis.StrictRedis = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
+            return self.cache_client.get(batch_id)
+        except Exception as e:
+            print(f"Error fetching from cache: {e}")
+            return None
 
     def fetch_batch_from_s3(self, batch_indices: List[str]) -> Tuple[List[torch.Tensor], List[int]]:
         s3_client = boto3.client('s3')

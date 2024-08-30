@@ -3,12 +3,11 @@
 import grpc
 import warnings
 
-import proto.minibatch_service_pb2 as proto_dot_minibatch__service__pb2
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
+from proto import minibatch_service_pb2 as proto_dot_minibatch__service__pb2
 
-GRPC_GENERATED_VERSION = '1.64.1'
+GRPC_GENERATED_VERSION = '1.66.0'
 GRPC_VERSION = grpc.__version__
-EXPECTED_ERROR_RELEASE = '1.65.0'
-SCHEDULED_RELEASE_DATE = 'June 25, 2024'
 _version_not_supported = False
 
 try:
@@ -18,15 +17,12 @@ except ImportError:
     _version_not_supported = True
 
 if _version_not_supported:
-    warnings.warn(
+    raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
         + f' but the generated code in proto/minibatch_service_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
-        + f' This warning will become an error in {EXPECTED_ERROR_RELEASE},'
-        + f' scheduled for release on {SCHEDULED_RELEASE_DATE}.',
-        RuntimeWarning
     )
 
 
@@ -57,6 +53,11 @@ class MiniBatchServiceStub(object):
                 request_serializer=proto_dot_minibatch__service__pb2.GetNextBatchForJobRequest.SerializeToString,
                 response_deserializer=proto_dot_minibatch__service__pb2.GetNextBatchForJobResponse.FromString,
                 _registered_method=True)
+        self.JobEnded = channel.unary_unary(
+                '/MiniBatchService/JobEnded',
+                request_serializer=proto_dot_minibatch__service__pb2.JobEndedRequest.SerializeToString,
+                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                _registered_method=True)
 
 
 class MiniBatchServiceServicer(object):
@@ -85,6 +86,12 @@ class MiniBatchServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def JobEnded(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_MiniBatchServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -102,6 +109,11 @@ def add_MiniBatchServiceServicer_to_server(servicer, server):
                     servicer.GetNextBatchForJob,
                     request_deserializer=proto_dot_minibatch__service__pb2.GetNextBatchForJobRequest.FromString,
                     response_serializer=proto_dot_minibatch__service__pb2.GetNextBatchForJobResponse.SerializeToString,
+            ),
+            'JobEnded': grpc.unary_unary_rpc_method_handler(
+                    servicer.JobEnded,
+                    request_deserializer=proto_dot_minibatch__service__pb2.JobEndedRequest.FromString,
+                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -188,6 +200,33 @@ class MiniBatchService(object):
             '/MiniBatchService/GetNextBatchForJob',
             proto_dot_minibatch__service__pb2.GetNextBatchForJobRequest.SerializeToString,
             proto_dot_minibatch__service__pb2.GetNextBatchForJobResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def JobEnded(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MiniBatchService/JobEnded',
+            proto_dot_minibatch__service__pb2.JobEndedRequest.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
             insecure,

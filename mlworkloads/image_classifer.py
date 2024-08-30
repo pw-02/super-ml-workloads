@@ -189,7 +189,7 @@ def get_transforms(workload_name):
         raise ValueError(f"Invalid workload: {workload_name}")
     return train_transform, val_transform
 
-def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, train_dataloader, train_start_time, current_epoch, global_step_count, max_steps = None, limit_train_batches = np.inf, criterion=nn.CrossEntropyLoss()):
+def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, train_dataloader:DataLoader, train_start_time, current_epoch, global_step_count, max_steps = None, limit_train_batches = np.inf, criterion=nn.CrossEntropyLoss()):
     model.train()
 
     total_samples = 0
@@ -197,7 +197,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
     correct_preds = 0
 
     end = time.perf_counter()
-    for batch_idx, (batch, data_fetch_time, transformation_time, cache_hit) in enumerate(train_dataloader):
+    for batch_idx, (batch, data_fetch_time, transformation_time, is_cache_hit) in enumerate(train_dataloader):
 
         data_load_time = time.perf_counter() - end
                         # end epoch if stopping training completely or max batches for this epoch reached
@@ -233,6 +233,9 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
         avg_train_acc = correct_preds / total_samples
         global_step_count +=1
 
+        if isinstance(train_dataloader.sampler, SUPERSampler):
+            train_dataloader.sampler.set_step_perf_metrics(time.perf_counter() - end, is_cache_hit,gpu_processing_time )
+
         metrics= OrderedDict({
                         "Elapsed Time (s)": time.perf_counter() - train_start_time,
                         "Device": fabric.global_rank,
@@ -244,7 +247,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                         "GPU Processing Time (s)": gpu_processing_time,
                         "Data Fetch Time (s)": data_fetch_time,
                         "Transformation Time (s)": transformation_time,
-                        "Cache Hit/Miss": 1 if cache_hit else 0,
+                        "Cache Hit/Miss": 1 if is_cache_hit else 0,
                         "Avg Train Loss": avg_train_loss, #calculates the average training loss across all batches.
                         "Avg Train Accuracy": avg_train_acc, #calculates the average training accuracy across all batches.
                         })
@@ -280,7 +283,7 @@ def validate_loop(fabric,job_id, val_logger:CSVLogger, model, dataloader, val_st
     correct_preds = 0
     total_samples = 0
 
-    for batch_idx, (batch, data_fetch_time, transformation_time, cache_hit) in enumerate(dataloader):
+    for batch_idx, (batch, data_fetch_time, transformation_time, is_cache_hit) in enumerate(dataloader):
         if batch_idx >= limit_val_batches:
             break
         
@@ -315,7 +318,7 @@ def validate_loop(fabric,job_id, val_logger:CSVLogger, model, dataloader, val_st
             "Total Iteration Time (s)": time.perf_counter() - end,
             "Data Fetch Time (s)": data_fetch_time,
             "Transformation Time (s)": transformation_time,
-            "Cache Hit/Miss": 1 if cache_hit else 0,
+            "Cache Hit/Miss": 1 if is_cache_hit else 0,
             "Avg Validation Loss": avg_val_loss,
             "Avg Validation Accuracy": avg_val_acc
         })
