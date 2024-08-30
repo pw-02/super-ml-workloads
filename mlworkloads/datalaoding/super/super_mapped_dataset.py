@@ -34,16 +34,16 @@ class S3Url(object):
 
 
 class SUPERMappedDataset(Dataset):
-    def __init__(self, s3_data_dir: str, transform=None, simulate_mode=False, cache_address= None, simulate_time_for_cache_miss=4, simulate_time_for_cache_hit=0.01):
+    def __init__(self, s3_data_dir: str, transform=None, cache_address= None):
         self.s3_bucket = S3Url(s3_data_dir).bucket
         self.s3_prefix = S3Url(s3_data_dir).key
         self.s3_data_dir = s3_data_dir
         self.transform = transform
         self.samples = self._get_sample_list_from_s3()
-        self.simulate_mode = simulate_mode
-        self._simlute_time_for_cache_miss = simulate_time_for_cache_miss
-        self._simlute_time_for_cache_hit = simulate_time_for_cache_hit
-
+        # self.simulate_mode = simulate_mode
+        # self._simlute_time_for_cache_miss = simulate_time_for_cache_miss
+        # self._simlute_time_for_cache_hit = simulate_time_for_cache_hit
+        
         if cache_address is not None:
             self.cache_host, self.cache_port = cache_address.split(":")
             self.cache_port = int(self.cache_port)

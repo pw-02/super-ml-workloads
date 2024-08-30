@@ -55,7 +55,9 @@ def train_image_classifer(config: DictConfig):
 
     if config.dataloader.name == 'super':
         if config.workload.run_training:
-            train_dataset = SUPERMappedDataset(s3_data_dir=config.workload.s3_train_prefix, transform=train_transform)
+            train_dataset = SUPERMappedDataset(s3_data_dir=config.workload.s3_train_prefix, 
+                                               transform=train_transform,
+                                               cache_address=config.dataloader.cache_address)
 
             train_sampler = SUPERSampler(
                 dataset=train_dataset,
@@ -66,8 +68,9 @@ def train_image_classifer(config: DictConfig):
             train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
         
         if config.workload.run_validation:
-            val_dataset = SUPERMappedDataset(s3_data_dir=config.workload.s3_val_prefix, transform=val_transform)
-
+            val_dataset = SUPERMappedDataset(s3_data_dir=config.workload.s3_val_prefix, 
+                                             transform=val_transform,
+                                             cache_address=config.dataloader.cache_address)
             val_sampler = SUPERSampler(
                 dataset=val_dataset,
                 grpc_server_address=config.dataloader.grpc_server_address,
