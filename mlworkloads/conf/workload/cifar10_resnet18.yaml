@@ -1,5 +1,6 @@
 #dataloading configuration
 # s3_bucket: sdl-cifar10
+name: cifar10_resnet18
 s3_train_prefix: s3://sdl-cifar10/train/
 s3_val_prefix: s3://sdl-cifar10/test/
 num_pytorch_workers: 0
@@ -16,8 +17,8 @@ run_training: True
 run_validation: False
 validation_frequency: 1000000 #every n epochs
 checkpoint_frequency: .inf #every n epochs
-max_epochs: 3
-max_steps: 5
+max_epochs: 1
+max_steps: 25
 batch_size: 128 #Number of samples between optimizer steps across data-parallel ranks
 limit_train_batches: null
 limit_val_batches: null

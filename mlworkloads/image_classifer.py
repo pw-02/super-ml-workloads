@@ -166,7 +166,7 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
 
 
 def get_transforms(workload_name):
-    if workload_name == 'ResNet50/ImageNet':
+    if workload_name == 'imagenet_resnet50':
         # Set up data transforms for ImageNet
         train_transform = transforms.Compose([
             transforms.Resize(256), 
@@ -182,7 +182,7 @@ def get_transforms(workload_name):
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
-    elif workload_name == 'ResNet18/Cifar-10':
+    elif workload_name == 'cifar10_resnet18':
           # Set up data transforms for ImageNet
         train_transform = transforms.Compose([
             transforms.RandomCrop(32, padding=4),    # Random crop with padding

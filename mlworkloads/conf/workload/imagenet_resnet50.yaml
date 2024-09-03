@@ -1,4 +1,6 @@
 #dataloading configuration
+name: imagenet_resnet50
+
 s3_bucket: imagenet1k-sdl
 s3_train_prefix: train/
 s3_val_prefix: val/

@@ -42,14 +42,14 @@ class ResourceMonitor:
         self.thread.join()
         # Final flush to ensure all metrics are saved
         self.flush_metrics()
-        # Optionally print or log final average metrics
-        if self.count > 0:
-            avg_cpu_usage = self.total_cpu_usage / self.count
-            avg_gpu_usage = self.total_gpu_usage / self.count
-            print(f"Final Average CPU Usage: {avg_cpu_usage:.2f}%")
-            print(f"Final Average GPU Usage: {avg_gpu_usage:.2f}%")
-        else:
-            print("No metrics collected.")
+        # # Optionally print or log final average metrics
+        # if self.count > 0:
+        #     avg_cpu_usage = self.total_cpu_usage / self.count
+        #     avg_gpu_usage = self.total_gpu_usage / self.count
+        #     # print(f"Final Average CPU Usage: {avg_cpu_usage:.2f}%")
+        #     # print(f"Final Average GPU Usage: {avg_gpu_usage:.2f}%")
+        # else:
+        #     # print("No metrics collected.")
     
     def collect_metrics(self):
         while self.running:

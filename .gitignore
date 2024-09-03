@@ -7,3 +7,4 @@ figures/
 *\__pycache__*
 *.pyc
 mlworkloads/__pycache__/resource_monitor.cpython-310.pyc
+nohup.out
