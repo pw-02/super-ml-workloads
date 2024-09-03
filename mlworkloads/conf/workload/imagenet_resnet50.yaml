@@ -1,5 +1,3 @@
-name: ResNet50/ImageNet
-
 #dataloading configuration
 s3_bucket: imagenet1k-sdl
 s3_train_prefix: train/

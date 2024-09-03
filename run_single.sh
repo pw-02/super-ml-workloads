@@ -1,37 +1,41 @@
 #!/bin/bash
+set -e
 
-# Start the first Python script and run it in the background
-# python mlworklaods/run.py config.training.learning_rate=0.01
+workload="cifar10_resnet18" # Define your workload
+gpu_indices=(0) # Define an array of GPU indices
+current_datetime=$(date +"%Y-%m-%d_%H-%M-%S") # Get the current date and time
 
-# Start the second Python script and run it in the background
-# python mlworklaods/image_classification/launch.py &
-
-# Wait for all background processes to finish
-# wait
-
-# Get the current date and time
-current_datetime=$(date +"%Y-%m-%d_%H-%M-%S")
 # Define experiment ID
 expid="single_job_$current_datetime"
-# Print experiment ID to verify
-echo "Experiment ID: $expid"
 
-# Define an array of GPU indices
-gpu_indices=(0)
+root_log_dir="logs"
+log_dir="$root_log_dir/$workload/$expid"
 
-# Define an array of learning rates
-learning_rates=(0.001)
+s3_bucket_for_exports="supercloudwtachexports"
+
+echo "Cleaning up CloudWatch logs for experiment $expid"
+python aws_utils/cleanup_cloudwatchlogs_for_experiment.py
+
+# Start resource monitor in the background
+nohup python resource_monitor.py start --interval 1 --flush_interval 10 --file_path "$log_dir/resource_usage_metrics.json" > resource_monitor.log 2>&1 &
+monitor_pid=$!
 
 # Loop over each job
-for i in "${!gpu_indices[@]}"; do
-    current_datetime=$(date +"%Y-%m-%d_%H-%M-%S")
-    expid="single_job_$current_datetime"
-    gpu_index=${gpu_indices[$i]}
-    lr=${learning_rates[$i]}
-    echo "Starting job on GPU $gpu_index with learning rate $lr and exp_id $expid"
-    CUDA_VISIBLE_DEVICES="$gpu_index" python mlworkloads/image_classifer.py workload.learning_rate="$lr" exp_id="$expid" job_id="$gpu_index" &
-    sleep 1  # Wait for 1 second
+for gpu_index in "${gpu_indices[@]}"; do
+    echo "Starting job on GPU $gpu_index with exp_id $expid"
+    CUDA_VISIBLE_DEVICES="$gpu_index" python mlworkloads/image_classifier.py workload="$workload" exp_id="$expid" job_id="$gpu_index" &
+    sleep 2  # Adjust as necessary
 done
 
 # Wait for all background jobs to finish
 wait
+
+# Stop the resource monitor
+echo "Stopping Resource Monitor..."
+kill $monitor_pid
+
+# Download CloudWatch logs
+echo "Downloading CloudWatch logs to $log_dir"
+python aws_utils/get_cloudwatchlogs_for_experiment.py "$log_dir" "$s3_bucket_for_exports"
+
+echo "Experiment completed."

@@ -25,16 +25,16 @@ from collections import OrderedDict
 import numpy as np
 from resource_monitor import ResourceMonitor
 import datetime
-from lightning.pytorch.core.saving import save_hparams_to_yaml
+# from lightning.pytorch.core.saving import save_hparams_to_yaml
 
-def train_image_classifer(config: DictConfig):
+def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logger: CSVLogger):
     # Initialize TorchFabric
     # timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     # log_dir = f"{config.log_dir}/{config.workload.name.replace('/','_')}/{timestamp}".lower()
-    log_dir = f"{config.log_dir}/{config.workload.name.replace('/','_')}/{config.exp_id}/{config.job_id}".lower()
+    # log_dir = f"{config.log_dir}/{config.workload.replace('/','_')}/{config.exp_id}/{config.job_id}".lower()
     # os.makedirs(log_dir, exist_ok=True)
-    train_logger = CSVLogger(root_dir=log_dir, name="train", prefix='', flush_logs_every_n_steps=config.log_interval)
-    val_logger = CSVLogger(root_dir=log_dir, name="val", prefix='', flush_logs_every_n_steps=config.log_interval)
+    # train_logger = CSVLogger(root_dir=log_dir, name="train", prefix='', flush_logs_every_n_steps=config.log_interval)
+    # val_logger = CSVLogger(root_dir=log_dir, name="val", prefix='', flush_logs_every_n_steps=config.log_interval)
 
     fabric = Fabric(
         accelerator=config.accelerator, 
@@ -83,7 +83,7 @@ def train_image_classifer(config: DictConfig):
     elif config.dataloader.name == 'pytorch':
         # PyTorch DataLoader
         if config.workload.run_training:
-            train_dataset = S3MappedDataset(s3_bucket=config.workload.s3_bucket, s3_prefix=config.workload.s3_train_prefix, transform=train_transform)
+            train_dataset = S3MappedDataset(s3_data_dir=config.workload.s3_train_prefix, transform=train_transform)
 
             train_sampler = BatchSamplerWithID(
                 sampler= RandomSampler(data_source=train_dataset,generator=torch.Generator().manual_seed(config.seed)),
@@ -94,7 +94,7 @@ def train_image_classifer(config: DictConfig):
             train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
         
         if config.workload.run_validation:
-            val_dataset = S3MappedDataset(s3_bucket=config.workload.s3_bucket, s3_prefix=config.workload.s3_val_prefix, transform=val_transform)
+            val_dataset = S3MappedDataset(s3_prefix=config.workload.s3_val_prefix, transform=val_transform)
             val_sampler = BatchSamplerWithID(
                 sampler= SequentialSampler(data_source=val_dataset),
                 batch_size=config.workload.batch_size, 
@@ -104,15 +104,18 @@ def train_image_classifer(config: DictConfig):
             val_dataloader =  DataLoader(val_dataset, batch_size=None, sampler=val_sampler, num_workers=config.workload.num_pytorch_workers)
             val_dataloader = fabric.setup_dataloaders(val_dataloader,move_to_device=True)
 
-    # Start training
-    metric_collector = ResourceMonitor(interval=1, flush_interval=10, file_path= f'{log_dir}/resource_usage_metrics.json')
-    metric_collector.start()
+    # # # Start training
+    # metric_collector = ResourceMonitor(interval=1, flush_interval=10, file_path= f'{log_dir}/resource_usage_metrics.json')
+    # # metric_collector.start()
     global_train_step_count = 0
     global_val_step_count = 0
     current_epoch=0
     should_stop = False
     train_start_time = time.perf_counter()
     
+    # if config.workload.limit_train_batches is None:
+    #     config.workload.limit_train_batches = len(train_dataloader)
+        
     while not should_stop:
 
         current_epoch += 1
@@ -127,7 +130,7 @@ def train_image_classifer(config: DictConfig):
                                        current_epoch, 
                                        global_train_step_count, 
                                        max_steps = config.workload.max_steps,
-                                       limit_train_batches = config.workload.limit_train_batches)
+                                       limit_train_batches = config.workload.limit_train_batches if config.workload.limit_train_batches is not None else np.inf)
         
         if val_dataloader is not None and current_epoch % config.workload.validation_frequency == 0:
             global_val_step_count=  validate_loop(fabric, 
@@ -151,10 +154,14 @@ def train_image_classifer(config: DictConfig):
         if config.workload.max_epochs is not None and current_epoch >= config.workload.max_epochs:
             should_stop = True
 
+    if isinstance(train_dataloader.sampler, SUPERSampler):
+        train_dataloader.sampler.send_job_ended_notfication()
+
+
     elapsed_time = time.perf_counter() - train_start_time
+
     fabric.print(f"Training completed in {elapsed_time:.2f} seconds")
-    metric_collector.stop()
-    save_hparams_to_yaml(os.path.join(log_dir, "hparms.yaml"), config)
+    # metric_collector.stop()
 
 
 
@@ -198,82 +205,88 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
     total_samples = 0
     total_train_loss = 0.0
     correct_preds = 0
-
-    end = time.perf_counter()
-    for batch_idx, (batch, data_fetch_time, transformation_time, is_cache_hit) in enumerate(train_dataloader):
-
-        data_load_time = time.perf_counter() - end
-                        # end epoch if stopping training completely or max batches for this epoch reached
-        if batch_idx >= limit_train_batches:   
-            break
-        inputs, labels = batch
-
-        # Synchronize to ensure previous GPU operations are finished
-        # Forward pass
-        gpu_processing_started = time.perf_counter()
-        outputs  = model(inputs)
-        loss = criterion(outputs, labels)
-        train_loss = loss.item()
-        # Backpropagation and optimization
-        optimizer.zero_grad()  # Clear previous gradients
-        fabric.backward(loss)  # Perform backpropagation
-        optimizer.step()  # Update weights
-         # Synchronize after the backward pass and optimization
-        if fabric.device.type == 'gpu':
-            torch.cuda.synchronize()
-        gpu_processing_time = time.perf_counter() - gpu_processing_started
-
-        train_acc = (outputs.argmax(dim=1) == labels).float().mean().item()
     
 
-        # Metrics calculation
-        total_train_loss += train_loss * inputs.size(0)  # accumulate total loss
-        correct_preds += (outputs.argmax(dim=1) == labels).sum().item() # accumulate correct predictions
-        total_samples += inputs.size(0)
+    end = time.perf_counter()
+    # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True, with_stack=True) as prof:
 
-        # Calculate average loss and accuracy across all batches
-        avg_train_loss = total_train_loss / total_samples
-        avg_train_acc = correct_preds / total_samples
-        global_step_count +=1
+    for batch_idx, (batch, data_fetch_time, transformation_time, is_cache_hit) in enumerate(train_dataloader):
 
-        if isinstance(train_dataloader.sampler, SUPERSampler):
-            train_dataloader.sampler.set_step_perf_metrics(time.perf_counter() - end, is_cache_hit,gpu_processing_time )
+            data_load_time = time.perf_counter() - end
+                            # end epoch if stopping training completely or max batches for this epoch reached
+            if limit_train_batches is not None and batch_idx >= limit_train_batches:
+                break
+            inputs, labels = batch
 
-        metrics= OrderedDict({
-                        "Elapsed Time (s)": time.perf_counter() - train_start_time,
-                        "Device": fabric.global_rank,
-                        "Epoch Index": current_epoch,
-                        "Batch Index": batch_idx+1,
-                        "Batch Size": batch[0].size(0),
-                        "Total Iteration Time (s)": time.perf_counter() - end,
-                        "Data Loading Time (s)": data_load_time,
-                        "GPU Processing Time (s)": gpu_processing_time,
-                        "Data Fetch Time (s)": data_fetch_time,
-                        "Transformation Time (s)": transformation_time,
-                        "Cache Hit/Miss": 1 if is_cache_hit else 0,
-                        "Avg Train Loss": avg_train_loss, #calculates the average training loss across all batches.
-                        "Avg Train Accuracy": avg_train_acc, #calculates the average training accuracy across all batches.
-                        })
-        train_logger.log_metrics(metrics,step=global_step_count)
+            # Synchronize to ensure previous GPU operations are finished
+            # Forward pass
+            gpu_processing_started = time.perf_counter()
+            outputs  = model(inputs)
+            loss = criterion(outputs, labels)
+            train_loss = loss.item()
+            # Backpropagation and optimization
+            optimizer.zero_grad()  # Clear previous gradients
+            fabric.backward(loss)  # Perform backpropagation
+            optimizer.step()  # Update weights
+            # Synchronize after the backward pass and optimization
+            if fabric.device.type == 'gpu':
+                torch.cuda.synchronize()
+            gpu_processing_time = time.perf_counter() - gpu_processing_started
+
+            train_acc = (outputs.argmax(dim=1) == labels).float().mean().item()
         
-        fabric.print(
-                f" Job {job_id} | Epoch: {metrics['Epoch Index']}({metrics['Batch Index']}/{min(len(train_dataloader),limit_train_batches)}) |"
-                # f" loss train: {metrics['Train Loss']:.3f} |"
-                # f" val: {val_loss} |"
-                f" iter time: {metrics['Total Iteration Time (s)']:.2f} |"
-                f" dataload time: {metrics['Data Loading Time (s)']:.2f} |"
-                f" gpu time: {metrics['GPU Processing Time (s)']:.2f} |"
-                f" fetch time: {metrics['Data Fetch Time (s)']:.2f} |"
-                f" transform time: {metrics['Transformation Time (s)']:.2f} |"
-                f" elapsed time: {metrics['Elapsed Time (s)']:.2f} |"
 
-                )
+            # Metrics calculation
+            total_train_loss += train_loss * inputs.size(0)  # accumulate total loss
+            correct_preds += (outputs.argmax(dim=1) == labels).sum().item() # accumulate correct predictions
+            total_samples += inputs.size(0)
 
-        # stopping criterion on step level
-        if max_steps is not None and global_step_count >= max_steps:
-            break
+            # Calculate average loss and accuracy across all batches
+            avg_train_loss = total_train_loss / total_samples
+            avg_train_acc = correct_preds / total_samples
+            global_step_count +=1
 
-        end = time.perf_counter()
+            if isinstance(train_dataloader.sampler, SUPERSampler):
+                train_dataloader.sampler.set_step_perf_metrics(time.perf_counter() - end, is_cache_hit,gpu_processing_time )
+            
+            # print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
+            # flops = prof.key_averages().table(sort_by="flop", row_limit=10)
+
+            metrics= OrderedDict({
+                            "Elapsed Time (s)": time.perf_counter() - train_start_time,
+                            "Device": fabric.global_rank,
+                            "Epoch Index": current_epoch,
+                            "Batch Index": batch_idx+1,
+                            "Batch Size": batch[0].size(0),
+                            "Total Iteration Time (s)": time.perf_counter() - end,
+                            "Data Loading Time (s)": data_load_time,
+                            "GPU Processing Time (s)": gpu_processing_time,
+                            "Data Fetch Time (s)": data_fetch_time,
+                            "Transformation Time (s)": transformation_time,
+                            "Cache Hit/Miss": 1 if is_cache_hit else 0,
+                            "Avg Train Loss": avg_train_loss, #calculates the average training loss across all batches.
+                            "Avg Train Accuracy": avg_train_acc, #calculates the average training accuracy across all batches.
+                            })
+            train_logger.log_metrics(metrics,step=global_step_count)
+            
+            fabric.print(
+                    f" Job {job_id} | Epoch: {metrics['Epoch Index']}({metrics['Batch Index']}/{min(len(train_dataloader),limit_train_batches)}) |"
+                    # f" loss train: {metrics['Train Loss']:.3f} |"
+                    # f" val: {val_loss} |"
+                    f" iter time: {metrics['Total Iteration Time (s)']:.2f} |"
+                    f" dataload time: {metrics['Data Loading Time (s)']:.2f} |"
+                    f" gpu time: {metrics['GPU Processing Time (s)']:.2f} |"
+                    f" fetch time: {metrics['Data Fetch Time (s)']:.2f} |"
+                    f" transform time: {metrics['Transformation Time (s)']:.2f} |"
+                    f" elapsed time: {metrics['Elapsed Time (s)']:.2f} |"
+
+                    )
+
+            # stopping criterion on step level
+            if max_steps is not None and global_step_count >= max_steps:
+                break
+
+            end = time.perf_counter()
 
     return  global_step_count
 

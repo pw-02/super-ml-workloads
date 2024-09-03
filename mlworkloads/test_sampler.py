@@ -15,7 +15,7 @@ if __name__ == "__main__":
 
 
 
-    dataset = SUPERMappedDataset(s3_data_dir="s3://sdl-cifar10/test/", transform=transform, simulate_mode=False, simulate_time_for_cache_miss=5, simulate_time_for_cache_hit=0.25)
+    dataset = SUPERMappedDataset(s3_data_dir="s3://sdl-cifar10/test/", transform=transform, cache_address="34.220.21.111:6378")
     sampler = SUPERSampler(dataset, "localhost:50051")
     dataloader:DataLoader = DataLoader(dataset, sampler=sampler, num_workers=0, batch_size=None)  # batch_size=None since sampler provides batches
     cache_hits = 0

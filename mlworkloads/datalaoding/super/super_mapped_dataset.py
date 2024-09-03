@@ -43,7 +43,7 @@ class SUPERMappedDataset(Dataset):
         # self.simulate_mode = simulate_mode
         # self._simlute_time_for_cache_miss = simulate_time_for_cache_miss
         # self._simlute_time_for_cache_hit = simulate_time_for_cache_hit
-        
+
         if cache_address is not None:
             self.cache_host, self.cache_port = cache_address.split(":")
             self.cache_port = int(self.cache_port)
@@ -113,11 +113,11 @@ class SUPERMappedDataset(Dataset):
     
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, float, float]:
         batch_id, batch_indices, is_cached = idx
-
+        cached_minibacth = None
         if is_cached and self.use_cache:
             fetch_start_time = time.perf_counter()
             cached_minibacth = self.fetch_from_cache(batch_id)
-            fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
+            fetch_duration = time.perf_counter() - fetch_start_time
 
         if cached_minibacth is not None and (isinstance(cached_minibacth, bytes) or isinstance(cached_minibacth, str)):
             tranform_start_time = time.perf_counter()
@@ -127,7 +127,7 @@ class SUPERMappedDataset(Dataset):
         else:
             fetch_start_time = time.perf_counter()
             data_samples, labels = self.fetch_batch_from_s3(batch_indices)
-            fetch_duration = time.perf_counter() - fetch_start_time - transform_duration
+            fetch_duration = time.perf_counter() - fetch_start_time
 
             transform_start_time = time.perf_counter()
             if self.transform is not None:
@@ -135,8 +135,10 @@ class SUPERMappedDataset(Dataset):
                     data_samples[i] = self.transform(data_samples[i])        
             transform_duration =  time.perf_counter() - transform_start_time
             cache_hit = False
+            data_samples= torch.stack(data_samples)
+            labels = torch.tensor(labels)
 
-        return (torch.stack(data_samples), torch.tensor(labels)), fetch_duration, transform_duration, cache_hit
+        return (data_samples,labels), fetch_duration, transform_duration, cache_hit
 
 
     def decode_cached_minibacth(self, cached_minibacth):

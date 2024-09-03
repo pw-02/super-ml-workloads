@@ -5,6 +5,8 @@ import psutil
 import subprocess
 import threading
 import numpy as np
+import argparse
+
 class ResourceMonitor:
     def __init__(self, interval=1, flush_interval=10, file_path='resource_usage_metrics.json'):
         self.interval = interval
@@ -156,5 +158,34 @@ def test_cpu_load():
 
     print("Test complete. Check 'resource_usage_metrics.json' for collected metrics.")
 
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Start or stop the resource monitor.")
+    parser.add_argument('action', choices=['start', 'stop'], help="Action to perform: 'start' or 'stop'")
+    parser.add_argument('--interval', type=int, default=1, help="Interval between metric collection (seconds)")
+    parser.add_argument('--flush_interval', type=int, default=10, help="Interval between metric flushes (seconds)")
+    parser.add_argument('--file_path', default='resource_usage_metrics.json', help="File path for saving metrics")
+    args = parser.parse_args()
+
+    monitor = ResourceMonitor(interval=args.interval, flush_interval=args.flush_interval, file_path=args.file_path)
+    
+    if args.action == 'start':
+        print("Starting Resource Monitor...")
+        monitor.start()
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("Stopping Resource Monitor...")
+            monitor.stop()
+    elif args.action == 'stop':
+        print("Stopping Resource Monitor...")
+        monitor.stop()
+
 if __name__ == "__main__":
-    test_cpu_load()
+    main()
+
+
+# if __name__ == "__main__":
+#     test_cpu_load()

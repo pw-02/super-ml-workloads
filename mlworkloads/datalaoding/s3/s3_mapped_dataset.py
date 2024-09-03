@@ -8,17 +8,41 @@ from torchvision import transforms
 from typing import List, Dict, Tuple
 import functools
 import time
+from urllib.parse import urlparse
+
+
+class S3Url(object):
+    def __init__(self, url):
+        self._parsed = urlparse(url, allow_fragments=False)
+
+    @property
+    def bucket(self):
+        return self._parsed.netloc
+
+    @property
+    def key(self):
+        if self._parsed.query:
+            return self._parsed.path.lstrip('/') + '?' + self._parsed.query
+        else:
+            return self._parsed.path.lstrip('/')
+
+    @property
+    def url(self):
+        return self._parsed.geturl()
+
 
 class S3MappedDataset(Dataset):
-    def __init__(self, s3_bucket: str, s3_prefix: str, transform=None):
-        self.s3_bucket = s3_bucket
-        self.s3_prefix = s3_prefix
+    def __init__(self, s3_data_dir: str, transform=None):
+
+        self.s3_bucket = S3Url(s3_data_dir).bucket
+        self.s3_prefix = S3Url(s3_data_dir).key
+        self.s3_data_dir = s3_data_dir
         self.transform = transform
         
         # Initialize S3 client
 
         # List all files in the S3 bucket under the specified prefix
-        self.samples = self.get_sample_list_from_s3()
+        self.samples = self._get_sample_list_from_s3()
     
     @functools.cached_property
     def _classed_items(self) -> List[Tuple[str, int]]:
@@ -26,7 +50,7 @@ class S3MappedDataset(Dataset):
             for class_index, blob_class in enumerate(self.samples)
             for blob in self.samples[blob_class]]
 
-    def get_sample_list_from_s3(self, use_index_file=True, images_only=True) -> Dict[str, List[str]]:
+    def _get_sample_list_from_s3(self, use_index_file=True, images_only=True) -> Dict[str, List[str]]:
         s3_client = boto3.client('s3')
 
         index_file_key = f"{self.s3_prefix}_paired_index.json"
