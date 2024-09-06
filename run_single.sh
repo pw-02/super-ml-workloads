@@ -2,7 +2,7 @@
 set -e
 
 workload="cifar10_resnet18" # Define your workload
-dataloder="shade" # Define your dataloader
+dataloder="super" # Define your dataloader
 gpu_indices=(0) # Define an array of GPU indices
 
 current_datetime=$(date +"%Y-%m-%d_%H-%M-%S") # Get the current date and time
