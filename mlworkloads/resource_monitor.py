@@ -83,17 +83,30 @@ class ResourceMonitor:
                 self.last_flush_time = current_time
             
             time.sleep(self.interval)
-
+    
     def get_gpu_usage(self):
         try:
             result = subprocess.run(
-                ['nvidia-smi', '--query-gpu=utilization.gpu', '--format=csv,noheader,nounits'],
+                ['nvidia-smi', '--query-gpu=index,utilization.gpu', '--format=csv,noheader,nounits'],
                 capture_output=True, text=True
             )
-            return int(result.stdout.strip())
+            # Split by lines and parse each GPU's usage
+            gpu_usages = [int(line.split()[1]) for line in result.stdout.strip().split('\n')]
+            return np.mean(gpu_usages)  # Return average GPU usage if desired
         except Exception as e:
             print(f"Error retrieving GPU usage: {e}")
             return 0
+
+    # def get_gpu_usage(self):
+    #     try:
+    #         result = subprocess.run(
+    #             ['nvidia-smi', '--query-gpu=utilization.gpu', '--format=csv,noheader,nounits'],
+    #             capture_output=True, text=True
+    #         )
+    #         return int(result.stdout.strip())
+    #     except Exception as e:
+    #         print(f"Error retrieving GPU usage: {e}")
+    #         return 0
 
     def flush_metrics(self):
         if os.path.exists(os.path.dirname(self.file_path)):
