@@ -2,6 +2,7 @@
 set -e
 
 workload="cifar10_resnet18" # Define your workload
+dataloder="shade" # Define your dataloader
 gpu_indices=(0) # Define an array of GPU indices
 
 current_datetime=$(date +"%Y-%m-%d_%H-%M-%S") # Get the current date and time
@@ -10,7 +11,7 @@ current_datetime=$(date +"%Y-%m-%d_%H-%M-%S") # Get the current date and time
 expid="single_job_$current_datetime"
 
 root_log_dir="logs"
-log_dir="$root_log_dir/$workload/$expid"
+log_dir="$root_log_dir/$workload/$dataloder/$expid"
 
 s3_bucket_for_exports="supercloudwtachexports"
 
@@ -29,7 +30,7 @@ echo "Training started UTC Time: $training_started_datetime"
 
 for gpu_index in "${gpu_indices[@]}"; do
     echo "Starting job on GPU $gpu_index with exp_id $expid"
-    CUDA_VISIBLE_DEVICES="$gpu_index" python mlworkloads/run.py workload="$workload" exp_id="$expid" job_id="$gpu_index" &
+    CUDA_VISIBLE_DEVICES="$gpu_index" python mlworkloads/run.py workload="$workload" exp_id="$expid" job_id="$gpu_index" dataloader="$dataloder" &
     job_pids+=($!)  # Save the PID of the background job
     sleep 2  # Adjust as necessary
 done

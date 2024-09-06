@@ -26,16 +26,18 @@ import numpy as np
 from resource_monitor import ResourceMonitor
 import datetime
 # from lightning.pytorch.core.saving import save_hparams_to_yaml
+import redis
+import heapdict
+from dataloading.shade.shadedataset import ShadeDataset
+from dataloading.shade.shadesampler import ShadeSampler
+import math
+
+#Initialization of local cache, PQ and ghost cache (for shade)
+PQ = heapdict.heapdict()
+ghost_cache = heapdict.heapdict()
 
 def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logger: CSVLogger):
-    # Initialize TorchFabric
-    # timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    # log_dir = f"{config.log_dir}/{config.workload.name.replace('/','_')}/{timestamp}".lower()
-    # log_dir = f"{config.log_dir}/{config.workload.replace('/','_')}/{config.exp_id}/{config.job_id}".lower()
-    # os.makedirs(log_dir, exist_ok=True)
-    # train_logger = CSVLogger(root_dir=log_dir, name="train", prefix='', flush_logs_every_n_steps=config.log_interval)
-    # val_logger = CSVLogger(root_dir=log_dir, name="val", prefix='', flush_logs_every_n_steps=config.log_interval)
-
+  
     fabric = Fabric(
         accelerator=config.accelerator, 
         devices=config.devices, 
@@ -78,6 +80,37 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
                 )
             val_dataloader =  DataLoader(val_dataset, batch_size=None, sampler=val_sampler, num_workers=config.workload.num_pytorch_workers)
             val_dataloader = fabric.setup_dataloaders(val_dataloader,move_to_device=True)
+    
+    elif config.dataloader.name == 'shade':
+        global PQ
+        global key_id_map
+        global ghost_cache
+
+        if config.workload.run_training:
+            key_id_map = redis.StrictRedis(host=config.dataloader.cache_address.split(":")[0], port=config.dataloader.cache_address.split(":")[1])
+            train_dataset = ShadeDataset(s3_data_dir=config.workload.s3_train_prefix, 
+                                        transform=train_transform,
+                                        cache_address=config.dataloader.cache_address,
+                                        PQ=PQ,
+                                        ghost_cache=ghost_cache,
+                                        wss=config.dataloader.wss)
+            train_sampler = ShadeSampler(
+                dataset=train_dataset,
+                num_replicas=1,
+                rank=0,
+                batch_size=config.workload.batch_size,
+                seed=config.seed,
+                host_ip=config.dataloader.cache_address.split(":")[0],
+                port_num=config.dataloader.cache_address.split(":")[1],
+                rep_factor=config.dataloader.rep_factor,
+                )
+            
+            train_dataloader = DataLoader(train_dataset, 
+                                          shuffle=False,
+                                          batch_size=config.workload.batch_size,
+                                          sampler=train_sampler, 
+                                          num_workers=config.workload.num_pytorch_workers)
+            train_dataloader = fabric.setup_dataloaders(train_dataloader,move_to_device=True)
 
 
     elif config.dataloader.name == 'pytorch':
@@ -112,26 +145,39 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
     current_epoch=0
     should_stop = False
     train_start_time = time.perf_counter()
+
+    if config.dataloader.name == 'shade':
+        batch_wts = []
+        for j in range(config.workload.batch_size):
+            batch_wts.append(math.log(j+10))
+    else:
+        batch_wts = None
     
-    # if config.workload.limit_train_batches is None:
-    #     config.workload.limit_train_batches = len(train_dataloader)
+    if config.workload.limit_train_batches is None:
+        config.workload.limit_train_batches = len(train_dataloader)
         
     while not should_stop:
 
+        if isinstance(train_dataloader.sampler, ShadeSampler):
+            train_dataloader.sampler.set_epoch(current_epoch)
+
         current_epoch += 1
 
-        global_train_step_count = train_loop(fabric, 
-                                      config.job_id,
-                                       train_logger,
-                                       model, 
-                                       optimizer,
-                                       train_dataloader, 
-                                       train_start_time, 
-                                       current_epoch, 
-                                       global_train_step_count, 
-                                       max_steps = config.workload.max_steps,
-                                       limit_train_batches = config.workload.limit_train_batches if config.workload.limit_train_batches is not None else np.inf)
-        
+        global_train_step_count = train_loop(
+            fabric=fabric,
+            job_id=config.job_id,
+            train_logger=train_logger,
+            model=model,
+            optimizer=optimizer,
+            train_dataloader=train_dataloader,
+            train_start_time=train_start_time,
+            current_epoch=current_epoch,
+            global_step_count=global_train_step_count,
+            max_steps=config.workload.max_steps,
+            limit_train_batches=config.workload.limit_train_batches,
+            criterion=nn.CrossEntropyLoss(reduction = 'none'),
+            batch_wts=batch_wts)
+    
         if val_dataloader is not None and current_epoch % config.workload.validation_frequency == 0:
             global_val_step_count=  validate_loop(fabric, 
                                         config.job_id,
@@ -199,16 +245,13 @@ def get_transforms(workload_name):
         raise ValueError(f"Invalid workload: {workload_name}")
     return train_transform, val_transform
 
-def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, train_dataloader:DataLoader, train_start_time, current_epoch, global_step_count, max_steps = None, limit_train_batches = np.inf, criterion=nn.CrossEntropyLoss()):
+def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, train_dataloader:DataLoader, train_start_time, current_epoch, global_step_count, max_steps = None, limit_train_batches = np.inf, criterion=nn.CrossEntropyLoss(), batch_wts = None):
     model.train()
-
     total_samples = 0
     total_train_loss = 0.0
     correct_preds = 0
-    
 
     end = time.perf_counter()
-    # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True, with_stack=True) as prof:
 
     for batch_idx, (batch, data_fetch_time, transformation_time, is_cache_hit, cached_after_fetch) in enumerate(train_dataloader):
 
@@ -222,8 +265,9 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
             # Forward pass
             gpu_processing_started = time.perf_counter()
             outputs  = model(inputs)
-            loss = criterion(outputs, labels)
-            train_loss = loss.item()
+            item_loss = criterion(outputs, labels)
+            loss = item_loss.mean()
+            # train_loss = loss.item()
             # Backpropagation and optimization
             optimizer.zero_grad()  # Clear previous gradients
             fabric.backward(loss)  # Perform backpropagation
@@ -237,7 +281,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
         
 
             # Metrics calculation
-            total_train_loss += train_loss * inputs.size(0)  # accumulate total loss
+            total_train_loss += loss.item() * inputs.size(0)  # accumulate total loss
             correct_preds += (outputs.argmax(dim=1) == labels).sum().item() # accumulate correct predictions
             total_samples += inputs.size(0)
 
@@ -245,6 +289,46 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
             avg_train_loss = total_train_loss / total_samples
             avg_train_acc = correct_preds / total_samples
             global_step_count +=1
+
+            if not isinstance(train_dataloader.sampler, ShadeSampler):
+                cache_hit_samples = batch[0].size(0) if is_cache_hit == True else 0
+                cache_hit_bacth = 1 if is_cache_hit == True else 0
+
+            if isinstance(train_dataloader.sampler, ShadeSampler):
+                data_fetch_time = float(data_fetch_time.sum())
+                transformation_time = float(transformation_time.sum())
+                cache_hit_samples = int(is_cache_hit.sum())
+                cache_hit_bacth = 1 if cache_hit_samples == len(is_cache_hit) else 0
+
+                train_dataloader.sampler.pass_batch_important_scores(item_loss.cpu())
+                sorted_img_indices = train_dataloader.sampler.get_sorted_index_list()
+                if isinstance(train_dataloader.dataset, ShadeDataset):
+                    global ghost_cache
+                    global PQ
+                    track_batch_indx = 0
+                    if current_epoch > 1:
+                        PQ = train_dataloader.dataset.get_PQ()
+                        ghost_cache = train_dataloader.dataset.get_ghost_cache()
+                    for indx in sorted_img_indices:
+                        if key_id_map.exists(indx.item()):
+                            if indx.item() in PQ:
+                                PQ[indx.item()] = (batch_wts[track_batch_indx],PQ[indx.item()][1]+1)
+                                ghost_cache[indx.item()] = (batch_wts[track_batch_indx],ghost_cache[indx.item()][1]+1)
+                                track_batch_indx+=1
+                            else:
+                                PQ[indx.item()] = (batch_wts[track_batch_indx],1)
+                                ghost_cache[indx.item()] = (batch_wts[track_batch_indx],1)
+                                track_batch_indx+=1
+                        else:
+                            if indx.item() in ghost_cache:
+                                ghost_cache[indx.item()] = (batch_wts[track_batch_indx],ghost_cache[indx.item()][1]+1)
+                                track_batch_indx+=1
+                            else:
+                                ghost_cache[indx.item()] = (batch_wts[track_batch_indx],1)
+                                track_batch_indx+=1
+                    train_dataloader.dataset.set_PQ(PQ)
+                    train_dataloader.dataset.set_ghost_cache(ghost_cache)
+                    train_dataloader.dataset.set_num_local_samples()
 
             if isinstance(train_dataloader.sampler, SUPERSampler):
                 train_dataloader.sampler.set_step_perf_metrics(time.perf_counter() - end, is_cache_hit,gpu_processing_time, cached_after_fetch )
@@ -263,7 +347,8 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                             "GPU Processing Time (s)": gpu_processing_time,
                             "Data Fetch Time (s)": data_fetch_time,
                             "Transformation Time (s)": transformation_time,
-                            "Cache Hit/Miss": 1 if is_cache_hit else 0,
+                            "Cache_Hit(Batch)": cache_hit_bacth,
+                            "Cache_Hits(Samples)": cache_hit_samples,
                             "Avg Train Loss": avg_train_loss, #calculates the average training loss across all batches.
                             "Avg Train Accuracy": avg_train_acc, #calculates the average training accuracy across all batches.
                             })
@@ -287,7 +372,10 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                 break
 
             end = time.perf_counter()
-
+    
+    if isinstance(train_dataloader.sampler, ShadeSampler):
+        train_dataloader.sampler.on_epoch_end(total_train_loss/batch_idx)
+        
     return  global_step_count
 
 
