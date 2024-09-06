@@ -2,7 +2,11 @@
 set -e
 
 workload="cifar10_resnet18" # Define your workload
-gpu_indices=(0) # Define an array of GPU indices
+gpu_indices=(1 2) # Define an array of GPU indices
+# Define an array of learning rates
+
+# learning_rates=(0.001 0.01)
+
 current_datetime=$(date +"%Y-%m-%d_%H-%M-%S") # Get the current date and time
 
 # Define experiment ID
@@ -28,7 +32,7 @@ echo "Training started UTC Time: $training_started_datetime"
 
 for gpu_index in "${gpu_indices[@]}"; do
     echo "Starting job on GPU $gpu_index with exp_id $expid"
-    CUDA_VISIBLE_DEVICES="$gpu_index" python mlworkloads/run.py workload="$workload" exp_id="$expid" job_id="$gpu_index" &
+    CUDA_VISIBLE_DEVICES=0 python mlworkloads/run.py workload="$workload" exp_id="$expid" job_id="$gpu_index" &
     job_pids+=($!)  # Save the PID of the background job
     sleep 2  # Adjust as necessary
 done
@@ -44,8 +48,8 @@ echo "Training ended UTC Time: $training_ended_datetime"
 echo "Stopping Resource Monitor..."
 kill $monitor_pid
 
-# Download CloudWatch logs
-echo "Downloading CloudWatch logs to $log_dir"
-python aws_utils/get_cloudwatchlogs_for_experiment.py --download_dir "$log_dir" --s3_bucket_name "$s3_bucket_for_exports" --start_time "$training_started_datetime" --end_time "$training_ended_datetime"
+# # Download CloudWatch logs
+# echo "Downloading CloudWatch logs to $log_dir"
+# python aws_utils/get_cloudwatchlogs_for_experiment.py --download_dir "$log_dir" --s3_bucket_name "$s3_bucket_for_exports" --start_time "$training_started_datetime" --end_time "$training_ended_datetime"
 
 echo "Experiment completed."

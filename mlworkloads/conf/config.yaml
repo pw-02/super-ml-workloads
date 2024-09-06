@@ -9,7 +9,7 @@ defaults:
 seed: 42 # Seed for reproducibility
 accelerator: 'gpu' # 'cpu', 'gpu', 'tpu'
 devices: 1 # Number of devices to use for training (e.g. GPUs) per job
-log_interval: 1 # Log every N steps
+log_interval: 5 # Log every N steps
 log_dir: logs # Directory to save logs
 checkpoint_dir: checkpoints # Save a checkpoint every N steps
 precision: 32 # 16, 32, 64

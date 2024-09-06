@@ -25,31 +25,31 @@ _sym_db = _symbol_database.Default()
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1dproto/minibatch_service.proto\x1a\x1bgoogle/protobuf/empty.proto\"s\n\x0fJobEndedRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x10\n\x08\x64\x61ta_dir\x18\x02 \x01(\t\x12\x1a\n\x12previous_step_time\x18\x03 \x01(\x02\x12\"\n\x1aprevious_step_is_cache_hit\x18\x04 \x01(\x08\"\x1e\n\x0bPingRequest\x12\x0f\n\x07message\x18\x01 \x01(\t\"\x1f\n\x0cPingResponse\x12\x0f\n\x07message\x18\x01 \x01(\t\"*\n\x16RegisterDatasetRequest\x12\x10\n\x08\x64\x61ta_dir\x18\x02 \x01(\t\"`\n\x17RegisterDatasetResponse\x12\x1d\n\x15\x64\x61taset_is_registered\x18\x01 \x01(\x08\x12\x15\n\rtotal_batches\x18\x02 \x01(\x05\x12\x0f\n\x07message\x18\x03 \x01(\t\">\n\x05\x42\x61tch\x12\x10\n\x08\x62\x61tch_id\x18\x01 \x01(\t\x12\x10\n\x08indicies\x18\x02 \x03(\x05\x12\x11\n\tis_cached\x18\x03 \x01(\x08\"\x9d\x01\n\x19GetNextBatchForJobRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x10\n\x08\x64\x61ta_dir\x18\x02 \x01(\t\x12\x1a\n\x12previous_step_time\x18\x03 \x01(\x02\x12\"\n\x1aprevious_step_is_cache_hit\x18\x04 \x01(\x08\x12\x1e\n\x16previous_step_gpu_time\x18\x05 \x01(\x02\"C\n\x1aGetNextBatchForJobResponse\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x15\n\x05\x62\x61tch\x18\x02 \x01(\x0b\x32\x06.Batch\"v\n SendJobPerformanceMetricsRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x10\n\x08\x64\x61ta_dir\x18\x02 \x01(\t\x12\x1a\n\x12training_step_time\x18\x03 \x01(\x02\x12\x14\n\x0cis_cache_hit\x18\x04 \x01(\x08\x32\x82\x02\n\x10MiniBatchService\x12#\n\x04Ping\x12\x0c.PingRequest\x1a\r.PingResponse\x12\x44\n\x0fRegisterDataset\x12\x17.RegisterDatasetRequest\x1a\x18.RegisterDatasetResponse\x12M\n\x12GetNextBatchForJob\x12\x1a.GetNextBatchForJobRequest\x1a\x1b.GetNextBatchForJobResponse\x12\x34\n\x08JobEnded\x12\x10.JobEndedRequest\x1a\x16.google.protobuf.Emptyb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1dproto/minibatch_service.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xb2\x01\n\x0fJobEndedRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x10\n\x08\x64\x61ta_dir\x18\x02 \x01(\t\x12\x1a\n\x12previous_step_time\x18\x03 \x01(\x02\x12\"\n\x1aprevious_step_is_cache_hit\x18\x04 \x01(\x08\x12\x1e\n\x16previous_step_gpu_time\x18\x05 \x01(\x02\x12\x1d\n\x15\x63\x61\x63hed_previous_batch\x18\x06 \x01(\x08\"\x1e\n\x0bPingRequest\x12\x0f\n\x07message\x18\x01 \x01(\t\"\x1f\n\x0cPingResponse\x12\x0f\n\x07message\x18\x01 \x01(\t\"*\n\x16RegisterDatasetRequest\x12\x10\n\x08\x64\x61ta_dir\x18\x02 \x01(\t\"`\n\x17RegisterDatasetResponse\x12\x1d\n\x15\x64\x61taset_is_registered\x18\x01 \x01(\x08\x12\x15\n\rtotal_batches\x18\x02 \x01(\x05\x12\x0f\n\x07message\x18\x03 \x01(\t\">\n\x05\x42\x61tch\x12\x10\n\x08\x62\x61tch_id\x18\x01 \x01(\t\x12\x10\n\x08indicies\x18\x02 \x03(\x05\x12\x11\n\tis_cached\x18\x03 \x01(\x08\"\xbc\x01\n\x19GetNextBatchForJobRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x10\n\x08\x64\x61ta_dir\x18\x02 \x01(\t\x12\x1a\n\x12previous_step_time\x18\x03 \x01(\x02\x12\"\n\x1aprevious_step_is_cache_hit\x18\x04 \x01(\x08\x12\x1e\n\x16previous_step_gpu_time\x18\x05 \x01(\x02\x12\x1d\n\x15\x63\x61\x63hed_previous_batch\x18\x06 \x01(\x08\"C\n\x1aGetNextBatchForJobResponse\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x15\n\x05\x62\x61tch\x18\x02 \x01(\x0b\x32\x06.Batch\"v\n SendJobPerformanceMetricsRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x10\n\x08\x64\x61ta_dir\x18\x02 \x01(\t\x12\x1a\n\x12training_step_time\x18\x03 \x01(\x02\x12\x14\n\x0cis_cache_hit\x18\x04 \x01(\x08\x32\x82\x02\n\x10MiniBatchService\x12#\n\x04Ping\x12\x0c.PingRequest\x1a\r.PingResponse\x12\x44\n\x0fRegisterDataset\x12\x17.RegisterDatasetRequest\x1a\x18.RegisterDatasetResponse\x12M\n\x12GetNextBatchForJob\x12\x1a.GetNextBatchForJobRequest\x1a\x1b.GetNextBatchForJobResponse\x12\x34\n\x08JobEnded\x12\x10.JobEndedRequest\x1a\x16.google.protobuf.Emptyb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'proto.minibatch_service_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_JOBENDEDREQUEST']._serialized_start=62
-  _globals['_JOBENDEDREQUEST']._serialized_end=177
-  _globals['_PINGREQUEST']._serialized_start=179
-  _globals['_PINGREQUEST']._serialized_end=209
-  _globals['_PINGRESPONSE']._serialized_start=211
-  _globals['_PINGRESPONSE']._serialized_end=242
-  _globals['_REGISTERDATASETREQUEST']._serialized_start=244
-  _globals['_REGISTERDATASETREQUEST']._serialized_end=286
-  _globals['_REGISTERDATASETRESPONSE']._serialized_start=288
-  _globals['_REGISTERDATASETRESPONSE']._serialized_end=384
-  _globals['_BATCH']._serialized_start=386
-  _globals['_BATCH']._serialized_end=448
-  _globals['_GETNEXTBATCHFORJOBREQUEST']._serialized_start=451
-  _globals['_GETNEXTBATCHFORJOBREQUEST']._serialized_end=608
-  _globals['_GETNEXTBATCHFORJOBRESPONSE']._serialized_start=610
-  _globals['_GETNEXTBATCHFORJOBRESPONSE']._serialized_end=677
-  _globals['_SENDJOBPERFORMANCEMETRICSREQUEST']._serialized_start=679
-  _globals['_SENDJOBPERFORMANCEMETRICSREQUEST']._serialized_end=797
-  _globals['_MINIBATCHSERVICE']._serialized_start=800
-  _globals['_MINIBATCHSERVICE']._serialized_end=1058
+  _globals['_JOBENDEDREQUEST']._serialized_start=63
+  _globals['_JOBENDEDREQUEST']._serialized_end=241
+  _globals['_PINGREQUEST']._serialized_start=243
+  _globals['_PINGREQUEST']._serialized_end=273
+  _globals['_PINGRESPONSE']._serialized_start=275
+  _globals['_PINGRESPONSE']._serialized_end=306
+  _globals['_REGISTERDATASETREQUEST']._serialized_start=308
+  _globals['_REGISTERDATASETREQUEST']._serialized_end=350
+  _globals['_REGISTERDATASETRESPONSE']._serialized_start=352
+  _globals['_REGISTERDATASETRESPONSE']._serialized_end=448
+  _globals['_BATCH']._serialized_start=450
+  _globals['_BATCH']._serialized_end=512
+  _globals['_GETNEXTBATCHFORJOBREQUEST']._serialized_start=515
+  _globals['_GETNEXTBATCHFORJOBREQUEST']._serialized_end=703
+  _globals['_GETNEXTBATCHFORJOBRESPONSE']._serialized_start=705
+  _globals['_GETNEXTBATCHFORJOBRESPONSE']._serialized_end=772
+  _globals['_SENDJOBPERFORMANCEMETRICSREQUEST']._serialized_start=774
+  _globals['_SENDJOBPERFORMANCEMETRICSREQUEST']._serialized_end=892
+  _globals['_MINIBATCHSERVICE']._serialized_start=895
+  _globals['_MINIBATCHSERVICE']._serialized_end=1153
 # @@protoc_insertion_point(module_scope)

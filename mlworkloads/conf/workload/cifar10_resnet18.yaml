@@ -18,7 +18,7 @@ run_validation: False
 validation_frequency: 1000000 #every n epochs
 checkpoint_frequency: .inf #every n epochs
 max_epochs: 1
-max_steps: 25
+max_steps: null
 batch_size: 128 #Number of samples between optimizer steps across data-parallel ranks
 limit_train_batches: null
 limit_val_batches: null

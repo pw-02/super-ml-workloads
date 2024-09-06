@@ -210,7 +210,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
     end = time.perf_counter()
     # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True, with_stack=True) as prof:
 
-    for batch_idx, (batch, data_fetch_time, transformation_time, is_cache_hit) in enumerate(train_dataloader):
+    for batch_idx, (batch, data_fetch_time, transformation_time, is_cache_hit, cached_after_fetch) in enumerate(train_dataloader):
 
             data_load_time = time.perf_counter() - end
                             # end epoch if stopping training completely or max batches for this epoch reached
@@ -247,7 +247,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
             global_step_count +=1
 
             if isinstance(train_dataloader.sampler, SUPERSampler):
-                train_dataloader.sampler.set_step_perf_metrics(time.perf_counter() - end, is_cache_hit,gpu_processing_time )
+                train_dataloader.sampler.set_step_perf_metrics(time.perf_counter() - end, is_cache_hit,gpu_processing_time, cached_after_fetch )
             
             # print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
             # flops = prof.key_averages().table(sort_by="flop", row_limit=10)

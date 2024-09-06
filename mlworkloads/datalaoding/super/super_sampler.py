@@ -20,6 +20,7 @@ class SUPERSampler(Sampler):
         self.previous_step_is_cache_hit = None
         self.previous_step_training_time = None
         self.previous_step_gpu_time = None
+        self.cached_previous_batch = False
 
 
     def _test_grpc_connection(self):
@@ -54,17 +55,20 @@ class SUPERSampler(Sampler):
         unique_id = hashlib.sha1(id_string.encode()).hexdigest() 
         return unique_id
     
-    def set_step_perf_metrics(self, training_step_time: float, is_cache_hit: bool, gpu_time: float):
+    def set_step_perf_metrics(self, training_step_time: float, is_cache_hit: bool, gpu_time: float, cached_previous_batch: bool):
         self.previous_step_training_time = training_step_time
         self.previous_step_is_cache_hit = is_cache_hit
         self.previous_step_gpu_time = gpu_time
+        self.cached_previous_batch = cached_previous_batch
+    
     def send_job_ended_notfication(self):
         try:
             self.stub.JobEnded(minibatch_service_pb2.JobEndedRequest(
                 job_id=self.job_id, 
                 data_dir=self.dataset.s3_data_dir,
                 previous_step_time = self.previous_step_training_time,
-                previous_step_is_cache_hit = self.previous_step_is_cache_hit
+                previous_step_is_cache_hit = self.previous_step_is_cache_hit,
+                cached_previous_batch = self.cached_previous_batch
                 ))
         except grpc.RpcError as e:
             print(f"Failed to send job ended notification: {e.details()}")
@@ -78,7 +82,8 @@ class SUPERSampler(Sampler):
                         data_dir=self.dataset.s3_data_dir,
                         previous_step_time = self.previous_step_training_time,
                         previous_step_is_cache_hit = self.previous_step_is_cache_hit,
-                        previous_step_gpu_time = self.previous_step_gpu_time))
+                        previous_step_gpu_time = self.previous_step_gpu_time,
+                        cached_previous_batch = self.cached_previous_batch))
                     
                     batch_id = response.batch.batch_id
                     batch_indices = list(response.batch.indicies)

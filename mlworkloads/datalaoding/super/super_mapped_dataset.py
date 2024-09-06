@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 import base64
 import zlib
 import redis
+from io import BytesIO
 
 class S3Url(object):
     def __init__(self, url):
@@ -113,15 +114,16 @@ class SUPERMappedDataset(Dataset):
     
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, float, float]:
         batch_id, batch_indices, is_cached = idx
-        cached_minibacth = None
+        next_minibacth = None
+        cached_after_fetch = False
         if is_cached and self.use_cache:
             fetch_start_time = time.perf_counter()
-            cached_minibacth = self.fetch_from_cache(batch_id)
+            next_minibacth = self.fetch_from_cache(batch_id)
             fetch_duration = time.perf_counter() - fetch_start_time
 
-        if cached_minibacth is not None and (isinstance(cached_minibacth, bytes) or isinstance(cached_minibacth, str)):
+        if next_minibacth is not None and (isinstance(next_minibacth, bytes) or isinstance(next_minibacth, str)):
             tranform_start_time = time.perf_counter()
-            data_samples, labels = self.decode_cached_minibacth(cached_minibacth)
+            data_samples, labels = self.decode_cached_minibacth(next_minibacth)
             transform_duration =  time.perf_counter() - tranform_start_time
             cache_hit = True
         else:
@@ -137,8 +139,21 @@ class SUPERMappedDataset(Dataset):
             cache_hit = False
             data_samples= torch.stack(data_samples)
             labels = torch.tensor(labels)
+            if self.use_cache:
+                try:
+                    if self.cache_client is None:
+                        self.cache_client:redis.StrictRedis = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
+                    with BytesIO() as buffer:
+                        torch.save((data_samples, labels), buffer)
+                        compressed_minibatch = zlib.compress(buffer.getvalue())
+                        compressed_minibatch = base64.b64encode(compressed_minibatch).decode('utf-8')
+                    
+                    self.cache_client.set(batch_id, compressed_minibatch)
+                    cached_after_fetch = True
+                except Exception as e:
+                    print(f"Error saving to cache: {e}")
 
-        return (data_samples,labels), fetch_duration, transform_duration, cache_hit
+        return (data_samples,labels), fetch_duration, transform_duration, cache_hit, cached_after_fetch
 
 
     def decode_cached_minibacth(self, cached_minibacth):
