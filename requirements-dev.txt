@@ -18,3 +18,5 @@ pynvml
 # "ray[tune]"
 awscli
 redis
+grpcio-tools
+heapdict

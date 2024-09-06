@@ -7,7 +7,6 @@ import torch.distributed as dist
 import numpy as np 
 import random
 import redis
-from rediscluster import RedisCluster
 from torch.utils.data import Sampler, Dataset
 
 
