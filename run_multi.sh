@@ -12,15 +12,15 @@ learning_rates=(0.001 0.01 0.1 1.0)
 current_datetime=$(date +"%Y-%m-%d_%H-%M-%S") # Get the current date and time
 
 # Define experiment ID
-expid="single_job_$current_datetime"
+expid="multi_job_$current_datetime"
 
 root_log_dir="logs"
 log_dir="$root_log_dir/$workload/$dataloder/$expid"
 
 s3_bucket_for_exports="supercloudwtachexports"
 
-echo "Cleaning up CloudWatch logs for experiment $expid"
-python aws_utils/cleanup_cloudwatchlogs_for_experiment.py
+# echo "Cleaning up CloudWatch logs for experiment $expid"
+# python aws_utils/cleanup_cloudwatchlogs_for_experiment.py
 
 # Start the resource monitor in the background
 echo "Starting Resource Monitor..."
