@@ -1,7 +1,7 @@
 
 defaults:
   - _self_
-  - dataloader: super #pytorch, super, dali
+  - dataloader: shade #pytorch, super, shade
   - workload: cifar10_resnet18  #imagenet_resnet50, cifar10_resnet18, openwebtext
   - override hydra/job_logging: disabled
   - override hydra/hydra_logging: disabled  

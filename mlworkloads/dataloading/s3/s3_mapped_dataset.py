@@ -116,7 +116,7 @@ class S3MappedDataset(Dataset):
                 data_samples[i] = self.transform(data_samples[i])
         transform_duration =  time.perf_counter() - transform_start_time
 
-        return (torch.stack(data_samples), torch.tensor(labels)), fetch_duration, transform_duration, False
+        return (torch.stack(data_samples), torch.tensor(labels)), fetch_duration, transform_duration, False, False
 
     def fetch_batch_from_s3(self, batch_indices: List[str]) -> Tuple[List[torch.Tensor], List[int]]:
         s3_client = boto3.client('s3')

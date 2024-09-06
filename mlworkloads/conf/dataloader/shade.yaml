@@ -1,0 +1,4 @@
+name: shade
+cache_address: 127.0.0.1:6379 #null
+wss: 0.1
+rep_factor: 1
