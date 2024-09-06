@@ -2,7 +2,7 @@
 defaults:
   - _self_
   - dataloader: shade #pytorch, super, shade
-  - workload: cifar10_resnet18  #imagenet_resnet50, cifar10_resnet18, openwebtext
+  - workload: imagenet_resnet50  #imagenet_resnet50, cifar10_resnet18, openwebtext
   - override hydra/job_logging: disabled
   - override hydra/hydra_logging: disabled  
 

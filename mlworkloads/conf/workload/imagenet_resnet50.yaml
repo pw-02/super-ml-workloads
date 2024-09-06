@@ -2,8 +2,8 @@
 name: imagenet_resnet50
 
 s3_bucket: imagenet1k-sdl
-s3_train_prefix: train/
-s3_val_prefix: val/
+s3_train_prefix: s3://imagenet1k-sdl/train/
+s3_val_prefix: s3://imagenet1k-sdl/val/
 num_pytorch_workers: 0
 
 #model configuration
@@ -16,10 +16,10 @@ num_classes: 1000
 #training configuration
 run_training: True
 run_validation: False
-validation_frequency: 1 #every n epochs
+validation_frequency: 1000000 #every n epochs
 checkpoint_frequency: .inf #every n epochs
-max_epochs: 100000
-max_steps: 20
-batch_size: 4 #Number of samples between optimizer steps across data-parallel ranks
-limit_train_batches: 10
+max_epochs: 1
+max_steps: 500
+batch_size: 256 #Number of samples between optimizer steps across data-parallel ranks
+limit_train_batches: 500
 limit_val_batches: .inf
