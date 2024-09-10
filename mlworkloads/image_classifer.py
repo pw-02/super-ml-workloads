@@ -44,7 +44,8 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
         precision=config.workload.precision   
     )
 
-    seed_everything(config.seed) # instead of torch.manual_seed(...)
+    if config.seed is not None:
+        seed_everything(config.seed) # instead of torch.manual_seed(...)
     
     model = get_model(name=config.workload.model_architecture, weights=None, num_classes=config.workload.num_classes)
     optimizer = optim.Adam(model.parameters(), lr=config.workload.learning_rate)
@@ -119,10 +120,13 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
             train_dataset = S3MappedDataset(s3_data_dir=config.workload.s3_train_prefix, transform=train_transform)
 
             train_sampler = BatchSamplerWithID(
-                sampler= RandomSampler(data_source=train_dataset,generator=torch.Generator().manual_seed(config.seed)),
-                batch_size=config.workload.batch_size, 
-                drop_last=False
-                )
+                data_source=train_dataset,
+                batch_size=config.workload.batch_size,
+                drop_last=config.dataloader.drop_last,
+                shuffle=config.dataloader.shuffle,
+                seed=None #already set in seed_everything
+             )
+        
             train_dataloader = DataLoader(train_dataset, batch_size=None, sampler=train_sampler, num_workers=config.workload.num_pytorch_workers)
             train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
         
@@ -131,7 +135,7 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
             val_sampler = BatchSamplerWithID(
                 sampler= SequentialSampler(data_source=val_dataset),
                 batch_size=config.workload.batch_size, 
-                drop_last=False
+                drop_last=config.dataloader.drop_last
                 )
 
             val_dataloader =  DataLoader(val_dataset, batch_size=None, sampler=val_sampler, num_workers=config.workload.num_pytorch_workers)
@@ -175,7 +179,7 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
             global_step_count=global_train_step_count,
             max_steps=config.workload.max_steps,
             limit_train_batches=config.workload.limit_train_batches,
-            criterion=nn.CrossEntropyLoss(reduction = 'none'),
+            criterion=nn.CrossEntropyLoss(reduction = 'none'), # if isinstance(train_dataloader.sampler, ShadeSampler) else nn.CrossEntropyLoss(),
             batch_wts=batch_wts)
     
         if val_dataloader is not None and current_epoch % config.workload.validation_frequency == 0:
@@ -252,50 +256,53 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
     correct_preds = 0
 
     end = time.perf_counter()
-
-    for batch_idx, (batch, data_fetch_time, transformation_time, is_cache_hit, cached_after_fetch) in enumerate(train_dataloader):
-
-            data_load_time = time.perf_counter() - end
-                            # end epoch if stopping training completely or max batches for this epoch reached
+    for batch_idx, (batch, data_load_time, transformation_time, is_cache_hit, cached_after_fetch) in enumerate(train_dataloader):
+            
+            wait_for_data_time = time.perf_counter() - end
+            # end epoch if stopping training completely or max batches for this epoch reached
             if limit_train_batches is not None and batch_idx >= limit_train_batches:
                 break
+            
+             # Unpack batch
             inputs, labels = batch
 
-            # Synchronize to ensure previous GPU operations are finished
-            # Forward pass
+            # Forward pass: Compute model output and loss
             gpu_processing_started = time.perf_counter()
             outputs  = model(inputs)
             item_loss = criterion(outputs, labels)
             loss = item_loss.mean()
-            # train_loss = loss.item()
+
             # Backpropagation and optimization
             optimizer.zero_grad()  # Clear previous gradients
-            fabric.backward(loss)  # Perform backpropagation
+            fabric.backward(loss)  # Backpropagation
             optimizer.step()  # Update weights
-            # Synchronize after the backward pass and optimization
-            if fabric.device.type == 'gpu':
+
+            # Accumulate metrics directly on GPU to avoid synchronization
+            correct_preds += (outputs.argmax(dim=1) == labels).sum().item()  # No .item(), stays on GPU
+            total_train_loss += loss.item() * inputs.size(0)  # Convert loss to CPU for accumulation
+            
+            if fabric.device.type == 'cuda':
                 torch.cuda.synchronize()
+
+
+             # Track time taken for GPU processing
             gpu_processing_time = time.perf_counter() - gpu_processing_started
-
-            train_acc = (outputs.argmax(dim=1) == labels).float().mean().item()
-        
-
+            
             # Metrics calculation
-            total_train_loss += loss.item() * inputs.size(0)  # accumulate total loss
-            correct_preds += (outputs.argmax(dim=1) == labels).sum().item() # accumulate correct predictions
             total_samples += inputs.size(0)
-
-            # Calculate average loss and accuracy across all batches
             avg_train_loss = total_train_loss / total_samples
             avg_train_acc = correct_preds / total_samples
             global_step_count +=1
 
+            # Calculate average loss and accuracy across all batches
+            avg_train_loss = total_train_loss / total_samples
+            
             if not isinstance(train_dataloader.sampler, ShadeSampler):
                 cache_hit_samples = batch[0].size(0) if is_cache_hit == True else 0
                 cache_hit_bacth = 1 if is_cache_hit == True else 0
 
             if isinstance(train_dataloader.sampler, ShadeSampler):
-                data_fetch_time = float(data_fetch_time.sum())
+                data_load_time = float(data_load_time.sum())
                 transformation_time = float(transformation_time.sum())
                 cache_hit_samples = int(is_cache_hit.sum())
                 cache_hit_bacth = 1 if cache_hit_samples == len(is_cache_hit) else 0
@@ -331,26 +338,30 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                     train_dataloader.dataset.set_num_local_samples()
 
             if isinstance(train_dataloader.sampler, SUPERSampler):
-                train_dataloader.sampler.set_step_perf_metrics(time.perf_counter() - end, is_cache_hit,gpu_processing_time, cached_after_fetch )
-            
-            # print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
-            # flops = prof.key_averages().table(sort_by="flop", row_limit=10)
+                train_dataloader.sampler.set_step_perf_metrics(
+                    batch_idx,
+                    wait_for_data_time, 
+                    is_cache_hit,
+                    gpu_processing_time, 
+                    cached_after_fetch )
+                
 
             metrics= OrderedDict({
                             "Elapsed Time (s)": time.perf_counter() - train_start_time,
+                            "Num Torch Workers": train_dataloader.num_workers,
                             "Device": fabric.global_rank,
                             "Epoch Index": current_epoch,
                             "Batch Index": batch_idx+1,
                             "Batch Size": batch[0].size(0),
-                            "Total Iteration Time (s)": time.perf_counter() - end,
-                            "Data Loading Time (s)": data_load_time,
+                            "Iteration Time (s)": time.perf_counter() - end,
+                            "Wait for Data Time (s)": wait_for_data_time,
                             "GPU Processing Time (s)": gpu_processing_time,
-                            "Data Fetch Time (s)": data_fetch_time,
+                            "Data Load Time (s)": data_load_time,
                             "Transformation Time (s)": transformation_time,
-                            "Cache_Hit(Batch)": cache_hit_bacth,
-                            "Cache_Hits(Samples)": cache_hit_samples,
-                            "Avg Train Loss": avg_train_loss, #calculates the average training loss across all batches.
-                            "Avg Train Accuracy": avg_train_acc, #calculates the average training accuracy across all batches.
+                            "Cache_Hit (Batch)": cache_hit_bacth,
+                            "Cache_Hits (Samples)": cache_hit_samples,
+                            "Train Loss (Avg)": avg_train_loss, #calculates the average training loss across all batches.
+                            "Train Accuracy (Avg)": avg_train_acc, #calculates the average training accuracy across all batches.
                             })
             train_logger.log_metrics(metrics,step=global_step_count)
             
@@ -358,13 +369,15 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                     f" Job {job_id} | Epoch: {metrics['Epoch Index']}({metrics['Batch Index']}/{min(len(train_dataloader),limit_train_batches)}) |"
                     # f" loss train: {metrics['Train Loss']:.3f} |"
                     # f" val: {val_loss} |"
-                    f" iter time: {metrics['Total Iteration Time (s)']:.2f} |"
-                    f" dataload time: {metrics['Data Loading Time (s)']:.2f} |"
-                    f" gpu time: {metrics['GPU Processing Time (s)']:.2f} |"
-                    f" fetch time: {metrics['Data Fetch Time (s)']:.2f} |"
-                    f" transform time: {metrics['Transformation Time (s)']:.2f} |"
-                    f" elapsed time: {metrics['Elapsed Time (s)']:.2f} |"
-
+                    f" iter:{metrics['Iteration Time (s)']:.2f}s |"
+                    f" data_delay:{metrics['Wait for Data Time (s)']:.2f}s |"
+                    f" gpu:{metrics['GPU Processing Time (s)']:.2f}s |"
+                    f" data_fetch:{metrics['Data Load Time (s)']:.2f}s |"
+                    f" transform:{metrics['Transformation Time (s)']:.2f}s |"
+                    f" elapsed:{metrics['Elapsed Time (s)']:.2f}s |"
+                    f" loss: {metrics['Train Loss (Avg)']:.3f} |"
+                    f" acc: {metrics['Train Accuracy (Avg)']:.3f} |"
+                    F" cache hit: {metrics['Cache_Hit (Batch)']} |"
                     )
 
             # stopping criterion on step level
@@ -387,7 +400,7 @@ def validate_loop(fabric,job_id, val_logger:CSVLogger, model, dataloader, val_st
     correct_preds = 0
     total_samples = 0
 
-    for batch_idx, (batch, data_fetch_time, transformation_time, is_cache_hit) in enumerate(dataloader):
+    for batch_idx, (batch, data_load_time, transformation_time, is_cache_hit) in enumerate(dataloader):
         if batch_idx >= limit_val_batches:
             break
         
@@ -420,7 +433,7 @@ def validate_loop(fabric,job_id, val_logger:CSVLogger, model, dataloader, val_st
             "Batch Index": batch_idx + 1,
             "Batch Size": batch[0].size(0),
             "Total Iteration Time (s)": time.perf_counter() - end,
-            "Data Fetch Time (s)": data_fetch_time,
+            "Data Fetch Time (s)": data_load_time,
             "Transformation Time (s)": transformation_time,
             "Cache Hit/Miss": 1 if is_cache_hit else 0,
             "Avg Validation Loss": avg_val_loss,
@@ -447,6 +460,18 @@ def validate_loop(fabric,job_id, val_logger:CSVLogger, model, dataloader, val_st
 def main(config: DictConfig):
     train_image_classifer(config)
 
+
+@hydra.main(version_base=None, config_path="./conf", config_name="config")
+def main(config: DictConfig):
+
+    log_dir = f"{config.log_dir}/{config.workload.name}/{config.dataloader.name}/{config.exp_id}/{config.job_id}".lower()
+    log_dir = os.path.normpath(log_dir)  # Normalize path for Windows
+    
+    train_logger = CSVLogger(root_dir=log_dir, name="train", prefix='', flush_logs_every_n_steps=config.log_interval)
+    val_logger = CSVLogger(root_dir=log_dir, name="val", prefix='', flush_logs_every_n_steps=config.log_interval)
+    train_image_classifer(config, train_logger,val_logger)
+
+  
 
 if __name__ == "__main__":
     main()

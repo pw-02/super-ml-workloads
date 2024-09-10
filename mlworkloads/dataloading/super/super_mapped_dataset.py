@@ -10,9 +10,9 @@ import functools
 import time
 from urllib.parse import urlparse
 import base64
-import zlib
 import redis
 from io import BytesIO
+import lz4.frame
 
 class S3Url(object):
     def __init__(self, url):
@@ -114,68 +114,80 @@ class SUPERMappedDataset(Dataset):
     
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, float, float]:
         batch_id, batch_indices, is_cached = idx
-        next_minibacth = None
+        next_minibatch  = None
         cached_after_fetch = False
-        if is_cached and self.use_cache:
-            fetch_start_time = time.perf_counter()
-            next_minibacth = self.fetch_from_cache(batch_id)
-            fetch_duration = time.perf_counter() - fetch_start_time
 
-        if next_minibacth is not None and (isinstance(next_minibacth, bytes) or isinstance(next_minibacth, str)):
-            tranform_start_time = time.perf_counter()
-            data_samples, labels = self.decode_cached_minibacth(next_minibacth)
-            transform_duration =  time.perf_counter() - tranform_start_time
+        # Start data loading timer
+        start_loading_time = time.perf_counter()
+
+        # Check cache if caching is enabled
+        if is_cached and self.use_cache:
+            next_minibatch = self._load_batch_from_cache(batch_id)
+
+        # If data is fetched from cache and it's in the correct format
+        if next_minibatch  is not None and (isinstance(next_minibatch , bytes) or isinstance(next_minibatch , str)):
+            start_transformation_time   = time.perf_counter()
+            data_samples, labels = self._bytes_to_torch_batch(next_minibatch )
+            transformation_time  =  time.perf_counter() - start_transformation_time 
             cache_hit = True
         else:
-            fetch_start_time = time.perf_counter()
-            data_samples, labels = self.fetch_batch_from_s3(batch_indices)
-            fetch_duration = time.perf_counter() - fetch_start_time
-
-            transform_start_time = time.perf_counter()
+            # Fetch data from S3
+            data_samples, labels = self._load_batch_from_s3(batch_indices)
+                    
+            # Apply transformations if provided
+            start_transformation_time = time.perf_counter()
             if self.transform is not None:
                 for i in range(len(data_samples)):
                     data_samples[i] = self.transform(data_samples[i])        
-            transform_duration =  time.perf_counter() - transform_start_time
+            transformation_time =  time.perf_counter() - start_transformation_time
             cache_hit = False
+            
+            # Convert to tensors
             data_samples= torch.stack(data_samples)
             labels = torch.tensor(labels)
+            
+            # Cache the data if enabled
             if self.use_cache:
                 try:
-                    if self.cache_client is None:
-                        self.cache_client:redis.StrictRedis = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
-                    with BytesIO() as buffer:
-                        torch.save((data_samples, labels), buffer)
-                        compressed_minibatch = zlib.compress(buffer.getvalue())
-                        compressed_minibatch = base64.b64encode(compressed_minibatch).decode('utf-8')
-                    
-                    self.cache_client.set(batch_id, compressed_minibatch)
+                    self._initialize_cache_client()
+                    batch_as_bytes = self._torch_batch_to_bytes(data_samples, labels)
+                    self.cache_client.set(batch_id, batch_as_bytes)
                     cached_after_fetch = True
                 except Exception as e:
                     print(f"Error saving to cache: {e}")
+        
+        # Calculate data loading time excluding transformation time
+        data_loading_time  = time.perf_counter() - start_loading_time - transformation_time
+        
+        return (data_samples,labels), data_loading_time, transformation_time, cache_hit, cached_after_fetch
+    def _initialize_cache_client(self):
+        """Initialize Redis cache client if not already connected."""
+        if self.cache_client is None:
+            self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
 
-        return (data_samples,labels), fetch_duration, transform_duration, cache_hit, cached_after_fetch
+    def _torch_batch_to_bytes(self, data_samples: torch.Tensor, labels: torch.Tensor) -> str:
+        with BytesIO() as buffer:
+            torch.save((data_samples, labels), buffer)
+            bytes_minibatch = buffer.getvalue()
+            bytes_minibatch = lz4.frame.compress(bytes_minibatch)
+        return bytes_minibatch
+    
+    def _bytes_to_torch_batch(self, bytes_minibatch) -> tuple:
+        compressed_batch = lz4.frame.decompress(bytes_minibatch)
+        with BytesIO(compressed_batch) as buffer:
+            data_samples, labels = torch.load(buffer)
+        return data_samples, labels
 
-
-    def decode_cached_minibacth(self, cached_minibacth):
-        decoded_data = base64.b64decode(cached_minibacth) # Decode base64
-        decoded_data = zlib.decompress(decoded_data)
-        buffer = io.BytesIO(decoded_data)
-        batch_samples, batch_labels = torch.load(buffer)
-        return  batch_samples, batch_labels
-
-
-    def fetch_from_cache(self, batch_id):
+    def _load_batch_from_cache(self, batch_id):
         try:
-            if self.cache_client is None:
-                self.cache_client:redis.StrictRedis = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
+            self._initialize_cache_client()   
             return self.cache_client.get(batch_id)
         except Exception as e:
             print(f"Error fetching from cache: {e}")
             return None
 
-    def fetch_batch_from_s3(self, batch_indices: List[str]) -> Tuple[List[torch.Tensor], List[int]]:
+    def _load_batch_from_s3(self, batch_indices: List[str]) -> Tuple[List[torch.Tensor], List[int]]:
         s3_client = boto3.client('s3')
-
         data_samples = []
         labels = []
         for idx in batch_indices:

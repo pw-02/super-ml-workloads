@@ -1,5 +1,5 @@
-from datalaoding.super.super_mapped_dataset import SUPERMappedDataset
-from datalaoding.super.super_sampler import SUPERSampler
+from dataloading.super.super_mapped_dataset import SUPERMappedDataset
+from dataloading.super.super_sampler import SUPERSampler
 from torch.utils.data import DataLoader
 import time
 
@@ -13,21 +13,19 @@ if __name__ == "__main__":
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
 
-
-
-    dataset = SUPERMappedDataset(s3_data_dir="s3://sdl-cifar10/test/", transform=transform, cache_address="34.220.21.111:6378")
+    dataset = SUPERMappedDataset(s3_data_dir="s3://sdl-cifar10/test/", transform=transform, cache_address=None)
     sampler = SUPERSampler(dataset, "localhost:50051")
-    dataloader:DataLoader = DataLoader(dataset, sampler=sampler, num_workers=0, batch_size=None)  # batch_size=None since sampler provides batches
+    dataloader:DataLoader = DataLoader(dataset, sampler=sampler, num_workers=2, batch_size=None)  # batch_size=None since sampler provides batches
     cache_hits = 0
     cache_misses = 0
     previous_step_training_time = 0
     previous_step_is_cache_hit = False
-    TIME_ON_CACHE_HIT = 0.45
-    TIME_ON_CACHE_MISS = 4.25
+    TIME_ON_CACHE_HIT = 0.045
+    TIME_ON_CACHE_MISS = 0.25
     GPU_TIME=0.1
     end = time.perf_counter()
 
-    for batch_idx, (batch_id, batch_indices, is_cache_hit) in enumerate(sampler):
+    for  batch_idx, (batch, data_load_time, transformation_time, is_cache_hit, cached_after_fetch) in enumerate(dataloader):
         if is_cache_hit:
             previous_step_is_cache_hit = True
             cache_hits += 1
@@ -40,9 +38,9 @@ if __name__ == "__main__":
             previous_step_training_time =TIME_ON_CACHE_MISS
 
         hit_rate = cache_hits / (batch_idx + 1) if (batch_idx + 1) > 0 else 0
-        print(f'Batch {batch_idx+1}: {batch_id}, Cache Hits: {cache_hits}, Cache Misses:{cache_misses}, Hit Rate: {hit_rate:.2f}, {time.perf_counter() - end}')
+        print(f'Batch {batch_idx+1}, Cache Hits: {cache_hits}, Cache Misses:{cache_misses}, Hit Rate: {hit_rate:.2f}, {time.perf_counter() - end}')
         if isinstance(sampler, SUPERSampler):
-            sampler.set_step_perf_metrics(previous_step_training_time, previous_step_is_cache_hit, GPU_TIME)
+            sampler.set_step_perf_metrics(previous_step_training_time, previous_step_is_cache_hit, GPU_TIME, False)
     
     if isinstance(sampler, SUPERSampler):
         sampler.send_job_ended_notfication()

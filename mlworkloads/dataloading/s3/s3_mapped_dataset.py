@@ -103,20 +103,20 @@ class S3MappedDataset(Dataset):
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, float, float]:
         batch_id, batch_indices = idx
         # batch_indices = self._classed_items[idx][0]  # Simplified for demonstration
-        
-        fetch_start_time = time.perf_counter()
+
+        start_loading_time  = time.perf_counter()
 
         data_samples, labels = self.fetch_batch_from_s3(batch_indices)
 
-        fetch_duration = time.perf_counter() - fetch_start_time
+        data_loading_time  = time.perf_counter() - start_loading_time
 
-        transform_start_time = time.perf_counter()
+        start_transformation_time  = time.perf_counter()
         if self.transform is not None:
             for i in range(len(data_samples)):
                 data_samples[i] = self.transform(data_samples[i])
-        transform_duration =  time.perf_counter() - transform_start_time
+        transformation_time  =  time.perf_counter() - start_transformation_time
 
-        return (torch.stack(data_samples), torch.tensor(labels)), fetch_duration, transform_duration, False, False
+        return (torch.stack(data_samples), torch.tensor(labels)), data_loading_time, transformation_time, False, False
 
     def fetch_batch_from_s3(self, batch_indices: List[str]) -> Tuple[List[torch.Tensor], List[int]]:
         s3_client = boto3.client('s3')

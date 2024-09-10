@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-workload="cifar10_resnet18" # Define your workload
+workload="imagenet_resnet50" # Define your workload
 dataloder="super" # Define your dataloader
 gpu_indices=(0) # Define an array of GPU indices
 

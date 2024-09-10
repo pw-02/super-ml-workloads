@@ -9,7 +9,7 @@ from datetime import datetime
 @hydra.main(version_base=None, config_path="./conf", config_name="config")
 def main(config: DictConfig):
 
-    print(OmegaConf.to_yaml(config, resolve=True))
+    # print(OmegaConf.to_yaml(config, resolve=True))
 
     log_dir = f"{config.log_dir}/{config.workload.name}/{config.dataloader.name}/{config.exp_id}/{config.job_id}".lower()
     log_dir = os.path.normpath(log_dir)  # Normalize path for Windows

@@ -20,3 +20,5 @@ awscli
 redis
 grpcio-tools
 heapdict
+python-snappy
+zstandard
