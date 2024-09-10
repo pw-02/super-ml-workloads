@@ -256,7 +256,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
     correct_preds = 0
 
     end = time.perf_counter()
-    for batch_idx, (batch, data_load_time, transformation_time, is_cache_hit, cached_after_fetch) in enumerate(train_dataloader):
+    for batch_idx, (batch, data_load_time, transformation_time, is_cache_hit, cached_on_miss) in enumerate(train_dataloader):
             
             wait_for_data_time = time.perf_counter() - end
             # end epoch if stopping training completely or max batches for this epoch reached
@@ -264,7 +264,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                 break
             
              # Unpack batch
-            inputs, labels = batch
+            inputs, labels, batch_id = batch
 
             # Forward pass: Compute model output and loss
             gpu_processing_started = time.perf_counter()
@@ -338,13 +338,13 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                     train_dataloader.dataset.set_num_local_samples()
 
             if isinstance(train_dataloader.sampler, SUPERSampler):
-                train_dataloader.sampler.set_step_perf_metrics(
-                    batch_idx,
-                    wait_for_data_time, 
+                train_dataloader.sampler.send_job_update_to_super(
+                    batch_id,
+                    wait_for_data_time,
                     is_cache_hit,
-                    gpu_processing_time, 
-                    cached_after_fetch )
-                
+                    gpu_processing_time,
+                    cached_on_miss
+                )
 
             metrics= OrderedDict({
                             "Elapsed Time (s)": time.perf_counter() - train_start_time,

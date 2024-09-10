@@ -15,7 +15,7 @@ if __name__ == "__main__":
 
     dataset = SUPERMappedDataset(s3_data_dir="s3://sdl-cifar10/test/", transform=transform, cache_address=None)
     sampler = SUPERSampler(dataset, "localhost:50051")
-    dataloader:DataLoader = DataLoader(dataset, sampler=sampler, num_workers=2, batch_size=None)  # batch_size=None since sampler provides batches
+    dataloader:DataLoader = DataLoader(dataset, sampler=sampler, num_workers=0, batch_size=None)  # batch_size=None since sampler provides batches
     cache_hits = 0
     cache_misses = 0
     previous_step_training_time = 0
@@ -25,7 +25,7 @@ if __name__ == "__main__":
     GPU_TIME=0.1
     end = time.perf_counter()
 
-    for  batch_idx, (batch, data_load_time, transformation_time, is_cache_hit, cached_after_fetch) in enumerate(dataloader):
+    for  batch_idx, (batch, data_load_time, transformation_time, is_cache_hit, cached_on_miss) in enumerate(dataloader):
         if is_cache_hit:
             previous_step_is_cache_hit = True
             cache_hits += 1

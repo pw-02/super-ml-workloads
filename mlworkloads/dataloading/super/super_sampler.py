@@ -17,11 +17,11 @@ class SUPERSampler(Sampler):
         self.stub = self._create_grpc_stub()
         self._register_dataset_with_super()
         self.current_batch = 0
-        self.previous_step_is_cache_hit = None
-        self.previous_step_wait_for_data_time = None
-        self.previous_step_gpu_time = None
-        self.cached_previous_batch = False
-        self.previous_step_idx = None
+        # self.previous_step_is_cache_hit = None
+        # self.previous_step_wait_for_data_time = None
+        # self.previous_step_gpu_time = None
+        # self.cached_previous_batch = False
+        # self.previous_step_idx = None
 
 
     def _test_grpc_connection(self):
@@ -56,48 +56,41 @@ class SUPERSampler(Sampler):
         unique_id = hashlib.sha1(id_string.encode()).hexdigest() 
         return unique_id
     
-    def set_step_perf_metrics(self, step_idx, previous_step_wait_for_data_time: float, previous_step_is_cache_hit: bool, previous_step_gpu_time: float, cached_previous_batch: bool):
-        self.previous_step_wait_for_data_time = previous_step_wait_for_data_time
-        self.previous_step_is_cache_hit = previous_step_is_cache_hit
-        self.previous_step_gpu_time = previous_step_gpu_time
-        self.cached_previous_batch = cached_previous_batch
-        self.previous_step_idx = step_idx
-        
-    # def reset_step_perf_metrics(self):
-    #     self.previous_step_wait_for_data_time = None
-    #     self.previous_step_is_cache_hit = None
-    #     self.previous_step_gpu_time = None
-    #     self.cached_previous_batch = False
     
     def send_job_ended_notfication(self):
         try:
             self.stub.JobEnded(minibatch_service_pb2.JobEndedRequest(
-                job_id=self.job_id, 
-                data_dir=self.dataset.s3_data_dir,
-                previous_step_time = self.previous_step_wait_for_data_time,
-                previous_step_is_cache_hit = self.previous_step_is_cache_hit,
-                cached_previous_batch = self.cached_previous_batch
-                ))
+                job_id=self.job_id))
         except grpc.RpcError as e:
             print(f"Failed to send job ended notification: {e.details()}")
 
+    def send_job_update_to_super(self, batch_id, wait_for_data_time: float, is_cache_hit: bool, gpu_time: float, cached_batch_on_miss: bool):
+        try:
+            self.stub.JobUpdate(minibatch_service_pb2.JobUpdateRequest(
+                job_id=self.job_id,
+                data_dir=self.dataset.s3_data_dir,
+                previous_step_batch_id = batch_id,
+                previous_step_wait_for_data_time = wait_for_data_time,
+                previous_step_is_cache_hit = is_cache_hit,
+                previous_step_gpu_time = gpu_time,
+                cached_previous_batch = cached_batch_on_miss
+                ))
+        
+        except grpc.RpcError as e:
+            print(f"Failed to send job update info to SUPER: {e.details()}")
+    
+    
     def __iter__(self):
         while True:
             for _ in range(self.total_batches):
                 try:  
                     response = self.stub.GetNextBatchForJob(minibatch_service_pb2.GetNextBatchForJobRequest(
                         job_id=self.job_id,
-                        data_dir=self.dataset.s3_data_dir,
-                        previous_step_idx = self.previous_step_idx,
-                        previous_step_wait_for_data_time = self.previous_step_wait_for_data_time,
-                        previous_step_is_cache_hit = self.previous_step_is_cache_hit,
-                        previous_step_gpu_time = self.previous_step_gpu_time,
-                        cached_previous_batch = self.cached_previous_batch))
+                        data_dir=self.dataset.s3_data_dir))
                     
                     batch_id = response.batch.batch_id
                     batch_indices = list(response.batch.indicies)
                     is_cached = response.batch.is_cached
-        
                     self.current_batch += 1
                     yield batch_id, batch_indices, is_cached
 

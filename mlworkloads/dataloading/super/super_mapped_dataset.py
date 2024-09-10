@@ -159,7 +159,7 @@ class SUPERMappedDataset(Dataset):
         # Calculate data loading time excluding transformation time
         data_loading_time  = time.perf_counter() - start_loading_time - transformation_time
         
-        return (data_samples,labels), data_loading_time, transformation_time, cache_hit, cached_after_fetch
+        return (data_samples,labels,batch_id), data_loading_time, transformation_time, cache_hit, cached_after_fetch
     def _initialize_cache_client(self):
         """Initialize Redis cache client if not already connected."""
         if self.cache_client is None:

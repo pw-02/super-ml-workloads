@@ -58,6 +58,11 @@ class MiniBatchServiceStub(object):
                 request_serializer=proto_dot_minibatch__service__pb2.JobEndedRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
+        self.JobUpdate = channel.unary_unary(
+                '/MiniBatchService/JobUpdate',
+                request_serializer=proto_dot_minibatch__service__pb2.JobUpdateRequest.SerializeToString,
+                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                _registered_method=True)
 
 
 class MiniBatchServiceServicer(object):
@@ -92,6 +97,12 @@ class MiniBatchServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def JobUpdate(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_MiniBatchServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -113,6 +124,11 @@ def add_MiniBatchServiceServicer_to_server(servicer, server):
             'JobEnded': grpc.unary_unary_rpc_method_handler(
                     servicer.JobEnded,
                     request_deserializer=proto_dot_minibatch__service__pb2.JobEndedRequest.FromString,
+                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
+            'JobUpdate': grpc.unary_unary_rpc_method_handler(
+                    servicer.JobUpdate,
+                    request_deserializer=proto_dot_minibatch__service__pb2.JobUpdateRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
     }
@@ -226,6 +242,33 @@ class MiniBatchService(object):
             target,
             '/MiniBatchService/JobEnded',
             proto_dot_minibatch__service__pb2.JobEndedRequest.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def JobUpdate(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MiniBatchService/JobUpdate',
+            proto_dot_minibatch__service__pb2.JobUpdateRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
