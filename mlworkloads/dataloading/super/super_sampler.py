@@ -74,7 +74,7 @@ class SUPERSampler(Sampler):
             self.stub.JobEnded(minibatch_service_pb2.JobEndedRequest(
                 job_id=self.job_id, 
                 data_dir=self.dataset.s3_data_dir,
-                previous_step_time = self.previous_step_training_time,
+                previous_step_time = self.previous_step_wait_for_data_time,
                 previous_step_is_cache_hit = self.previous_step_is_cache_hit,
                 cached_previous_batch = self.cached_previous_batch
                 ))
