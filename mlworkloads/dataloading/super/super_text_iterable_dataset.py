@@ -15,63 +15,88 @@ from torch.utils.data import SequentialSampler, IterableDataset, RandomSampler, 
 from transformers import PreTrainedTokenizer
 import logging
 import functools
+import uuid
+import proto.minibatch_service_pb2 as minibatch_service_pb2
+import proto.minibatch_service_pb2_grpc as minibatch_service_pb2_grpc
+import grpc
+from urllib.parse import urlparse
+import json
+import boto3
 
+class S3Url(object):
+    def __init__(self, url):
+        self._parsed = urlparse(url, allow_fragments=False)
 
+    @property
+    def bucket(self):
+        return self._parsed.netloc
+
+    @property
+    def key(self):
+        if self._parsed.query:
+            return self._parsed.path.lstrip('/') + '?' + self._parsed.query
+        else:
+            return self._parsed.path.lstrip('/')
+
+    @property
+    def url(self):
+        return self._parsed.geturl()
+    
+    
 class SUPERTextDataset(IterableDataset):
-
     def __init__(self,
-                job_id:int,
-                data_dir: str, 
-                tokenizer: PreTrainedTokenizer, 
-                transform, 
-                block_size: int, 
-                batch_size: int, 
-                super_address:str,
-                world_size:int,
-                cache_address:str = None,
-                simulate_delay = None):
+                 s3_data_dir: str,
+                 sampler: SUPERSampler,
+                 tokenizer: PreTrainedTokenizer, 
+                 block_size: int, 
+                 batch_size: int,
+                 transform=None):
         super().__init__()
-        super_client:SuperClient = SuperClient(super_addresss=super_address)
-        super_client.register_job(job_id, data_dir)
-        dataset_info = super_client.get_dataset_details(data_dir)
-        self.dataset_size = dataset_info.num_files
-        self.dataset_chunked_size = dataset_info.num_chunks // world_size
-        self.samples: Dict[str, List[str]] = s3utils.load_paired_s3_object_keys(data_dir, False, False)
-        self.job_id = job_id
-        self.data_dir = data_dir
-        self.s3_bucket_name = s3utils.S3Url(data_dir).bucket
+        self.s3_bucket = S3Url(s3_data_dir).bucket
+        self.s3_prefix = S3Url(s3_data_dir).key
         self.transform = transform
-        self.super_address  = super_address
-        self.batch_size = batch_size
-        self.simulate_delay = simulate_delay
-        self.index = 0
-        self.cache_host, self.cache_port = None,None
-        if cache_address:
-            self.cache_host, self.cache_port = cache_address.split(":")
-        if self.cache_host:
-            self.setup_cache_client()
-        self.super_client = None
-        self.tokenizer:PreTrainedTokenizer = tokenizer
+        self.sampler = sampler
+        self.tokenizer = tokenizer
         self.block_size = block_size
-        self.is_s3: bool = data_dir.startswith("s3://")
-        # if self.is_s3:
-        #     self.file_list: Dict[str, List[str]] = s3utils.load_unpaired_s3_object_keys(data_dir, False, True)
-        #     self.bucket_name = S3Url(data_dir).bucket
-        # else:
-        #     self.file_list = glob.glob(f'{self.data_dir}/*.txt')
+        self.batch_size = batch_size
+        self.s3_client = boto3.client('s3')
+
+
+    def _test_grpc_connection(self):
+        try:
+            # Example ping to test connection
+            self.stub.Ping(minibatch_service_pb2.PingRequest(message='ping'))
+            print("Connection to SUPER server confirmed. Registering as a client...")
+        except grpc.RpcError as e:
+            print(f"Failed to connect to SUPER server: {e.details()}")
+            exit(1)
+
+    def _create_grpc_stub(self):
+        channel = grpc.insecure_channel(self.grpc_server_address)
+        stub = minibatch_service_pb2_grpc.MiniBatchServiceStub(channel)
+        return stub
+    
+    def _register_dataset_with_super(self):
+        try:
+            response = self.stub.RegisterDataset(minibatch_service_pb2.RegisterDatasetRequest(
+                data_dir=self.dataset.s3_data_dir))
+           
+            print(f"{response.message}")
+            self.total_batches = response.total_batches
+        except grpc.RpcError as e:
+            print(f"Failed to register dataset: {e.details()}")
+            exit(1)
 
     @functools.cached_property
     def _classed_items(self) -> List[Tuple[str, int]]:
         return [(blob, class_index)
                 for class_index, blob_class in enumerate(self.samples)
                 for blob in self.samples[blob_class]
-                ]        
-    def setup_cache_client(self):
-        self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
-
+                ]    
+    
     def __len__(self) -> int:
         return self.dataset_chunked_size
-
+    
     def __iter__(self):
         worker_info = get_worker_info()
         if worker_info is None:  # single-process data loading, return the full iterator
@@ -84,9 +109,8 @@ class SUPERTextDataset(IterableDataset):
             workloads = [per_worker + 1 if i < remaining_work else per_worker for i in range(num_workers)]
             return self.__iter_non_distributed__(workloads[worker_info.id])
 
-
     def __iter_non_distributed__(self, num_files):   
-        super_client:SuperClient = SuperClient(super_addresss=self.super_address)
+
         current_file_idx = 0
         current_tokens = None
         current_position = 0
@@ -94,14 +118,14 @@ class SUPERTextDataset(IterableDataset):
         while current_file_idx < num_files:
             fetch_start_time = time.perf_counter()
             if current_tokens is None:
-                current_tokens, transform_duration, cache_hit = self._load_next_file(super_client)
+                current_tokens, transform_duration, cache_hit = self._load_next_file()
                 current_file_idx +=1
                 current_position = 0
             required_size = (self.block_size +1) * self.batch_size
             remaining_tokens = current_tokens[current_position:]
 
             while len(remaining_tokens) < required_size:
-                next_tokens, transform_duration, cache_hit = self._load_next_file(super_client)
+                next_tokens, transform_duration, cache_hit = self._load_next_file()
                 current_file_idx +=1
                 current_position = 0
                 remaining_tokens = torch.cat((remaining_tokens, next_tokens), dim=0)
@@ -126,11 +150,17 @@ class SUPERTextDataset(IterableDataset):
 
         current_file_idx = 0
     
-    def _load_next_file(self, super_client:SuperClient):
-        next_data = super_client.get_next_batch(self.job_id)
-
-        if not next_data:
-            raise ValueError("Empty file returned by super_client.")
+    def _load_next_file(self):
+     
+            response = self.stub.GetNextBatchForJob(minibatch_service_pb2.GetNextBatchForJobRequest(
+            job_id=self.job_id,
+            data_dir=self.dataset.s3_data_dir))
+                    
+            batch_id = response.batch.batch_id
+            batch_indices = list(response.batch.indicies)
+            is_cached = response.batch.is_cached
+            self.current_batch += 1
+        
         
         next_data = next_data[0]
         data_id = next_data.batch_id
@@ -178,30 +208,54 @@ class SUPERTextDataset(IterableDataset):
                 transform_duration = time.perf_counter() - transform_start_time     
                 return tokens, transform_duration, cache_hit
 
-    def fetch_from_cache(self, data_id, max_attempts = 5):
-        response = None
-        attempts = 0
-         # Try fetching from cache initially
-        response = self.cache_get(data_id)
-        if response is not None and not isinstance(response, Exception):
-            return response
-        else:
-            # Retry fetching from cache for a specified number of attempts
-            while attempts < max_attempts:
-                logger.error(f"Error fetching batch '{data_id}' from cache: {response}. Retrying (attempt {attempts}).")
-                response = self.cache_get(data_id)
-                if response is not None and not isinstance(response, Exception):
-                    break
-                else:
-                    time.sleep(0.01)
-                attempts += 1
-        return response
-    
-    def cache_get(self, data_id, max_attempts = 1):     
-        try:
-            return self.cache_client.get(data_id)
-        except Exception as e:
-             return e
+  
+    def _get_sample_list_from_s3(self, use_index_file=False, images_only=False) -> Dict[str, List[str]]:
+        s3_client = boto3.client('s3')
+
+        index_file_key = f"{self.s3_prefix}_paired_index.json"
+        paired_samples = {}
+
+        if use_index_file:
+            try:
+                index_object = s3_client.get_object(Bucket=self.s3_bucket, Key=index_file_key)
+                file_content = index_object['Body'].read().decode('utf-8')
+                paired_samples = json.loads(file_content)
+                return paired_samples
+            except Exception as e:
+                print(f"Error reading index file '{index_file_key}': {e}")
+
+        paginator = s3_client.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=self.s3_bucket, Prefix=self.s3_prefix):
+            for blob in page.get('Contents', []):
+                blob_path = blob.get('Key')
+                
+                if blob_path.endswith("/"):
+                    continue  # Skip folders
+                
+                stripped_path = blob_path[len(self.s3_prefix):].lstrip("/")
+                if stripped_path == blob_path:
+                    continue  # No matching prefix, skip
+
+                if images_only and not blob_path.lower().endswith(('.jpg', '.jpeg', '.png')):
+                    continue  # Skip non-image files
+                
+                if 'index.json' in blob_path:
+                    continue  # Skip index file
+
+                blob_class = stripped_path.split("/")[0]
+                if blob_class not in paired_samples:
+                    paired_samples[blob_class] = []
+                paired_samples[blob_class].append(blob_path)
+
+        if use_index_file and paired_samples:
+            s3_client.put_object(
+                Bucket=self.s3_bucket,
+                Key=index_file_key,
+                Body=json.dumps(paired_samples, indent=4).encode('utf-8')
+            )
+
+        return paired_samples
+
 
 # Example Usage
 if __name__ == "__main__":

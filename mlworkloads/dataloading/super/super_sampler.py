@@ -42,14 +42,7 @@ class SUPERSampler(Sampler):
         except grpc.RpcError as e:
             print(f"Failed to register dataset: {e.details()}")
             exit(1)
-    
-    def _gen_batch_id(self, indicies):
-    # Convert integers to strings and concatenate them
-        id_string = ''.join(str(x) for x in indicies)
-        # Hash the concatenated string to generate a unique ID
-        unique_id = hashlib.sha1(id_string.encode()).hexdigest() 
-        return unique_id
-    
+
     
     def send_job_ended_notfication(self):
         try:
@@ -99,6 +92,10 @@ class SUPERSampler(Sampler):
 
     def __len__(self):
         return self.total_batches
+
+    dataset = SUPERMappedDataset(s3_data_dir="s3://sdl-cifar10/test/", transform=transform)
+    sampler = SUPERSampler(dataset, "localhost:50051")
+
 
 # if __name__ == "__main__":
 #     import torchvision.transforms as transforms

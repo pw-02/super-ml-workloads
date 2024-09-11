@@ -9,6 +9,8 @@ from torch.utils.data import DataLoader
 
 from litgpt.tokenizer import Tokenizer
 from litgpt.data import DataModule
+from litdata.streaming import StreamingDataLoader, TokensLoader, StreamingDataset
+# from stream_dataset import StreamingDataset
 
 
 @dataclass
@@ -32,8 +34,8 @@ class OpenWebText(DataModule):
     def __post_init__(self) -> None:
         super().__init__()
         # Could be a remote path (s3://) or a local path
-        self.data_path_train = str(self.data_path).rstrip("/") + "/train"
-        self.data_path_val = str(self.data_path).rstrip("/") + "/val"
+        self.data_path_train = os.path.join(str(self.data_path).rstrip("/"), "train")
+        self.data_path_val = os.path.join(str(self.data_path).rstrip("/"), "val")
 
     def connect(
         self, tokenizer: Optional[Tokenizer] = None, batch_size: int = 1, max_seq_length: Optional[int] = 2048
@@ -70,14 +72,14 @@ class OpenWebText(DataModule):
             return data
 
         optimize(
-            fn=partial(extract_text, split_dataset["train"]),
+            fn=partial(tokenize, split_dataset["train"]),
             inputs=list(range(len(split_dataset["train"]))),
             output_dir=self.data_path_train,
             num_workers=min(64, os.cpu_count() - 1),
             chunk_bytes="5MB",
         )
         optimize(
-            fn=partial(extract_text, split_dataset["val"]),
+            fn=partial(tokenize, split_dataset["val"]),
             inputs=list(range(len(split_dataset["val"]))),
             output_dir=self.data_path_val,
             num_workers=min(8, os.cpu_count() - 1),
@@ -85,11 +87,10 @@ class OpenWebText(DataModule):
         )
 
     def train_dataloader(self) -> DataLoader:
-        from litdata.streaming import StreamingDataLoader, StreamingDataset, TokensLoader
 
         train_dataset = StreamingDataset(
             input_dir=self.data_path_train,
-            item_loader=TokensLoader(block_size=self.seq_length),
+            item_loader=TokensLoader,
             shuffle=True,
         )
         train_dataloader = StreamingDataLoader(
@@ -102,7 +103,7 @@ class OpenWebText(DataModule):
 
         val_dataset = StreamingDataset(
             input_dir=self.data_path_val,
-            item_loader=TokensLoader(block_size=self.seq_length),
+            item_loader=TokensLoader,
             shuffle=True,
         )
         val_dataloader = StreamingDataLoader(

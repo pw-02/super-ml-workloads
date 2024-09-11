@@ -1,0 +1,35 @@
+attention_logit_softcapping: null
+attention_scores_scalar: null
+bias: true
+block_size: 512
+final_logit_softcapping: null
+gelu_approximate: none
+head_size: 32
+hf_config:
+  name: pythia-14m
+  org: EleutherAI
+intermediate_size: 512
+lm_head_bias: false
+mlp_class_name: GptNeoxMLP
+n_embd: 128
+n_expert: 0
+n_expert_per_token: 0
+n_head: 4
+n_layer: 6
+n_query_groups: 4
+name: pythia-14m
+norm_class_name: LayerNorm
+norm_eps: 1.0e-05
+padded_vocab_size: 50304
+padding_multiple: 128
+parallel_residual: true
+post_attention_norm: false
+post_mlp_norm: false
+rope_base: 10000
+rope_condense_ratio: 1
+rotary_percentage: 0.25
+scale_embeddings: false
+shared_attention_norm: false
+sliding_window_layer_placing: null
+sliding_window_size: null
+vocab_size: 50254
