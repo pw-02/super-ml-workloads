@@ -17,12 +17,6 @@ class SUPERSampler(Sampler):
         self.stub = self._create_grpc_stub()
         self._register_dataset_with_super()
         self.current_batch = 0
-        # self.previous_step_is_cache_hit = None
-        # self.previous_step_wait_for_data_time = None
-        # self.previous_step_gpu_time = None
-        # self.cached_previous_batch = False
-        # self.previous_step_idx = None
-
 
     def _test_grpc_connection(self):
         try:

@@ -9,7 +9,6 @@ from typing import List, Dict, Tuple
 import functools
 import time
 from urllib.parse import urlparse
-import base64
 import redis
 from io import BytesIO
 import lz4.frame

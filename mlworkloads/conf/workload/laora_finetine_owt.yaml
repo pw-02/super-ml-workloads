@@ -1,0 +1,48 @@
+#dataloading configuration
+name: lora_finetune_owt
+s3_bucket: imagenet1k-sdl
+s3_train_prefix: s3://imagenet1k-sdl/train/
+s3_val_prefix: s3://imagenet1k-sdl/val/
+num_pytorch_workers: 4
+
+#trin
+save_interval: 1000
+log_interval: 1
+global_batch_size: 16
+micro_batch_size: 1
+lr_warmup_steps: 100
+epochs: 5
+max_tokens: null
+max_steps: null
+max_seq_length: null
+tie_embeddings: null
+max_norm=config.workload: null
+min_lr: 6e-5
+
+#eval
+eval_interval: 1000
+eval_max_new_tokens: 100
+eval_max_iters: 100
+eval_initial_validation: False
+eval_final_validation: False
+
+optimizer:  "AdamW"
+
+
+checkpoint_dir: #The path to the base model's checkpoint directory to load for finetuning.
+out_dir: 
+precision: 16-true #ossible choices: "bf16-true", "bf16-mixed", "32-true".
+quantize: null
+devices: 1 #How many devices/GPUs to use.
+num_nodes: 1 #How many nodes the code is being run on.
+lora_r: 8 
+lora_alpha: 16
+lora_dropout: 0.05
+lora_query: True
+lora_key: False
+lora_value: True
+lora_projection: False
+lora_mlp: False
+lora_head: False
+
+#train
