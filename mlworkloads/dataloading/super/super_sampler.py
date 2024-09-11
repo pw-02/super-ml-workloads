@@ -60,7 +60,8 @@ class SUPERSampler(Sampler):
     def send_job_ended_notfication(self):
         try:
             self.stub.JobEnded(minibatch_service_pb2.JobEndedRequest(
-                job_id=self.job_id))
+                job_id=self.job_id,
+                data_dir=self.dataset.s3_data_dir))
         except grpc.RpcError as e:
             print(f"Failed to send job ended notification: {e.details()}")
 
