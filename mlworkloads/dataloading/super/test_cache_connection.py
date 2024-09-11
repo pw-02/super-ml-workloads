@@ -1,10 +1,19 @@
 import redis
-name: super
 # grpc_server_address: 44.243.2.122:50051
 # cache_address: 44.243.2.122:6378 #null
-def fetch_from_cache(batch_id, cache_host = "44.243.2.122", cache_port = 6378):
+
+
+cache_client =redis.StrictRedis = redis.StrictRedis(host="34.219.214.22", port=6378)
+
+def put_in_cache(batch_id):
      try:
-        cache_client =redis.StrictRedis = redis.StrictRedis(host=cache_host, port=cache_port)
+        cache_client.set(batch_id, 'hello')
+     except Exception as e:
+        print(f"Error fetching from cache: {e}")
+        return None
+
+def fetch_from_cache(batch_id):
+     try:
         return cache_client.get(batch_id)
      except Exception as e:
         print(f"Error fetching from cache: {e}")
@@ -12,6 +21,7 @@ def fetch_from_cache(batch_id, cache_host = "44.243.2.122", cache_port = 6378):
         
 
 if __name__ == "__main__":
+   put_in_cache("1")
    respsonse = fetch_from_cache("1")
    
    print(respsonse)
