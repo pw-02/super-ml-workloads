@@ -385,7 +385,7 @@ def fit(
                             "Epoch Index": train_iterator.epoch + 1,
                             "Batch Index": iter_num,
                             "Batch Size (Tokens)": train.micro_batch_size * model.config.block_size,
-                            "Iteration Time (s)": t1 - total_t0,
+                            "Iteration Time (s)": t1 - iter_t0,
                             "Wait for Data Time (s)": wait_for_data_time,
                             "GPU Processing Time (s)": gpu_processing_time,
                             "Data Load Time (s)": data_load_time,
