@@ -32,7 +32,8 @@ import math
 from dataclasses import dataclass
 from typing import Optional
 import warnings
-from ...dataloading.litdata.custom_streming_dataset import CustomStreamingDataset
+from dataloading.litdata.custom_streming_dataset import CustomStreamingDataset
+warnings.filterwarnings("ignore", category=UserWarning)
 
 from litgpt.utils import (
     auto_download_checkpoint,
@@ -238,7 +239,7 @@ def main(fabric: Fabric,
     tokenizer = Tokenizer(checkpoint_dir)
     train_dataloader, val_dataloader = get_dataloaders(fabric, config, tokenizer, train, eval)
     steps_per_epoch = len(train_dataloader) // train.gradient_accumulation_iters(devices)
-    lr_max_steps = min(train.epochs * steps_per_epoch, (train.max_steps or float("inf")))
+    lr_max_steps = train.max_steps or float("inf")
 
     if config.seed is not None:
         seed_everything(config.seed) # instead of torch.manual_seed(...)
@@ -250,11 +251,14 @@ def main(fabric: Fabric,
     fabric.print(f"Number of trainable parameters: {num_parameters(model, requires_grad=True):,}")
     fabric.print(f"Number of non-trainable parameters: {num_parameters(model, requires_grad=False):,}")
     model = fabric.setup_module(model)
-    optimizer =config.workload.optimizer
-    if isinstance(fabric.strategy.precision, BitsandbytesPrecision):
-        optimizer = instantiate_bnb_optimizer(optimizer, model.parameters())
-    else:
-        optimizer = instantiate_torch_optimizer(optimizer, model.parameters())
+    # optimizer =config.workload.optimizer
+    # if isinstance(fabric.strategy.precision, BitsandbytesPrecision):
+    #     optimizer = instantiate_bnb_optimizer(optimizer, model.parameters())
+    # else:
+    #     optimizer = instantiate_torch_optimizer(optimizer, model.parameters())
+    
+    optimizer = torch.optim.SGD(model.parameters(), lr=config.workload.learning_rate)
+
     optimizer = fabric.setup_optimizers(optimizer)
     scheduler = get_lr_scheduler(optimizer, warmup_steps=train.lr_warmup_steps, max_steps=lr_max_steps)
     # strict=False because missing keys due to LoRA weights not contained in state dict
@@ -304,7 +308,6 @@ def fit(
     train_logger: CSVLogger,
     val_logger: CSVLogger
 ) -> None:
-    tokenizer = Tokenizer(checkpoint_dir)
     
     # longest_seq_length, longest_seq_ix = get_longest_seq_length(ConcatDataset([train_dataloader.dataset, val_dataloader.dataset]))
     # model.max_seq_length = min(longest_seq_length, train.max_seq_length or float("inf"))
@@ -337,14 +340,15 @@ def fit(
     while step_count < max_steps and train_iterator.epoch < train.epochs:
         iter_num += 1
         iter_t0 = time.perf_counter()
-        batch = next(train_iterator)
+        batch, data_loading_time, transformation_time,is_cache_hit,cached_on_miss = next(train_iterator)
+        input_ids, targets = batch
         wait_for_data_time = time.perf_counter() - iter_t0
-
-        # Create input_ids by taking all tokens except the last token in the sequence
-        input_ids = batch[:, 0 : model.max_seq_length].contiguous().long()
-        # Create targets by shifting input_ids one step to the right.
-        # The target is to predict the next token in the sequence.
-        targets = batch[:, 1 : (model.max_seq_length + 1)].contiguous().long()
+        if isinstance(train_dataloader.dataset, CustomStreamingDataset):
+                data_load_time = float(data_loading_time.sum())
+                transformation_time = float(transformation_time.sum())
+                cache_hit_samples = int(is_cache_hit.sum())
+                cache_hit_bacth = 1 if cache_hit_samples == len(is_cache_hit) else 0
+      
         is_accumulating = iter_num % train.gradient_accumulation_iters(devices) != 0
 
         gpu_processing_started = time.perf_counter()
@@ -384,10 +388,10 @@ def fit(
                             "Iteration Time (s)": t1 - total_t0,
                             "Wait for Data Time (s)": wait_for_data_time,
                             "GPU Processing Time (s)": gpu_processing_time,
-                            "Data Load Time (s)": 0,
-                            "Transformation Time (s)": 0,
-                            "Cache_Hit (Batch)": 0,
-                            "Cache_Hits (Samples)": 0,
+                            "Data Load Time (s)": data_load_time,
+                            "Transformation Time (s)": transformation_time,
+                            "Cache_Hit (Batch)": cache_hit_bacth,
+                            "Cache_Hits (Samples)": cache_hit_samples,
                             "Train Loss": loss, #calculates the average training loss across all batches.
                             })
             train_logger.log_metrics(metrics,step=iter_num)
@@ -499,13 +503,18 @@ def get_dataloaders(
     val_dataloader = None
 
     if config.dataloader.name == 'litgpt' or 'pytorch':
-        from litdata.streaming import StreamingDataLoader, StreamingDataset, TokensLoader
+        from litdata.streaming import StreamingDataLoader, TokensLoader
+        from dataloading.litdata.custom_streming_dataset import CustomStreamingDataset
         if train.run_training:
-            train_dataset = StreamingDataset(
+            train_dataset = CustomStreamingDataset(
             input_dir=config.workload.s3_train_prefix,
-            item_loader=TokensLoader(block_size=train.max_seq_length+1),
+            item_loader=None,
             shuffle=True,
-            max_cache_size="0GB")
+            max_cache_size="0GB",
+            tokenizer=tokenizer,
+            batch_size=train.micro_batch_size,
+            seq_length=train.max_seq_length
+            )
 
             train_dataloader = StreamingDataLoader(
                 train_dataset, batch_size=train.batch_size(devices=config.workload.devices), 
@@ -516,11 +525,15 @@ def get_dataloaders(
             train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
 
         if val.run_validation:
-            val_dataset = StreamingDataset(
+            val_dataset = CustomStreamingDataset(
             input_dir=config.workload.s3_val_prefix,
             item_loader=TokensLoader(block_size=train.max_seq_length+1),
             shuffle=True,
-            max_cache_size="0GB")
+            max_cache_size="0GB",
+            tokenizer=tokenizer,
+            batch_size=train.micro_batch_size,
+            seq_length=train.max_seq_length
+            )
             val_dataloader = StreamingDataLoader(
                 val_dataset, batch_size=train.batch_size(devices=config.workload.devices), 
                 pin_memory=True, 
@@ -594,7 +607,7 @@ def validate_args(train: TrainArgs, eval: EvalArgs) -> None:
         raise ValueError("\n".join(issues))
     
 
-@hydra.main(version_base=None, config_path="../../conf", config_name="config")
+@hydra.main(version_base=None, config_path="./conf", config_name="config")
 def run(config: DictConfig):
 
     log_dir = f"{config.log_dir}/{config.workload.name}/{config.dataloader.name}/{config.exp_id}/{config.job_id}".lower()

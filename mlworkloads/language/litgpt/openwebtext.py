@@ -10,8 +10,7 @@ from torch.utils.data import DataLoader
 from litgpt.tokenizer import Tokenizer
 from litgpt.data import DataModule
 from litdata.streaming import StreamingDataLoader, TokensLoader, StreamingDataset
-# from stream_dataset import StreamingDataset
-
+from custom_streming_dataset import CustomStreamingDataset
 
 @dataclass
 class OpenWebText(DataModule):
@@ -68,8 +67,8 @@ class OpenWebText(DataModule):
         )
         split_dataset["val"] = split_dataset.pop("test")  # rename the test split to val
 
-        # def tokenize(data: Dataset, index: int):
-        #     yield self.tokenizer.encode(data[index]["text"], eos=True)
+        def tokenize(data: Dataset, index: int):
+            yield self.tokenizer.encode(data[index]["text"], eos=True)
 
         def extract_text(data: Dataset, index: int):
             # data = {"index": index, "text": data[index]["text"]}
@@ -95,8 +94,12 @@ class OpenWebText(DataModule):
         train_dataset = StreamingDataset(
             input_dir=self.data_path_train,
             item_loader=TokensLoader(block_size=self.seq_length),
+            # item_loader=None,
             shuffle=True,
-            max_cache_size=0
+            max_cache_size=0,
+            # tokenizer=self.tokenizer,
+            # batch_size=self.batch_size,
+            # seq_length=self.seq_length
         )
         train_dataloader = StreamingDataLoader(
             train_dataset, batch_size=self.batch_size, pin_memory=True, num_workers=self.num_workers, drop_last=True
@@ -104,13 +107,16 @@ class OpenWebText(DataModule):
         return train_dataloader
 
     def val_dataloader(self) -> DataLoader:
-        from litdata.streaming import StreamingDataLoader, StreamingDataset, TokensLoader
 
         val_dataset = StreamingDataset(
             input_dir=self.data_path_val,
             item_loader=TokensLoader(block_size=self.seq_length),
+            # item_loader=None,
             shuffle=True,
-            max_cache_size=0
+            max_cache_size=0,
+            # tokenizer=self.tokenizer,
+            # batch_size=self.batch_size,
+            # seq_length=self.seq_length
         )
         val_dataloader = StreamingDataLoader(
             val_dataset, batch_size=self.batch_size, pin_memory=True, num_workers=self.num_workers, drop_last=True

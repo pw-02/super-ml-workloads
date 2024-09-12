@@ -1,8 +1,8 @@
 #dataloading configuration
 name: lora_finetune_owt
 s3_bucket: imagenet1k-sdl
-s3_train_prefix: s3://litdatapreprocessed5mbowt/train
-s3_val_prefix: s3://litdatapreprocessed5mbowt/val
+s3_train_prefix: s3://owt-5mb-text-chunks/train
+s3_val_prefix: s3://owt-5mb-text-chunks/val
 num_pytorch_workers: 0
 model_name: pythia-14m
 run_training: True
@@ -10,17 +10,17 @@ run_validation: False
 #trin
 save_interval: 1000
 log_interval: 1
-global_batch_size: 1
-micro_batch_size: 1
-lr_warmup_steps: 100
+global_batch_size: 16
+micro_batch_size: 16
+lr_warmup_steps: 50
 epochs: 5
 max_tokens: null
 max_steps: null
 max_seq_length: 512
 tie_embeddings: null
 max_norm: null
-min_lr: 6e-5
-
+min_lr:  4e-5
+learning_rate: 4e-5
 #eval
 eval_interval: 1000
 eval_max_new_tokens: 100

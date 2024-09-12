@@ -16,6 +16,7 @@ from lightning.fabric.utilities import ThroughputMonitor
 from lightning_utilities.core.imports import RequirementCache
 from torch.utils.data import DataLoader, ConcatDataset
 from torchmetrics import RunningMean
+import torch.optim as optim
 
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.data import Alpaca, DataModule
@@ -208,6 +209,8 @@ def main(
         optimizer = instantiate_bnb_optimizer(optimizer, model.parameters())
     else:
         optimizer = instantiate_torch_optimizer(optimizer, model.parameters())
+    
+    optimizer = optim.SGD(model.parameters(), lr=4e-5)
 
     optimizer = fabric.setup_optimizers(optimizer)
     scheduler = get_lr_scheduler(optimizer, warmup_steps=train.lr_warmup_steps, max_steps=lr_max_steps)
@@ -381,8 +384,8 @@ def validate(fabric: L.Fabric, model: GPT, val_dataloader: DataLoader, eval: Eva
     for k, batch in enumerate(val_dataloader):
         if k >= eval.max_iters:
             break
-
-        # Create input_ids by taking all tokens except the last token in the sequence
+        
+        # # Create input_ids by taking all tokens except the last token in the sequence
         input_ids = batch[:, 0 : model.max_seq_length].contiguous().long()
         # Create targets by shifting input_ids one step to the right.
         # The target is to predict the next token in the sequence.
@@ -477,11 +480,13 @@ def validate_args(train: TrainArgs, eval: EvalArgs) -> None:
         raise ValueError("\n".join(issues))
     
 if __name__ == "__main__":
-    setup(checkpoint_dir=Path("checkpoints/EleutherAI/pythia-14m"), 
+    setup(checkpoint_dir=Path("mlworkloads\language\checkpoints\EleutherAI\pythia-14m"), 
           devices=1, 
           num_nodes=1, 
-          train=TrainArgs(epochs=1, max_seq_length=512),
+          train=TrainArgs(epochs=1, max_seq_length=512, micro_batch_size=4, global_batch_size=4),
           precision="16-true",
-          data=OpenWebText(data_path='data/openwebtext', num_workers=0)
+        #   data=OpenWebText(data_path='s3://owt-5mb-text-chunks', num_workers=0)
+          data=OpenWebText(data_path='s3://litdatapreprocessed5mbowt', num_workers=0)
+
         #  ,quantize="bnb.nf4-dq"
          )

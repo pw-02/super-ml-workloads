@@ -2,16 +2,13 @@ import os
 import glob
 from typing import List
 import torch
-from torch.utils.data import Dataset, DataLoader
 from transformers import PreTrainedTokenizer
 from typing import List, Tuple, Dict
 import glob
 import time
 import redis
 import io
-import base64
-import zlib
-from torch.utils.data import SequentialSampler, IterableDataset, RandomSampler, DataLoader, get_worker_info
+from torch.utils.data import  IterableDataset, get_worker_info
 from transformers import PreTrainedTokenizer
 import logging
 import functools
@@ -19,12 +16,10 @@ from urllib.parse import urlparse
 import grpc
 import proto.minibatch_service_pb2 as minibatch_service_pb2
 import proto.minibatch_service_pb2_grpc as minibatch_service_pb2_grpc
-from torch.utils.data import Sampler
-import hashlib
-import uuid
 import time
 import boto3
 import json
+import lz4.frame
 
 class S3Url(object):
     def __init__(self, url):
@@ -201,21 +196,21 @@ class SUPERTextDataset(IterableDataset):
             return self.__iter_non_distributed__(workloads[worker_info.id])
 
 
-    def __iter_non_distributed__(self, num_files):   
+    def __iter_non_distributed__(self, num_files):
         current_file_idx = 0
         current_tokens = None
         current_position = 0
         while current_file_idx < num_files:
             fetch_start_time = time.perf_counter()
             if current_tokens is None:
-                current_tokens, transform_duration, cache_hit = self._load_next_file()
+                current_tokens, data_loading_time, transformation_time, cache_hit, cached_after_fetch = self._load_next_file_tokens()
                 current_file_idx +=1
                 current_position = 0
             required_size = (self.block_size +1) * self.batch_size
             remaining_tokens = current_tokens[current_position:]
 
             while len(remaining_tokens) < required_size:
-                next_tokens, transform_duration, cache_hit = self._load_next_file(super_client)
+                next_tokens, data_loading_time, transformation_time, cache_hit, cached_after_fetch = self._load_next_file_tokens()
                 current_file_idx +=1
                 current_position = 0
                 remaining_tokens = torch.cat((remaining_tokens, next_tokens), dim=0)
@@ -223,103 +218,96 @@ class SUPERTextDataset(IterableDataset):
             batch_tokens = remaining_tokens[:required_size]
             current_position += required_size
             current_tokens = remaining_tokens[required_size:]
-            # fetch_duration = time.perf_counter() - fetch_start_time
-            
-            if cache_hit:
-                cache_hits = 1
-            else:
-                cache_hits = 0
 
             data = batch_tokens[:(self.block_size +1) * self.batch_size].reshape(self.batch_size, (self.block_size+1))
             input_ids = data[:, 0 : self.block_size].contiguous().long()
             targets = data[:, 1 : (self.block_size + 1)].contiguous().long()
-            fetch_duration = time.perf_counter() - fetch_start_time
-            yield input_ids, targets, fetch_duration, transform_duration, cache_hits
+            
+            yield input_ids, targets, data_loading_time, transformation_time, cache_hit, cached_after_fetch
 
-            # yield batch_tokens,fetch_duration, transform_duration, cache_hits
 
         current_file_idx = 0
     
-    def _load_next_file(self):
+    def _load_next_file_tokens(self):
         response = self.stub.GetNextBatchForJob(minibatch_service_pb2.GetNextBatchForJobRequest(
                         job_id=self.job_id,
-                        data_dir=self.s3_data_dir))
-                    
-        file_cache_id = response.batch.batch_id
+                        data_dir=self.s3_data_dir))          
+        cache_key = response.batch.batch_id
         file_idx = list(response.batch.indicies)[0]
-        file_path, _ = self._classed_items[file_idx]
-        file_is_cached = response.batch.is_cached
+        is_cached = response.batch.is_cached
+        file_content = None
 
-        data = None
-
-        if self.simulate_delay:
-            time.sleep(self.simulate_delay)
-            tokens = torch.empty(len(self.block_size*self.batch_size))
-            transform_duration = 0
+        # Start data loading timer
+        start_loading_time = time.perf_counter()
+        if is_cached and self.cache_client is not None:
+            file_content = self._load_batch_from_cache(cache_key)
+        # If data is fetched from cache and it's in the correct format
+        if file_content  is not None and (isinstance(file_content , bytes) or isinstance(file_content , str)):
+            start_transformation_time   = time.perf_counter()
+            tokens = self._bytes_to_torch_batch(file_content)
+            transformation_time  =  time.perf_counter() - start_transformation_time 
             cache_hit = True
-            return tokens, transform_duration, cache_hit
         else:
-            data = None
-            if file_is_cached and self.cache_client is not None:
-                data = self.fetch_from_cache(file_cache_id)
+            # Fetch data from S3
+            file_content = self._load_batch_from_s3(file_idx)
 
-            if data is not None and (isinstance(data, bytes) or isinstance(data, str)):
-                transform_start_time = time.perf_counter()
-                decoded_data = base64.b64decode(data) # Decode base64
-                decoded_data = zlib.decompress(decoded_data)
-                buffer = io.BytesIO(decoded_data)
-                tokens = torch.load(buffer)
-                transform_duration = time.perf_counter() - transform_start_time
-                cache_hit = True
-                return tokens, transform_duration, cache_hit
-            else:
-                cache_hit = False
-                chunk_text = s3utils.get_s3_object(self.s3_bucket_name, data_path)
-                transform_start_time = time.perf_counter()
-                if self.transform:
-                    chunk_text = self.transform(chunk_text)
-                
-                documents = chunk_text.split('\n')  # Split based on the specified delimiter 
-                eos_token_id = tokenizer.eos_token_id
-                all_tokens = []
-                for doc in documents:
-                    encoded_input = tokenizer(doc, truncation=False, padding=False, return_tensors='pt')
-                    input_ids_with_eos = torch.cat([encoded_input.input_ids, torch.tensor([[eos_token_id]])], dim=1)            
-                    # Append the input_ids_with_eos to the list
-                    all_tokens.append(input_ids_with_eos)
-                    # tokens = self.tokenizer(text, truncation=False, padding=False, return_tensors='pt').input_ids.squeeze()
-                tokens = torch.cat(all_tokens, dim=0)
-                transform_duration = time.perf_counter() - transform_start_time     
-                return tokens, transform_duration, cache_hit
+            # Apply transformations if provided
+            start_transformation_time = time.perf_counter()
+            if self.transform is not None:
+                tokens = self.transform(file_content)
+            transformation_time =  time.perf_counter() - start_transformation_time
+            cache_hit = False
 
-    def fetch_from_cache(self, data_id, max_attempts = 5):
-        response = None
-        attempts = 0
-         # Try fetching from cache initially
-        response = self.cache_get(data_id)
-        if response is not None and not isinstance(response, Exception):
-            return response
-        else:
-            # Retry fetching from cache for a specified number of attempts
-            while attempts < max_attempts:
-                logger.error(f"Error fetching batch '{data_id}' from cache: {response}. Retrying (attempt {attempts}).")
-                response = self.cache_get(data_id)
-                if response is not None and not isinstance(response, Exception):
-                    break
-                else:
-                    time.sleep(0.01)
-                attempts += 1
-        return response
+            # Convert to tensors
+            tokens = torch.stack(tokens)
+             # Cache the data if enabled
+            if self.use_cache:
+                try:
+                    self._initialize_cache_client()
+                    tokens_as_bytes = self._torch_batch_to_bytes(tokens)
+                    self.cache_client.set(cache_key, tokens_as_bytes)
+                    cached_after_fetch = True
+                except Exception as e:
+                    print(f"Error saving to cache: {e}")
+
+        # Calculate data loading time excluding transformation time
+        data_loading_time  = time.perf_counter() - start_loading_time - transformation_time
+        return tokens, data_loading_time, transformation_time, cache_hit, cached_after_fetch
+
+
+    def _torch_batch_to_bytes(self, samples: torch.Tensor) -> str:
+        with io.BytesIO() as buffer:
+            torch.save(samples, buffer)
+            bytes_minibatch = buffer.getvalue()
+            bytes_minibatch = lz4.frame.compress(bytes_minibatch)
+        return bytes_minibatch
     
-    def cache_get(self, data_id, max_attempts = 1):     
-        try:
-            return self.cache_client.get(data_id)
-        except Exception as e:
-             return e
+    def _bytes_to_torch_batch(self, bytes_minibatch) -> tuple:
+        compressed_batch = lz4.frame.decompress(bytes_minibatch)
+        with io.BytesIO(compressed_batch) as buffer:
+            data_samples, labels = torch.load(buffer)
+        return data_samples, labels
 
+    def _load_batch_from_cache(self, batch_id):
+        try:
+            self._initialize_cache_client()   
+            return self.cache_client.get(batch_id)
+        except Exception as e:
+            print(f"Error fetching from cache: {e}")
+            return None
+        
+    def _load_batch_from_s3(self, idx) -> Tuple[List[torch.Tensor], List[int]]:
+        s3_client = boto3.client('s3')
+        data_path, _ = self._classed_items[idx]
+        obj = s3_client.get_object(Bucket=self.s3_bucket, Key=data_path)
+        content = obj['Body'].read().decode('utf-8')
+        return content
+   
+    
 # Example Usage
 if __name__ == "__main__":
     from transformers import GPT2Tokenizer
+    from torch.utils.data import DataLoader
 
     data_dir = 's3://owtchunks/train/'  # Adjust the path to your .txt files
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
