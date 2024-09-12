@@ -477,7 +477,7 @@ def validate_args(train: TrainArgs, eval: EvalArgs) -> None:
         raise ValueError("\n".join(issues))
     
 if __name__ == "__main__":
-    setup(checkpoint_dir=Path("mlworkloads/language/checkpoints/EleutherAI/pythia-14m"), 
+    setup(checkpoint_dir=Path("checkpoints/EleutherAI/pythia-14m"), 
           devices=1, 
           num_nodes=1, 
           train=TrainArgs(epochs=1, max_seq_length=512),
