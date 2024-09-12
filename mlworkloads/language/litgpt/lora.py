@@ -477,11 +477,11 @@ def validate_args(train: TrainArgs, eval: EvalArgs) -> None:
         raise ValueError("\n".join(issues))
     
 if __name__ == "__main__":
-    setup(checkpoint_dir=Path("mlworkloads\language\checkpoints\EleutherAI\pythia-14m"), 
+    setup(checkpoint_dir=Path("mlworkloads/language/checkpoints/EleutherAI/pythia-14m"), 
           devices=1, 
           num_nodes=1, 
           train=TrainArgs(epochs=1, max_seq_length=512),
           precision="16-true",
-          data=OpenWebText(data_path='s3://litdatapreprocessed5mbowt', num_workers=0)
+          data=OpenWebText(data_path='data/openwebtext', num_workers=0)
         #  ,quantize="bnb.nf4-dq"
          )
