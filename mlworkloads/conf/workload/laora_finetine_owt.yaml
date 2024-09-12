@@ -15,7 +15,7 @@ micro_batch_size: 16
 lr_warmup_steps: 50
 epochs: 5
 max_tokens: null
-max_steps: null
+max_steps: 500
 max_seq_length: 512
 tie_embeddings: null
 max_norm: null
@@ -46,6 +46,3 @@ lora_value: True
 lora_projection: False
 lora_mlp: False
 lora_head: False
-
-
-#train
