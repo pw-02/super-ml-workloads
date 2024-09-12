@@ -73,7 +73,7 @@ class SUPERTextDataset(IterableDataset):
                 cache_address:str = None,
                 simulate_delay = None):
         super().__init__()
-        self.job_id = job_id
+        self.job_id = str(job_id)
         self.grpc_server_address = grpc_server_address
         self.batch_size = batch_size
         self.total_batches = None
@@ -105,6 +105,7 @@ class SUPERTextDataset(IterableDataset):
         self.super_client = None
         self.tokenizer:PreTrainedTokenizer = tokenizer
         self.block_size = block_size
+        self.dataset_length = len(self)
 
     @functools.cached_property
     def _classed_items(self) -> List[Tuple[str, int]]:
@@ -115,7 +116,7 @@ class SUPERTextDataset(IterableDataset):
     def _get_sample_list_from_s3(self, use_index_file=True, images_only=True) -> Dict[str, List[str]]:
         s3_client = boto3.client('s3')
 
-        index_file_key = f"{self.s3_prefix}_paired_index.json"
+        index_file_key = f"{self.s3_prefix}_index.json"
         paired_samples = {}
 
         if use_index_file:
@@ -139,7 +140,7 @@ class SUPERTextDataset(IterableDataset):
                 if stripped_path == blob_path:
                     continue  # No matching prefix, skip
 
-                if images_only and not blob_path.lower().endswith(('.jpg', '.jpeg', '.png')):
+                if images_only and not blob_path.lower().endswith(('.jpg', '.jpeg', '.png', 'json')):
                     continue  # Skip non-image files
                 
                 if 'index.json' in blob_path:
@@ -184,13 +185,13 @@ class SUPERTextDataset(IterableDataset):
     def setup_cache_client(self):
         self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
 
-    def __len__(self) -> int:
-        return self.dataset_chunked_size
+    def __len__(self):
+        return sum(len(class_items) for class_items in self.samples.values())
 
     def __iter__(self):
         worker_info = get_worker_info()
         if worker_info is None:  # single-process data loading, return the full iterator
-            return self.__iter_non_distributed__(self.dataset_chunked_size)
+            return self.__iter_non_distributed__(len(self))
         else:
             #split workload
             num_workers = worker_info.num_workers
@@ -201,15 +202,13 @@ class SUPERTextDataset(IterableDataset):
 
 
     def __iter_non_distributed__(self, num_files):   
-        super_client:SuperClient = SuperClient(super_addresss=self.super_address)
         current_file_idx = 0
         current_tokens = None
         current_position = 0
-
         while current_file_idx < num_files:
             fetch_start_time = time.perf_counter()
             if current_tokens is None:
-                current_tokens, transform_duration, cache_hit = self._load_next_file(super_client)
+                current_tokens, transform_duration, cache_hit = self._load_next_file()
                 current_file_idx +=1
                 current_position = 0
             required_size = (self.block_size +1) * self.batch_size
@@ -241,16 +240,16 @@ class SUPERTextDataset(IterableDataset):
 
         current_file_idx = 0
     
-    def _load_next_file(self, super_client:SuperClient):
-        next_data = super_client.get_next_batch(self.job_id)
+    def _load_next_file(self):
+        response = self.stub.GetNextBatchForJob(minibatch_service_pb2.GetNextBatchForJobRequest(
+                        job_id=self.job_id,
+                        data_dir=self.s3_data_dir))
+                    
+        file_cache_id = response.batch.batch_id
+        file_idx = list(response.batch.indicies)[0]
+        file_path, _ = self._classed_items[file_idx]
+        file_is_cached = response.batch.is_cached
 
-        if not next_data:
-            raise ValueError("Empty file returned by super_client.")
-        
-        next_data = next_data[0]
-        data_id = next_data.batch_id
-        data_path, label = self._classed_items[next_data.indicies[0]]
-        is_cached = next_data.is_cached
         data = None
 
         if self.simulate_delay:
@@ -261,8 +260,8 @@ class SUPERTextDataset(IterableDataset):
             return tokens, transform_duration, cache_hit
         else:
             data = None
-            if is_cached and self.cache_client is not None:
-                data = self.fetch_from_cache(data_id)
+            if file_is_cached and self.cache_client is not None:
+                data = self.fetch_from_cache(file_cache_id)
 
             if data is not None and (isinstance(data, bytes) or isinstance(data, str)):
                 transform_start_time = time.perf_counter()
@@ -321,17 +320,24 @@ class SUPERTextDataset(IterableDataset):
 # Example Usage
 if __name__ == "__main__":
     from transformers import GPT2Tokenizer
-    from mlworklaods.llm.data import TextTransformations
 
-    data_dir = 's3://openwebtxt/owt/train/'  # Adjust the path to your .txt files
+    data_dir = 's3://owtchunks/train/'  # Adjust the path to your .txt files
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
     block_size = 512
     batch_size = 4
 
-    transformations = TextTransformations()
-
-
-    dataset = SUPERTextDataset(data_dir, tokenizer, None, block_size, batch_size)
+    dataset = SUPERTextDataset(
+        job_id=1,
+        s3_data_dir=data_dir,
+        tokenizer=tokenizer,
+        transform=None,
+        block_size=block_size,
+        batch_size=batch_size,
+        grpc_server_address="localhost:50051",
+        world_size=1,
+        cache_address=None,
+        simulate_delay=None)
+        
     dataloader = DataLoader(dataset, batch_size=None, shuffle=False, num_workers=0)
 
     for input_ids, targets, fetch, transform in dataloader:

@@ -68,22 +68,22 @@ class OpenWebText(DataModule):
         )
         split_dataset["val"] = split_dataset.pop("test")  # rename the test split to val
 
-        def tokenize(data: Dataset, index: int):
-            yield self.tokenizer.encode(data[index]["text"], eos=True)
+        # def tokenize(data: Dataset, index: int):
+        #     yield self.tokenizer.encode(data[index]["text"], eos=True)
 
         def extract_text(data: Dataset, index: int):
-            data = {"index": index, "text": data[index]["text"]}
-            return data
+            # data = {"index": index, "text": data[index]["text"]}
+            return data[index]["text"]
 
         optimize(
-            fn=partial(tokenize, split_dataset["train"]),
+            fn=partial(extract_text, split_dataset["train"]),
             inputs=list(range(len(split_dataset["train"]))),
             output_dir=self.data_path_train,
             num_workers=min(64, os.cpu_count() - 1),
             chunk_bytes="5MB",
         )
         optimize(
-            fn=partial(tokenize, split_dataset["val"]),
+            fn=partial(extract_text, split_dataset["val"]),
             inputs=list(range(len(split_dataset["val"]))),
             output_dir=self.data_path_val,
             num_workers=min(8, os.cpu_count() - 1),
