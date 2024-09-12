@@ -51,7 +51,7 @@ class StreamingDataset(IterableDataset):
         drop_last: Optional[bool] = None,
         seed: int = 42,
         serializers: Optional[Dict[str, Serializer]] = None,
-        max_cache_size: Union[int, str] = "100GB",
+        max_cache_size: Union[int, str] = "5GB",
         subsample: float = 1.0,
         encryption: Optional[Encryption] = None,
         storage_options: Optional[Dict] = {},

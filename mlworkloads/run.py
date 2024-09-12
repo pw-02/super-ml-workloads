@@ -5,7 +5,7 @@ from image_classifer import train_image_classifer
 import os
 from lightning.pytorch.core.saving import save_hparams_to_yaml
 from datetime import datetime
-from language.finetune.lora_finetune import launch_finetune
+from mlworkloads.language.finetune.lora_finetune import launch_finetune
 @hydra.main(version_base=None, config_path="./conf", config_name="config")
 def main(config: DictConfig):
 
@@ -20,7 +20,7 @@ def main(config: DictConfig):
     if config.workload.name == 'cifar10_resnet18' or config.workload.name  == 'imagenet_resnet50':
         train_image_classifer(config, train_logger,val_logger)
 
-    elif config.workload.name  == 'laora_finetine_owt':
+    elif config.workload.name  == 'lora_finetune_owt':
         launch_finetune(config, train_logger, val_logger)
     else:
         raise ValueError(f"Invalid workload: {config.workload}")

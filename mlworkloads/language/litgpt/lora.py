@@ -111,7 +111,7 @@ def setup(
 
     check_valid_checkpoint_dir(checkpoint_dir)
     config = Config.from_file(
-        checkpoint_dir / "model_config.yaml",
+        os.path.join(checkpoint_dir, "model_config.yaml"),
         lora_r=lora_r,
         lora_alpha=lora_alpha,
         lora_dropout=lora_dropout,
@@ -268,12 +268,12 @@ def fit(
     data: DataModule,
 ) -> None:
     tokenizer = Tokenizer(checkpoint_dir)
-    longest_seq_length, longest_seq_ix = get_longest_seq_length(ConcatDataset([train_dataloader.dataset, val_dataloader.dataset]))
-    model.max_seq_length = min(longest_seq_length, train.max_seq_length or float("inf"))
-    fabric.print(
-        f"The longest sequence length in the train data is {longest_seq_length}, the model's maximum sequence length is"
-        f" {model.max_seq_length} and context length is {model.config.block_size}"
-    )
+    # longest_seq_length, longest_seq_ix = get_longest_seq_length(ConcatDataset([train_dataloader.dataset, val_dataloader.dataset]))
+    model.max_seq_length = 512 # min(longest_seq_length, train.max_seq_length or float("inf"))
+    # fabric.print(
+    #     f"The longest sequence length in the train data is {longest_seq_length}, the model's maximum sequence length is"
+    #     f" {model.max_seq_length} and context length is {model.config.block_size}"
+    # )
 
     if eval.initial_validation:
         val_loss = validate(fabric, model, val_dataloader, dataclasses.replace(eval, max_iters=len(val_dataloader)))
@@ -298,14 +298,20 @@ def fit(
         iter_num += 1
         iter_t0 = time.perf_counter()
         batch = next(train_iterator)
-        input_ids, targets = batch["input_ids"], batch["labels"]
 
+        print(f"dataload: {time.perf_counter() - iter_t0}")
+        # Create input_ids by taking all tokens except the last token in the sequence
+        input_ids = batch[:, 0 : model.max_seq_length].contiguous().long()
+        # Create targets by shifting input_ids one step to the right.
+        # The target is to predict the next token in the sequence.
+        targets = batch[:, 1 : (model.max_seq_length + 1)].contiguous().long()
+        
         is_accumulating = iter_num % train.gradient_accumulation_iters(devices) != 0
         with fabric.no_backward_sync(model, enabled=is_accumulating):
             logits = model(input_ids, lm_head_chunk_size=128)
             # shift the targets such that output n predicts token n+1
-            logits[-1] = logits[-1][..., :-1, :]
-            loss = chunked_cross_entropy(logits, targets[..., 1:])
+          
+            loss = chunked_cross_entropy(logits, targets)
             fabric.backward(loss / train.gradient_accumulation_iters(devices))
 
         running_loss.update(loss.detach())
@@ -371,15 +377,21 @@ def validate(fabric: L.Fabric, model: GPT, val_dataloader: DataLoader, eval: Eva
     if verbose:
         fabric.print("Validating ...")
     model.eval()
-    losses = torch.zeros(min(len(val_dataloader), eval.max_iters))
+    losses = []
     for k, batch in enumerate(val_dataloader):
         if k >= eval.max_iters:
             break
-        input_ids, targets = batch["input_ids"], batch["labels"]
-        logits = model(input_ids)
-        losses[k] = chunked_cross_entropy(logits[..., :-1, :], targets[..., 1:], chunk_size=0)
 
-    val_loss = losses.mean()
+        # Create input_ids by taking all tokens except the last token in the sequence
+        input_ids = batch[:, 0 : model.max_seq_length].contiguous().long()
+        # Create targets by shifting input_ids one step to the right.
+        # The target is to predict the next token in the sequence.
+        targets = batch[:, 1 : (model.max_seq_length + 1)].contiguous().long()
+
+        logits = model(input_ids)
+        loss = chunked_cross_entropy(logits, targets, chunk_size=0)
+        losses.append(loss)
+    val_loss = torch.stack(losses).mean()
 
     model.train()
     return val_loss
@@ -465,11 +477,11 @@ def validate_args(train: TrainArgs, eval: EvalArgs) -> None:
         raise ValueError("\n".join(issues))
     
 if __name__ == "__main__":
-    setup(checkpoint_dir=Path("checkpoints/EleutherAI/pythia-14m"), 
+    setup(checkpoint_dir=Path("mlworkloads\language\checkpoints\EleutherAI\pythia-14m"), 
           devices=1, 
           num_nodes=1, 
           train=TrainArgs(epochs=1, max_seq_length=512),
           precision="16-true",
-          data=OpenWebText()
+          data=OpenWebText(data_path='s3://litdatapreprocessed5mbowt', num_workers=0)
         #  ,quantize="bnb.nf4-dq"
          )

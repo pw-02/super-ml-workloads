@@ -93,8 +93,8 @@ class SUPERSampler(Sampler):
     def __len__(self):
         return self.total_batches
 
-    dataset = SUPERMappedDataset(s3_data_dir="s3://sdl-cifar10/test/", transform=transform)
-    sampler = SUPERSampler(dataset, "localhost:50051")
+    # dataset = SUPERMappedDataset(s3_data_dir="s3://sdl-cifar10/test/", transform=transform)
+    # sampler = SUPERSampler(dataset, "localhost:50051")
 
 
 # if __name__ == "__main__":

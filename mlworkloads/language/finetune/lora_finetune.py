@@ -16,10 +16,8 @@ from lightning_utilities.core.imports import RequirementCache
 from lightning.fabric.strategies import FSDPStrategy
 from litgpt.tokenizer import Tokenizer
 from pathlib import Path
-from args import TrainArgs, EvalArgs
 import warnings
 from typing import Dict, List, Literal, Optional, Tuple, Union
-from alpaca import Alpaca
 from litgpt.data import DataModule
 from torch.utils.data import DataLoader, ConcatDataset
 from lightning.fabric.utilities import ThroughputMonitor
@@ -29,6 +27,11 @@ from litgpt.prompts import save_prompt_style
 import os
 import time
 from collections import OrderedDict
+# Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
+import math
+from dataclasses import dataclass
+from typing import Optional
+import warnings
 
 from litgpt.utils import (
     auto_download_checkpoint,
@@ -48,13 +51,100 @@ from litgpt.utils import (
     save_hyperparameters,
 )
 
+@dataclass
+class TrainArgs:
+    """Training-related arguments"""
+    save_interval: Optional[int] = 1000
+    """Number of optimizer steps between saving checkpoints"""
+    log_interval: int = 1
+    """Number of iterations between logging calls"""
+    global_batch_size: int = 64
+    """Number of samples between optimizer steps across data-parallel ranks"""
+    micro_batch_size: int = 4
+    """Number of samples per data-parallel rank"""
+    lr_warmup_steps: Optional[int] = 100
+    """Number of iterations with learning rate warmup active"""
+    lr_warmup_fraction: Optional[float] = None
+    """The fraction of an epoch to use for learning rate warmup"""
+    epochs: Optional[int] = None
+    """Number of epochs to train on"""
+    # TODO: `pretrain` is the only script using `max_tokens` explicitly. replace it with epoch_size*epochs?
+    max_tokens: Optional[int] = None
+    """Total number of tokens to train on"""
+    max_steps: Optional[int] = None
+    """Limits the number of optimizer steps to run"""
+    max_seq_length: Optional[int] = None
+    """Limits the length of samples"""
+    tie_embeddings: Optional[bool] = None
+    """Whether to tie the embedding weights with the language modeling head weights"""
+    
+    run_training: Optional[bool] = True
+
+    # Optimization args
+    max_norm: Optional[float] = None
+    min_lr: float = 6e-5
+
+    def __post_init__(self) -> None:
+        if self.lr_warmup_fraction and self.lr_warmup_steps:
+            raise ValueError(
+                "Can't provide both `--train.lr_warmup_fraction` and `--train.lr_warmup_steps`. Choose one."
+            )
+        if self.lr_warmup_fraction and not (0 <= self.lr_warmup_fraction <= 1):
+            raise ValueError("`--train.lr_warmup_fraction` must be between 0 and 1.")
+
+        if self.lr_warmup_steps and self.max_steps and (self.lr_warmup_steps >= self.max_steps):
+            warnings.warn(
+                "`--train.lr_warmup_steps` should be less than `--train.max_steps`."
+                f" Got {self.lr_warmup_steps} lr_warmup_steps and {self.max_steps} max_steps.", UserWarning)
+
+    def gradient_accumulation_iters(self, devices: int) -> int:
+        """Number of iterations between gradient synchronizations"""
+        gradient_accumulation_iters = self.batch_size(devices) // self.micro_batch_size
+        assert gradient_accumulation_iters > 0
+        return gradient_accumulation_iters
+
+    def batch_size(self, devices: int) -> int:
+        """Number of samples between optimizer steps per data-parallel rank"""
+        batch_size = self.global_batch_size // devices
+        assert batch_size > 0
+        return batch_size
+
+    def warmup_iters(self, devices: int, max_iters: int, train_dataloader) -> int:
+        """Number of iterations to warm up the learning rate."""
+        if self.lr_warmup_fraction:
+            return min(max_iters, math.ceil(self.lr_warmup_fraction * len(train_dataloader)))
+        if self.lr_warmup_steps:
+            return min(max_iters, self.lr_warmup_steps * self.gradient_accumulation_iters(devices))
+        return 0
+
+
+@dataclass
+class EvalArgs:
+    """Evaluation-related arguments"""
+
+    interval: int = 600
+    """Number of optimizer steps between evaluation calls"""
+    max_new_tokens: Optional[int] = None
+    """Number of tokens to generate"""
+    max_iters: int = 100
+    """Number of iterations"""
+    initial_validation: bool = False
+    """Whether to evaluate on the validation set at the beginning of the training"""
+    final_validation: bool = True
+    """Whether to evaluate on the validation set at the end of the training"""
+    run_validation: Optional[bool] = True
+
+
+
+
 def launch_finetune(config: DictConfig, train_logger: CSVLogger, val_logger: CSVLogger):
-    checkpoint_dir = auto_download_checkpoint(model_name=config.workload.checkpoint_dir)
+    # config.workload.checkpoint_dir = Path(config.workload.checkpoint_dir)
+    checkpoint_dir = auto_download_checkpoint(model_name=Path(config.workload.checkpoint_dir), access_token=None)
     devices = parse_devices(config.workload.devices)
-    out_dir = init_out_dir(config.workload.out_dir)
+    # out_dir = init_out_dir(config.workload.out_dir)
     check_valid_checkpoint_dir(checkpoint_dir)
     lora_config = Config.from_file(
-        path= os.path.join(checkpoint_dir, "model_config.json"),
+        os.path.join(checkpoint_dir, "model_config.yaml"),
         lora_r=config.workload.lora_r,
         lora_alpha=config.workload.lora_alpha,
         lora_dropout=config.workload.lora_dropout,
@@ -65,7 +155,9 @@ def launch_finetune(config: DictConfig, train_logger: CSVLogger, val_logger: CSV
         lora_mlp=config.workload.lora_mlp,
     )
 
-    precision = precision or get_default_supported_precision(training=True)
+
+    precision = config.workload.precision or get_default_supported_precision(training=True)
+
     train = TrainArgs(
         save_interval=config.workload.save_interval,
         log_interval=config.workload.log_interval,
@@ -79,16 +171,16 @@ def launch_finetune(config: DictConfig, train_logger: CSVLogger, val_logger: CSV
         tie_embeddings=config.workload.tie_embeddings,
         max_norm=config.workload.max_norm,
         min_lr=config.workload.min_lr,
+        run_training=config.workload.run_training
     )
     eval = EvalArgs(
         interval=config.workload.eval_interval,
         max_new_tokens=config.workload.eval_max_new_tokens,
         max_iters=config.workload.eval_max_iters,
         initial_validation=config.workload.eval_final_validation,
-        final_validation=config.workload.eval_final_validation
+        final_validation=config.workload.eval_final_validation,
+        run_validation=config.workload.run_validation
     )
-
-    data = Alpaca() if data is None else data
 
     plugins = None
     if config.workload.quantize is not None and config.workload.quantize.startswith("bnb."):
@@ -127,16 +219,14 @@ def launch_finetune(config: DictConfig, train_logger: CSVLogger, val_logger: CSV
         plugins=plugins,
     )
 
-    fabric.launch(main, devices, config, lora_config, data, checkpoint_dir, out_dir, train, eval, train_logger, val_logger)
+    fabric.launch(main, devices, config, lora_config, checkpoint_dir, train, eval, train_logger, val_logger)
 
 
 def main(fabric: Fabric,
     devices: int,
     config: DictConfig,
-    lora_config: Config,
-    data: DataModule,
+    model_config: Config,
     checkpoint_dir: Path,
-    out_dir: Path,
     train: TrainArgs,
     eval: EvalArgs,
     train_logger: CSVLogger, 
@@ -145,7 +235,7 @@ def main(fabric: Fabric,
     
     validate_args(train, eval)
     tokenizer = Tokenizer(checkpoint_dir)
-    train_dataloader, val_dataloader = get_dataloaders(fabric, data, tokenizer, train)
+    train_dataloader, val_dataloader = get_dataloaders(fabric, config, tokenizer, train, eval)
     steps_per_epoch = len(train_dataloader) // train.gradient_accumulation_iters(devices)
     lr_max_steps = min(train.epochs * steps_per_epoch, (train.max_steps or float("inf")))
 
@@ -154,7 +244,7 @@ def main(fabric: Fabric,
 
     checkpoint_path = os.path.join(checkpoint_dir, "lit_model.pth")
     with fabric.init_module(empty_init=(fabric.world_size > 1)):
-        model = GPT(lora_config)
+        model = GPT(model_config)
     mark_only_lora_as_trainable(model)
     fabric.print(f"Number of trainable parameters: {num_parameters(model, requires_grad=True):,}")
     fabric.print(f"Number of non-trainable parameters: {num_parameters(model, requires_grad=False):,}")
@@ -170,22 +260,20 @@ def main(fabric: Fabric,
     load_checkpoint(fabric, model, checkpoint_path, strict=False)
     train_time = time.perf_counter()
     fit(
-        fabric,
-        config.job_id,
-        train_time,
-        model,
-        optimizer,
-        scheduler,
-        train_dataloader,
-        val_dataloader,
-        devices,
-        checkpoint_dir,
-        out_dir,
-        train,
-        eval,
-        data,
-        train_logger,
-        val_logger
+        fabric=fabric,
+        job_id=config.job_id,
+        train_start_time=train_time,
+        model=model,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        train_dataloader=train_dataloader,
+        val_dataloader=val_dataloader,
+        devices=devices,
+        checkpoint_dir=checkpoint_dir,
+        train=train,
+        eval=eval,
+        train_logger=train_logger,
+        val_logger=val_logger,
     )
     fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
     if fabric.device.type == "cuda":
@@ -210,28 +298,29 @@ def fit(
     val_dataloader: DataLoader,
     devices: int,
     checkpoint_dir: Path,
-    out_dir: Path,
     train: TrainArgs,
     eval: EvalArgs,
-    data: DataModule,
     train_logger: CSVLogger,
     val_logger: CSVLogger
 ) -> None:
     tokenizer = Tokenizer(checkpoint_dir)
-    longest_seq_length, longest_seq_ix = get_longest_seq_length(ConcatDataset([train_dataloader.dataset, val_dataloader.dataset]))
-    model.max_seq_length = min(longest_seq_length, train.max_seq_length or float("inf"))
-    fabric.print(
-        f"The longest sequence length in the train data is {longest_seq_length}, the model's maximum sequence length is"
-        f" {model.max_seq_length} and context length is {model.config.block_size}"
-    )
+    
+    # longest_seq_length, longest_seq_ix = get_longest_seq_length(ConcatDataset([train_dataloader.dataset, val_dataloader.dataset]))
+    # model.max_seq_length = min(longest_seq_length, train.max_seq_length or float("inf"))
+    # fabric.print(
+    #     f"The longest sequence length in the train data is {longest_seq_length}, the model's maximum sequence length is"
+    #     f" {model.max_seq_length} and context length is {model.config.block_size}"
+    # )
 
-    if eval.initial_validation:
+    if eval.initial_validation and eval.run_validation:
         val_loss = validate(fabric, model, val_dataloader, dataclasses.replace(eval, max_iters=len(val_dataloader)))
         val_loss = f"{val_loss:.3f}"
     else:
-        fabric.print("Verifying settings ...")
-        validate(fabric, model, val_dataloader, dataclasses.replace(eval, max_iters=2), verbose=False)  # sanity check
         val_loss = "n/a"
+    # else:
+    #     fabric.print("Verifying settings ...")
+    #     validate(fabric, model, val_dataloader, dataclasses.replace(eval, max_iters=2), verbose=False)  # sanity check
+    #     val_loss = "n/a"
 
     train_iterator = CycleIterator(train_dataloader)
     throughput = ThroughputMonitor(fabric, window_size=50)
@@ -247,18 +336,21 @@ def fit(
     while step_count < max_steps and train_iterator.epoch < train.epochs:
         iter_num += 1
         iter_t0 = time.perf_counter()
-        batch, data_load_time, transformation_time, is_cache_hit, cached_on_miss  = next(train_iterator)
+        batch = next(train_iterator)
         wait_for_data_time = time.perf_counter() - iter_t0
 
-        input_ids, targets = batch["input_ids"], batch["labels"]
+        # Create input_ids by taking all tokens except the last token in the sequence
+        input_ids = batch[:, 0 : model.max_seq_length].contiguous().long()
+        # Create targets by shifting input_ids one step to the right.
+        # The target is to predict the next token in the sequence.
+        targets = batch[:, 1 : (model.max_seq_length + 1)].contiguous().long()
+        is_accumulating = iter_num % train.gradient_accumulation_iters(devices) != 0
 
         gpu_processing_started = time.perf_counter()
-        is_accumulating = iter_num % train.gradient_accumulation_iters(devices) != 0
         with fabric.no_backward_sync(model, enabled=is_accumulating):
             logits = model(input_ids, lm_head_chunk_size=128)
             # shift the targets such that output n predicts token n+1
-            logits[-1] = logits[-1][..., :-1, :]
-            loss = chunked_cross_entropy(logits, targets[..., 1:])
+            loss = chunked_cross_entropy(logits, targets)
             fabric.backward(loss / train.gradient_accumulation_iters(devices))
 
         running_loss.update(loss.detach())
@@ -291,15 +383,15 @@ def fit(
                             "Iteration Time (s)": t1 - total_t0,
                             "Wait for Data Time (s)": wait_for_data_time,
                             "GPU Processing Time (s)": gpu_processing_time,
-                            "Data Load Time (s)": data_load_time,
-                            "Transformation Time (s)": transformation_time,
-                            "Cache_Hit (Batch)": is_cache_hit,
-                            "Cache_Hits (Samples)": is_cache_hit,
+                            "Data Load Time (s)": 0,
+                            "Transformation Time (s)": 0,
+                            "Cache_Hit (Batch)": 0,
+                            "Cache_Hits (Samples)": 0,
                             "Train Loss": loss, #calculates the average training loss across all batches.
                             })
             train_logger.log_metrics(metrics,step=iter_num)
             fabric.print(
-                    f" Job {job_id} | Epoch: {metrics['Epoch Index']}({iter_num}/{min(max_steps, train.epochs)}) |"
+                    f" Job {job_id} | Epoch: {metrics['Epoch Index']} ({iter_num}) |"
                     f" iter:{metrics['Iteration Time (s)']:.2f}s |"
                     f" data_delay:{metrics['Wait for Data Time (s)']:.2f}s |"
                     f" gpu:{metrics['GPU Processing Time (s)']:.2f}s |"
@@ -313,10 +405,10 @@ def fit(
             if isinstance(val_loss, torch.Tensor):
                 val_loss = f"{val_loss:.3f}"
             
-        if not is_accumulating and step_count % eval.interval == 0:
+        if not is_accumulating and step_count % eval.interval == 0 and eval.run_validation:
             t0 = time.perf_counter()
             val_loss = validate(fabric, model, val_dataloader, eval)
-            generate_example(fabric, model, tokenizer, eval, data)
+            # generate_example(fabric, model, tokenizer, eval, data)
             t1 = time.perf_counter() - t0
             fabric.print(f"iter {iter_num}: val loss {val_loss.item():.4f}, val time: {t1 * 1000:.2f} ms")
             # metrics = {"val_loss": val_loss, "val_ppl": math.exp(val_loss)}
@@ -401,15 +493,84 @@ def get_lr_scheduler(optimizer, warmup_steps: int, max_steps: int):
 
 
 def get_dataloaders(
-    fabric: Fabric, data: DataModule, tokenizer: Tokenizer, train: TrainArgs
-) -> Tuple[DataLoader, DataLoader]:
-    data.connect(tokenizer=tokenizer, batch_size=train.micro_batch_size, max_seq_length=train.max_seq_length)
-    with fabric.rank_zero_first():
-        data.prepare_data()
-    data.setup()
-    train_dataloader = data.train_dataloader()
-    val_dataloader = data.val_dataloader()
-    train_dataloader, val_dataloader = fabric.setup_dataloaders(train_dataloader, val_dataloader)
+    fabric: Fabric, config:DictConfig, tokenizer: Tokenizer, train: TrainArgs, val: EvalArgs) -> Tuple[DataLoader, DataLoader]:
+    train_dataloader = None
+    val_dataloader = None
+
+    if config.dataloader.name == 'litgpt' or 'pytorch':
+        from litdata.streaming import StreamingDataLoader, StreamingDataset, TokensLoader
+        if train.run_training:
+            train_dataset = StreamingDataset(
+            input_dir=config.workload.s3_train_prefix,
+            item_loader=TokensLoader(block_size=train.max_seq_length+1),
+            shuffle=True,
+            max_cache_size="0GB")
+
+            train_dataloader = StreamingDataLoader(
+                train_dataset, batch_size=train.batch_size(devices=config.workload.devices), 
+                pin_memory=True, 
+                num_workers=config.workload.num_pytorch_workers, 
+                drop_last=True
+            )
+            train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
+
+        if val.run_validation:
+            val_dataset = StreamingDataset(
+            input_dir=config.workload.s3_val_prefix,
+            item_loader=TokensLoader(block_size=train.max_seq_length+1),
+            shuffle=True,
+            max_cache_size="0GB")
+            val_dataloader = StreamingDataLoader(
+                val_dataset, batch_size=train.batch_size(devices=config.workload.devices), 
+                pin_memory=True, 
+                num_workers=config.workload.num_pytorch_workers, 
+                drop_last=True
+            )
+            val_dataloader = fabric.setup_dataloaders(val_dataloader, move_to_device=True)
+
+
+    # if dataloader_name == 'super':
+    #     if run_training:
+    #         train_dataset = SUPERMappedDataset(s3_data_dir=config.workload.s3_train_prefix, 
+    #                                             transform=train_transform,
+    #                                             cache_address=config.dataloader.cache_address)
+
+    #         train_sampler = SUPERSampler(
+    #                 dataset=train_dataset,
+    #                 grpc_server_address=config.dataloader.grpc_server_address,
+    #                 batch_size=config.workload.batch_size
+    #                 )
+    #         train_dataloader = DataLoader(train_dataset, batch_size=None, sampler=train_sampler, num_workers=config.workload.num_pytorch_workers)
+    #         train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
+        
+    #     if run_validation:
+    #         val_dataset = SUPERMappedDataset(s3_data_dir=config.workload.s3_val_prefix, 
+    #                                          transform=val_transform,
+    #                                          cache_address=config.dataloader.cache_address)
+    #         val_sampler = SUPERSampler(
+    #             dataset=val_dataset,
+    #             grpc_server_address=config.dataloader.grpc_server_address,
+    #             batch_size=config.workload.batch_size
+    #             )
+    #         val_dataloader =  DataLoader(val_dataset, batch_size=None, sampler=val_sampler, num_workers=config.workload.num_pytorch_workers)
+    #         val_dataloader = fabric.setup_dataloaders(val_dataloader,move_to_device=True)
+    
+    # elif dataloader_name == 'litgpt':
+    #     litdata_data.connect(tokenizer=tokenizer, batch_size=train.micro_batch_size, max_seq_length=train.max_seq_length)
+    #     with fabric.rank_zero_first():
+    #         litdata_data.prepare_data()
+    #         litdata_data.connect(tokenizer=tokenizer, batch_size=train.micro_batch_size, max_seq_length=train.max_seq_length)
+    #         with fabric.rank_zero_first():
+    #             litdata_data.prepare_data()
+    #         litdata_data.setup()
+
+    #         if run_training:
+    #             train_dataloader = litdata_data.train_dataloader()
+    #             train_dataloader = fabric.setup_dataloaders(train_dataloader)
+    #         if run_validation:
+    #             val_dataloader = litdata_data.val_dataloader()
+    #             val_dataloader = fabric.setup_dataloaders(val_dataloader)
+    
     return train_dataloader, val_dataloader
 
 
@@ -432,8 +593,8 @@ def validate_args(train: TrainArgs, eval: EvalArgs) -> None:
         raise ValueError("\n".join(issues))
     
 
-@hydra.main(version_base=None, config_path="./conf", config_name="config")
-def main(config: DictConfig):
+@hydra.main(version_base=None, config_path="../../conf", config_name="config")
+def run(config: DictConfig):
 
     log_dir = f"{config.log_dir}/{config.workload.name}/{config.dataloader.name}/{config.exp_id}/{config.job_id}".lower()
     log_dir = os.path.normpath(log_dir)  # Normalize path for Windows
@@ -444,4 +605,4 @@ def main(config: DictConfig):
 
 
 if __name__ == "__main__":
-    main()
+    run()

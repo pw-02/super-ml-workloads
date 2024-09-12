@@ -10,7 +10,6 @@ from torch.utils.data import DataLoader
 from litgpt.tokenizer import Tokenizer
 from litgpt.data import DataModule
 
-
 @dataclass
 class OpenWebText(DataModule):
     """The OpenWebText data module for pretraining."""
@@ -28,6 +27,8 @@ class OpenWebText(DataModule):
     tokenizer: Optional[Tokenizer] = field(default=None, repr=False, init=False)
     batch_size: int = field(default=1, repr=False, init=False)
     seq_length: int = field(default=2048, repr=False, init=False)
+
+    datalaoder_name = "StreamingDataLoader"
 
     def __post_init__(self) -> None:
         super().__init__()
@@ -80,6 +81,7 @@ class OpenWebText(DataModule):
             chunk_bytes="200MB",
         )
 
+    
     def train_dataloader(self) -> DataLoader:
         from litdata.streaming import StreamingDataLoader, StreamingDataset, TokensLoader
 
