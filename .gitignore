@@ -8,3 +8,4 @@ figures/
 *.pyc
 mlworkloads/__pycache__/resource_monitor.cpython-310.pyc
 nohup.out
+mlworkloads/checkpoints/TinyLlama-1.1B-Chat-v1.0*
