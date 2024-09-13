@@ -13,10 +13,10 @@ log_interval: 1
 global_batch_size: 16
 micro_batch_size: 4
 lr_warmup_steps: 50
-epochs: 5
+epochs: 4
 max_tokens: null
-max_steps: 2500
-max_seq_length: 1024
+max_steps: 750
+max_seq_length: 512
 tie_embeddings: null
 max_norm: null
 min_lr:  4e-5
@@ -35,7 +35,7 @@ checkpoint_dir: 'checkpoints/TinyLlama/TinyLlama-1.1B-Chat-v1.0'  #'mlworkloads\
 out_dir: 
 precision: 16-true #ossible choices: "bf16-true", "bf16-mixed", "32-true".
 quantize: null
-devices: 4 #How many devices/GPUs to use.
+devices: 1 #How many devices/GPUs to use.
 num_nodes: 1 #How many nodes the code is being run on.
 lora_r: 8 
 lora_alpha: 16
