@@ -16,7 +16,7 @@ lr_warmup_steps: 50
 epochs: 5
 max_tokens: null
 max_steps: 2500
-max_seq_length: 2048
+max_seq_length: 1024
 tie_embeddings: null
 max_norm: null
 min_lr:  4e-5
