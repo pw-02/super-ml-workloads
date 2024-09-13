@@ -509,7 +509,7 @@ def get_dataloaders(
             train_dataset = CustomStreamingDataset(
             input_dir=config.workload.s3_train_prefix,
             item_loader=None,
-            shuffle=True,
+            shuffle=config.dataloader.shuffle,
             max_cache_size="0GB",
             tokenizer=tokenizer,
             batch_size=train.micro_batch_size,
@@ -528,7 +528,7 @@ def get_dataloaders(
             val_dataset = CustomStreamingDataset(
             input_dir=config.workload.s3_val_prefix,
             item_loader=TokensLoader(block_size=train.max_seq_length+1),
-            shuffle=True,
+            shuffle=config.dataloader.shuffle,
             max_cache_size="0GB",
             tokenizer=tokenizer,
             batch_size=train.micro_batch_size,

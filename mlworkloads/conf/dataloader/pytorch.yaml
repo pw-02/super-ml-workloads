@@ -2,4 +2,4 @@ name: pytorch
 cache_address: null
 source_system: s3
 drop_last: False
-shuffle: True
+shuffle: False

@@ -224,6 +224,7 @@ class CustomStreamingDataset(StreamingDataset):
             _my_cache_indices = [ChunkedIndex(*self.cache._get_chunk_index_from_index(idx)) for idx in _my_indices]
             data,is_cache_hit = [self.cache[chnk_idx] for chnk_idx in _my_cache_indices]
         data, is_cache_hit = self.cache[index]
+        data_loading_time = time.perf_counter() - start_loading_time
 
         start_transformation_time = time.perf_counter()
         tokenized_data = self.tokenize_data(data)
@@ -238,9 +239,7 @@ class CustomStreamingDataset(StreamingDataset):
         transformation_time =  time.perf_counter() - start_transformation_time
 
         # print(input_ids.size(), targets.size())
-         # Calculate data loading time excluding transformation time
-        data_loading_time  = time.perf_counter() - start_loading_time - transformation_time
-     
+         # Calculate data loading time excluding transformation time     
         return (input_ids, targets), data_loading_time, transformation_time, is_cache_hit, False
     
     def tokenize_data(self, data: Any) -> Any:
