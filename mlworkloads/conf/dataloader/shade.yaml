@@ -1,4 +1,4 @@
 name: shade
-cache_address: localhost:6379 # null # 127.0.0.1:6379 #null
+cache_address: testcache-0001-001.testcache.rdior4.usw2.cache.amazonaws.com:6379 # null # 127.0.0.1:6379 #null
 wss: 0.5
 rep_factor: 1

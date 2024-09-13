@@ -56,7 +56,7 @@ class ShadeDataset(Dataset):
         self.PQ = PQ
         self.ghost_cache = ghost_cache
         self.key_counter = 0
-        self.key_id_map:redis.StrictRedis = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
+        self.key_id_map:redis.StrictRedis = None
         self.s3_client = boto3.client('s3')
     
     @functools.cached_property
@@ -69,6 +69,8 @@ class ShadeDataset(Dataset):
         return 0.6858089651836363
 
     def set_num_local_samples(self):
+        if self.key_id_map is None:
+            self.key_id_map = redis.StrictRedis(host=self.cache_host, port=self.cache_port, db=0)
         self.key_counter = self.key_id_map.dbsize()
 
     def set_PQ(self, curr_PQ):
@@ -84,7 +86,8 @@ class ShadeDataset(Dataset):
         return self.ghost_cache
     
     def cache_and_evict(self, path, target, index):
-        
+        if self.key_id_map is None:
+            self.key_id_map = redis.StrictRedis(host=self.cache_host, port=self.cache_port, db=0)
         fetch_start_time = time.perf_counter()
         cache_hit = False
         cached_after_fetch = False
