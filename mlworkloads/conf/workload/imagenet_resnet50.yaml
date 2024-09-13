@@ -4,7 +4,7 @@ name: imagenet_resnet50
 s3_bucket: imagenet1k-sdl
 s3_train_prefix: s3://imagenet1k-sdl/train/
 s3_val_prefix: s3://imagenet1k-sdl/val/
-num_pytorch_workers: 4
+num_pytorch_workers: 0
 
 #model configuration
 model_architecture: resnet50
