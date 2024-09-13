@@ -10,8 +10,8 @@ run_validation: False
 #trin
 save_interval: 1000
 log_interval: 1
-global_batch_size: 32
-micro_batch_size: 32
+global_batch_size: 16
+micro_batch_size: 4
 lr_warmup_steps: 50
 epochs: 5
 max_tokens: null
