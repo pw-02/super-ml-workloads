@@ -623,7 +623,7 @@ def run(config: DictConfig):
 
     log_dir = f"{config.log_dir}/{config.workload.name}/{config.dataloader.name}/{config.exp_id}/{config.job_id}".lower()
     log_dir = os.path.normpath(log_dir)  # Normalize path for Windows
-    config.workload.checkpoint_dir = 'mlworkloads\checkpoints\TinyLlama-1.1B-Chat-v1.0'
+    # config.workload.checkpoint_dir = 'mlworkloads\checkpoints\TinyLlama-1.1B-Chat-v1.0'
     train_logger = CSVLogger(root_dir=log_dir, name="train", prefix='', flush_logs_every_n_steps=config.log_interval)
     val_logger = CSVLogger(root_dir=log_dir, name="val", prefix='', flush_logs_every_n_steps=config.log_interval)
     launch_finetune(config, train_logger,val_logger)
