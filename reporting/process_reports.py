@@ -26,35 +26,36 @@ def convert_all_csv_to_dict(folder_path):
         if 'metrics.csv' in file_name:
             csv_data = convert_csv_to_dict(csv_file)
             metrics["num_jobs"] +=1
-            metrics["total_bathces"] += len(csv_data["batch_idx"])
-            metrics["total_samples"] += sum(csv_data["batch_size"])
-            metrics["total_time(s)"] += sum(csv_data["batch_time"])
-            # metrics["total_time(s)"] += csv_data["elapsed_time(s)"][len(csv_data["elapsed_time(s)"])-1]
-            metrics["data_time(s)"] += sum(csv_data["data_time"])
-            metrics["compute_time(s)"] += sum(csv_data["compute_time"])
-            # metrics["transform_time(s)"] += sum(csv_data["transform_time"])
-            metrics["cache_hits"] += sum(csv_data["cache_hits"])
+            metrics["total_bathces"] += len(csv_data["Batch Index"])
+            metrics["total_samples"] += sum(csv_data["Batch Size"])
+            metrics["total_time(s)"] += sum(csv_data["Iteration Time (s)"])
+            metrics["wait_on_data_time(s)"] += sum(csv_data["Wait for Data Time (s)"])
+            metrics["gpu_processing_time(s)"] += sum(csv_data["GPU Processing Time (s))"])
+            metrics["data_loading_time(s)"] += sum(csv_data["Data Load Time (s)"])
+            metrics["transformation_time(s)"] += sum(csv_data["Transformation Time (s)"])
+            metrics["cache_hits"] += sum(csv_data["Cache_Hits (Samples)"])
 
-            data_times = csv_data["data_time"]
-            transform_times = csv_data["transform_time"]
+    #         data_times = csv_data["data_time"]
+    #         transform_times = csv_data["transform_time"]
 
-            for idx, value in enumerate(data_times):
-                if value >=1:
-                    metrics["transform_time(s)"] += transform_times[idx]
-                pass
+    #         for idx, value in enumerate(data_times):
+    #             if value >=1:
+    #                 metrics["transform_time(s)"] += transform_times[idx]
+    #             pass
 
-    metrics["data_time(s)"] = metrics["data_time(s)"] - metrics["transform_time(s)"]
+    # metrics["data_time(s)"] = metrics["data_time(s)"] - metrics["transform_time(s)"]
 
 
-    for key in ['total_time(s)',"data_time(s)", "compute_time(s)","transform_time(s)" ]:
+    for key in ['total_time(s)',"wait_on_data_time(s)", "gpu_processing_time(s)","data_loading_time(s)", "transformation_time(s)" ]:
         metrics[key] = metrics[key] / metrics['num_jobs']
     
-    metrics["throughput(batches_per_second)"] = metrics["total_bathces"]/metrics["total_time(s)"]
+    metrics["throughput(batches/s)"] = metrics["total_bathces"]/metrics["total_time(s)"]
+    metrics["throughput(samples/s)"] = metrics["total_samples"]/metrics["total_time(s)"]
     metrics["cache_hit%"] = metrics["cache_hits"]/metrics["total_samples"]
-    metrics["compute%"] = metrics["compute_time(s)"]/metrics["total_time(s)"]
-    metrics["data%"] = metrics["data_time(s)"]/metrics["total_time(s)"]
-    metrics["transform%"] = metrics["transform_time(s)"]/metrics["total_time(s)"]
-
+    metrics["compute_time(%)"] = metrics["gpu_processing_time(s)"]/metrics["total_time(s)"]
+    metrics["waiting_on_data_time(%)"] = metrics["wait_on_data_time(s)"]/metrics["total_time(s)"]
+    metrics["transform_time(%)"] = metrics["transform_time(s)"]/(metrics["transformation_time(s)"]+metrics["data_loading_time(s)"])
+    metrics["data_loading_time(%)"] = metrics["data_loading_time(s)"]/(metrics["transformation_time(s)"]+metrics["data_loading_time(s)"])
     return metrics
 
 def save_dict_to_csv(data_dict, output_file):
@@ -65,7 +66,7 @@ def save_dict_to_csv(data_dict, output_file):
 
 
 if __name__ == "__main__":
-    folder_path = "C:\\Users\\pw\\Desktop\\logs\\cifar10\\resnet18"
+    folder_path = "C:\\Users\\pw\\Desktop\\experiment_results\\logs\\cifar10_resnet18"
     #folder_path = "C:\\Users\\pw\\Desktop\\logs\\imagenet1k\\resnet50"
 
     subfolders = glob.glob(os.path.join(folder_path, '*'))
