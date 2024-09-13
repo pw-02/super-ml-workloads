@@ -30,9 +30,8 @@ eval_final_validation: False
 
 optimizer:  "AdamW"
 
-# checkpoint_dir: 'mlworkloads/checkpoints/TinyLlama-1.1B-Chat-v1.0'  #'mlworkloads\language\checkpoints\EleutherAI\pythia-14m' #The path to the base model's checkpoint directory to load for finetuning.
-
-checkpoint_dir: 'mlworkloads\checkpoints\TinyLlama-1.1B-Chat-v1.0'  #'mlworkloads\language\checkpoints\EleutherAI\pythia-14m' #The path to the base model's checkpoint directory to load for finetuning.
+checkpoint_dir: 'mlworkloads/checkpoints/TinyLlama-1.1B-Chat-v1.0'  #'mlworkloads\language\checkpoints\EleutherAI\pythia-14m' #The path to the base model's checkpoint directory to load for finetuning.
+#checkpoint_dir: 'mlworkloads\checkpoints\TinyLlama-1.1B-Chat-v1.0'  #'mlworkloads\language\checkpoints\EleutherAI\pythia-14m' #The path to the base model's checkpoint directory to load for finetuning.
 out_dir: 
 precision: 16-true #ossible choices: "bf16-true", "bf16-mixed", "32-true".
 quantize: null
