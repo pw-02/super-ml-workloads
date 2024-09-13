@@ -107,7 +107,7 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
                 )
             
             train_dataloader = DataLoader(train_dataset, 
-                                          shuffle=False,
+                                          shuffle=config.dataloader.shuffle,
                                           batch_size=config.workload.batch_size,
                                           sampler=train_sampler, 
                                           num_workers=config.workload.num_pytorch_workers)
