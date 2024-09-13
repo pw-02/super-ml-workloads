@@ -221,6 +221,7 @@ def launch_finetune(config: DictConfig, train_logger: CSVLogger, val_logger: CSV
         strategy=strategy,
         precision=precision,
         plugins=plugins,
+        accelerator=config.accelerator,
     )
 
     fabric.launch(main, devices, config, lora_config, checkpoint_dir, train, eval, train_logger, val_logger)

@@ -1,5 +1,5 @@
 name: super
-grpc_server_address:  10.0.17.5:50051 # 10.0.17.31:50051  10.0.17.5:50051
-cache_address:  10.0.17.5:6378 #null # 10.0.17.5:6378  #10.0.17.31:6378 # null # 54.245.179.233:6378 #null
+grpc_server_address:  35.88.174.245:50051 # 10.0.17.31:50051  10.0.17.5:50051
+cache_address:  35.88.174.245:6378 #null # 10.0.17.5:6378  #10.0.17.31:6378 # null # 54.245.179.233:6378 #null
 drop_last: False
 shuffle: False

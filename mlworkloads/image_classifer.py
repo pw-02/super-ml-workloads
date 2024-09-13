@@ -264,7 +264,10 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                 break
             
              # Unpack batch
-            inputs, labels, batch_id = batch
+            if isinstance(train_dataloader.sampler, ShadeSampler):
+                inputs, labels = batch
+            elif isinstance(train_dataloader.sampler, SUPERSampler):
+                inputs, labels, batch_id = batch
 
             # Forward pass: Compute model output and loss
             gpu_processing_started = time.perf_counter()
