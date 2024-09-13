@@ -5,7 +5,8 @@ from image_classifer import train_image_classifer
 import os
 from lightning.pytorch.core.saving import save_hparams_to_yaml
 from datetime import datetime
-from mlworkloads.language.finetune.lora_finetune import launch_finetune
+from lora_finetune import launch_finetune
+
 @hydra.main(version_base=None, config_path="./conf", config_name="config")
 def main(config: DictConfig):
 
