@@ -5,7 +5,7 @@ workload="lora_finetune_owt" # Define your workload imagenet_resnet50, cifar10_r
 dataloder="super" # Define your dataloader
 
 # Define an array of GPU indices
-gpu_indices=(0 1 2 3)
+gpu_indices=(0)
 # Define an array of learning rates
 learning_rates=(0.001 0.01 0.1 1.0)
 
