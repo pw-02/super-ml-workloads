@@ -100,7 +100,7 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
                 num_replicas=1,
                 rank=0,
                 batch_size=config.workload.batch_size,
-                seed=config.seed,
+                seed=config.job_id,
                 host_ip=config.dataloader.cache_address.split(":")[0],
                 port_num=config.dataloader.cache_address.split(":")[1],
                 rep_factor=config.dataloader.rep_factor,
