@@ -531,7 +531,7 @@ def get_dataloaders(
             input_dir=config.workload.s3_train_prefix,
             item_loader=None,
             shuffle=config.dataloader.shuffle,
-            max_cache_size="0GB",
+            max_cache_size="100GB",
             tokenizer=tokenizer,
             batch_size=train.micro_batch_size,
             seq_length=train.max_seq_length
