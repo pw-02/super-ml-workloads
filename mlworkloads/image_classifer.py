@@ -84,11 +84,11 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
     
     elif config.dataloader.name == 'shade':
         global PQ
-        global key_id_map
+        # global key_id_map
         global ghost_cache
 
         if config.workload.run_training:
-            key_id_map = redis.StrictRedis(host=config.dataloader.cache_address.split(":")[0], port=config.dataloader.cache_address.split(":")[1])
+            # key_id_map = redis.StrictRedis(host=config.dataloader.cache_address.split(":")[0], port=config.dataloader.cache_address.split(":")[1])
             train_dataset = ShadeDataset(s3_data_dir=config.workload.s3_train_prefix, 
                                         transform=train_transform,
                                         cache_address=config.dataloader.cache_address,
@@ -320,7 +320,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                         PQ = train_dataloader.dataset.get_PQ()
                         ghost_cache = train_dataloader.dataset.get_ghost_cache()
                     for indx in sorted_img_indices:
-                        if key_id_map.exists(indx.item()):
+                        if train_dataloader.dataset.key_id_map.exists(indx.item()):
                             if indx.item() in PQ:
                                 PQ[indx.item()] = (batch_wts[track_batch_indx],PQ[indx.item()][1]+1)
                                 ghost_cache[indx.item()] = (batch_wts[track_batch_indx],ghost_cache[indx.item()][1]+1)
