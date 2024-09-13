@@ -240,7 +240,7 @@ class CustomStreamingDataset(StreamingDataset):
 
         # print(input_ids.size(), targets.size())
          # Calculate data loading time excluding transformation time     
-        return (input_ids, targets), data_loading_time, transformation_time, is_cache_hit, False
+        return (input_ids, targets), data_loading_time, transformation_time, is_cache_hit
     
     def tokenize_data(self, data: Any) -> Any:
         return self.tokenizer.encode(data, eos=True)
