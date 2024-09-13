@@ -35,7 +35,7 @@ checkpoint_dir: 'checkpoints/TinyLlama/TinyLlama-1.1B-Chat-v1.0'  #'mlworkloads\
 out_dir: 
 precision: 16-true #ossible choices: "bf16-true", "bf16-mixed", "32-true".
 quantize: null
-devices: 1 #How many devices/GPUs to use.
+devices: 4 #How many devices/GPUs to use.
 num_nodes: 1 #How many nodes the code is being run on.
 lora_r: 8 
 lora_alpha: 16
