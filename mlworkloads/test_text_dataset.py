@@ -152,17 +152,26 @@ if __name__ == "__main__":
         tokenizer=tokenizer,
         transform=None,
         block_size=block_size,
-        batch_size=batch_size,
         grpc_server_address="localhost:50051",
         world_size=1,
         cache_address=None,
-        simulate_delay=None)
+        shuffle=False)
         
     dataloader = DataLoader(dataset, batch_size=16, shuffle=False, num_workers=0)
 
-    for  batch, data_loading_time, transformation_time, cache_hit, cached_after_fetc in dataloader:
-        input_ids, targets = batch
-        print(f"Input IDs: {input_ids.shape}, Targets: {targets.shape}")
+    for idx, (batch, data_loading_time, transformation_time, cache_hit, cached_after_fetc) in enumerate(dataloader):
+        input_ids, targets, chunk_id = batch
+        
+        print(f"Idx: {idx}, Input IDs: {input_ids.shape}, Targets: {targets.shape}")
+        if isinstance(dataloader.dataset, SUPERTextDataset):
+            dataloader.dataset.send_job_update_to_super(
+                job_id=dataloader.dataset.job_id,
+                data_loading_time=data_loading_time,
+                transformation_time=transformation_time,
+                cache_hit=cache_hit,
+                cached_after_fetch=cached_after_fetc,
+            )
+       
 
 
 

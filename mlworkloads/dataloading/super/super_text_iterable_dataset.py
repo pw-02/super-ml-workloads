@@ -194,17 +194,19 @@ class SUPERTextDataset(IterableDataset):
 
     def __iter_non_distributed__(self, num_files):
         current_file_idx = 0
+        current_chunk_id = None
         tokenized_samples = [] 
         while current_file_idx < num_files:
             start = time.perf_counter()
 
             if not tokenized_samples or len(tokenized_samples) == 0:
-                tokenized_samples, data_loading_time, transformation_time, cache_hit, cached_after_fetch = self._load_next_chunk_samples()
+                current_chunk_id, tokenized_samples, data_loading_time, transformation_time, cache_hit, cached_after_fetch = self._load_next_chunk_samples()
                 current_file_idx +=1
                 input_ids, targets = tokenized_samples.pop(0)
-                yield (input_ids, targets), data_loading_time, transformation_time, cache_hit, cached_after_fetch
+                yield (input_ids, targets, current_chunk_id), data_loading_time, transformation_time, cache_hit, cached_after_fetch
             else:
-                input_ids, targets = tokenized_samples.pop(0), time.perf_counter() - start, 0, cache_hit, cached_after_fetch
+                input_ids, targets = tokenized_samples.pop(0)
+                yield (input_ids, targets, current_chunk_id), time.perf_counter() - start, 0, True, False
            
         current_file_idx = 0
     
@@ -213,7 +215,7 @@ class SUPERTextDataset(IterableDataset):
                         job_id=self.job_id,
                         data_dir=self.s3_data_dir))          
         
-        cache_key = response.batch.batch_id
+        chunk_id = response.batch.batch_id
         chunk_idx = list(response.batch.indicies)[0]
         is_cached = response.batch.is_cached
         tokenized_samples = None
@@ -221,7 +223,7 @@ class SUPERTextDataset(IterableDataset):
         # Start data loading timer
         start_loading_time = time.perf_counter()
         if is_cached and self.cache_client is not None:
-            tokenized_samples = self._load_batch_from_cache(cache_key)
+            tokenized_samples = self._load_batch_from_cache(chunk_id)
 
         # If data is fetched from cache and it's in the correct format
         if tokenized_samples  is not None and (isinstance(tokenized_samples , bytes) or isinstance(tokenized_samples , str)):
@@ -243,14 +245,14 @@ class SUPERTextDataset(IterableDataset):
                 try:
                     self._initialize_cache_client()
                     tokens_as_bytes = self._torch_tenors_to_bytes(tokenized_samples)
-                    self.cache_client.set(cache_key, tokens_as_bytes)
+                    self.cache_client.set(chunk_id, tokens_as_bytes)
                     cached_after_fetch = True
                 except Exception as e:
                     print(f"Error saving to cache: {e}")
 
         # Calculate data loading time excluding transformation time
         data_loading_time  = time.perf_counter() - start_loading_time - transformation_time
-        return tokenized_samples, data_loading_time, transformation_time, cache_hit, cached_after_fetch
+        return chunk_id, tokenized_samples, data_loading_time, transformation_time, cache_hit, cached_after_fetch
     
     
     def _initialize_cache_client(self):
@@ -268,8 +270,8 @@ class SUPERTextDataset(IterableDataset):
     def _bytes_to_torch_batch(self, bytes_minibatch) -> tuple:
         compressed_batch = lz4.frame.decompress(bytes_minibatch)
         with io.BytesIO(compressed_batch) as buffer:
-            data_samples, labels = torch.load(buffer)
-        return data_samples, labels
+            samples = torch.load(buffer)
+        return samples
 
     def _load_batch_from_cache(self, batch_id):
         try:
@@ -335,12 +337,21 @@ class SUPERTextDataset(IterableDataset):
         content = response['Body'].read()
         return content
     
-    def _truncate_or_pad_sequence(self, sequence, max_length):
-        # Truncate sequence if longer than max_length
-        if sequence.size(1) > max_length:
-            return sequence[:, :max_length]
-        # Pad sequence if shorter than max_length
-        elif sequence.size(1) < max_length:
-            pad_length = max_length - sequence.size(1)
-            return torch.cat([sequence, torch.zeros(sequence.size(0), pad_length, dtype=sequence.dtype)], dim=1)
-        return sequence
+    def send_job_update_to_super(self, 
+                                 batch_id, 
+                                 wait_for_data_time: float, 
+                                 is_cache_hit: bool, 
+                                 gpu_time: float, 
+                                 cached_batch_on_miss: bool):
+        try:
+            self.stub.JobUpdate(minibatch_service_pb2.JobUpdateRequest(
+                job_id=self.job_id,
+                data_dir=self.s3_data_dir,
+                previous_step_batch_id = batch_id,
+                previous_step_wait_for_data_time = wait_for_data_time,
+                previous_step_is_cache_hit = is_cache_hit,
+                previous_step_gpu_time = gpu_time,
+                cached_previous_batch = cached_batch_on_miss
+                ))  
+        except grpc.RpcError as e:
+            print(f"Failed to send job update info to SUPER: {e.details()}")

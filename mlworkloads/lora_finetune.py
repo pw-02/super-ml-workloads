@@ -342,21 +342,23 @@ def fit(
     while step_count < max_steps and train_iterator.epoch < train.epochs:
         iter_num += 1
         iter_t0 = time.perf_counter()
-        batch, data_loading_time, transformation_time,is_cache_hit,cached_on_miss = next(train_iterator)
-        input_ids, targets = batch
-        wait_for_data_time = time.perf_counter() - iter_t0
         
-
         if isinstance(train_dataloader.dataset, CustomStreamingDataset):
-                data_load_time = float(data_loading_time.sum())
-                transformation_time = float(transformation_time.sum())
-                cache_hit_samples = int(is_cache_hit.sum())
-                cache_hit_bacth = 1 if cache_hit_samples == len(is_cache_hit) else 0
+            batch, data_loading_time, transformation_time,is_cache_hit = next(train_iterator)
+            input_ids, targets = batch
+            wait_for_data_time = time.perf_counter() - iter_t0
+
         if isinstance(train_dataloader.dataset, SUPERTextDataset):
-                data_load_time = float(data_loading_time.sum())
-                transformation_time = float(transformation_time.sum())
-                cache_hit_samples = int(is_cache_hit.sum())
-                cache_hit_bacth = 1 if cache_hit_samples == len(is_cache_hit) else 0
+            batch, data_loading_time, transformation_time,is_cache_hit, cached_batch_on_miss = next(train_iterator)
+            input_ids, targets, chunk_ids = batch
+            wait_for_data_time = time.perf_counter() - iter_t0
+            cached_batch_on_miss = cached_batch_on_miss[0].item()
+
+        data_load_time = float(data_loading_time.sum())
+        transformation_time = float(transformation_time.sum())
+        cache_hit_samples = int(is_cache_hit.sum())
+        cache_hit_bacth = 1 if cache_hit_samples == len(is_cache_hit) else 0
+        
         gpu_processing_started = time.perf_counter()
 
         is_accumulating = iter_num % train.gradient_accumulation_iters(devices) != 0
@@ -388,6 +390,7 @@ def fit(
              
             # throughput.compute_and_log(step=iter_num)
             metrics= OrderedDict({
+                            "Chunk_id": chunk_ids[0] if isinstance(train_dataloader.dataset, SUPERTextDataset) else None,
                             "Elapsed Time (s)": time.perf_counter() - train_start_time,
                             "Num Torch Workers": train_dataloader.num_workers,
                             "Device": fabric.global_rank,
@@ -428,6 +431,15 @@ def fit(
             # metrics = {"val_loss": val_loss, "val_ppl": math.exp(val_loss)}
             # fabric.log_dict(metrics, step=iter_num)
             fabric.barrier()
+        
+        if isinstance(train_dataloader.dataset, SUPERTextDataset):
+            train_dataloader.dataset.send_job_update_to_super(
+                batch_id=chunk_ids[0],
+                wait_for_data_time=wait_for_data_time,
+                is_cache_hit= True if cache_hit_samples == len(is_cache_hit) else False,
+                gpu_time=gpu_processing_time,
+                cached_batch_on_miss=cached_batch_on_miss,
+            )
 
         # if train.save_interval is not None and not is_accumulating and step_count % train.save_interval == 0:
         #     checkpoint_file = out_dir / f"step-{step_count:06d}" / "lit_model.pth.lora"
