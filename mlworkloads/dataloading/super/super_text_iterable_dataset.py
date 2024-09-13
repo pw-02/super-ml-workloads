@@ -188,8 +188,8 @@ class SUPERTextDataset(IterableDataset):
         else:
             #split workload
             num_workers = worker_info.num_workers
-            per_worker = self.dataset_chunked_size // num_workers
-            remaining_work = self.dataset_chunked_size % num_workers
+            per_worker = len(self) // num_workers
+            remaining_work = len(self) % num_workers
             workloads = [per_worker + 1 if i < remaining_work else per_worker for i in range(num_workers)]
             return self.__iter_non_distributed__(workloads[worker_info.id])
 
