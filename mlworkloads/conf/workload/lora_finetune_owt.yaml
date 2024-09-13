@@ -1,6 +1,6 @@
 #dataloading configuration
 name: lora_finetune_owt
-s3_bucket: imagenet1k-sdl
+s3_bucket: owt-5mb-text-chunks
 s3_train_prefix: s3://owt-5mb-text-chunks/train
 s3_val_prefix: s3://owt-5mb-text-chunks/val
 num_pytorch_workers: 0
