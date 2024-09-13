@@ -70,7 +70,7 @@ class ShadeDataset(Dataset):
 
     def set_num_local_samples(self):
         if self.key_id_map is None:
-            self.key_id_map = redis.StrictRedis(host=self.cache_host, port=self.cache_port, db=0)
+            self.key_id_map = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
         self.key_counter = self.key_id_map.dbsize()
 
     def set_PQ(self, curr_PQ):

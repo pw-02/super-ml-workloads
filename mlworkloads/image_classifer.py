@@ -313,6 +313,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                 train_dataloader.sampler.pass_batch_important_scores(item_loss.cpu())
                 sorted_img_indices = train_dataloader.sampler.get_sorted_index_list()
                 if isinstance(train_dataloader.dataset, ShadeDataset):
+                    key_id_map = redis.StrictRedis(host=train_dataloader.dataset.cache_host, port=train_dataloader.dataset.cache_port)
                     global ghost_cache
                     global PQ
                     track_batch_indx = 0
@@ -320,7 +321,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                         PQ = train_dataloader.dataset.get_PQ()
                         ghost_cache = train_dataloader.dataset.get_ghost_cache()
                     for indx in sorted_img_indices:
-                        if train_dataloader.dataset.key_id_map.exists(indx.item()):
+                        if key_id_map.exists(indx.item()):
                             if indx.item() in PQ:
                                 PQ[indx.item()] = (batch_wts[track_batch_indx],PQ[indx.item()][1]+1)
                                 ghost_cache[indx.item()] = (batch_wts[track_batch_indx],ghost_cache[indx.item()][1]+1)
