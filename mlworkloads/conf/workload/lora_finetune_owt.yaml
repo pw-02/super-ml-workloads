@@ -48,12 +48,12 @@ lora_mlp: False
 lora_head: False
 
 
-#model configuration
-model_architecture: pythia-14m
-learning_rate: 4e-4
-weight_decay: 1e-1
-beta1: 0.9
-beta2: 0.95
-max_norm: 1.0
-min_lr: 4e-5
-max_seq_length: 512
+# #model configuration
+# model_architecture: pythia-14m
+# learning_rate: 4e-4
+# weight_decay: 1e-1
+# beta1: 0.9
+# beta2: 0.95
+# max_norm: 1.0
+# min_lr: 4e-5
+# max_seq_length: 512
