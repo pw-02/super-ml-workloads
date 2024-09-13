@@ -19,7 +19,7 @@ from pathlib import Path
 import warnings
 from typing import Dict, List, Literal, Optional, Tuple, Union
 from litgpt.data import DataModule
-from torch.utils.data import DataLoader, ConcatDataset
+from torch.utils.data import DataLoader
 from lightning.fabric.utilities import ThroughputMonitor
 from torchmetrics import RunningMean
 from litgpt.generate.base import generate
@@ -33,7 +33,9 @@ from dataclasses import dataclass
 from typing import Optional
 import warnings
 from dataloading.litdata.custom_streming_dataset import CustomStreamingDataset
+from dataloading.super.super_text_iterable_dataset import SUPERTextDataset
 warnings.filterwarnings("ignore", category=UserWarning)
+import uuid
 
 from litgpt.utils import (
     auto_download_checkpoint,
@@ -343,15 +345,22 @@ def fit(
         batch, data_loading_time, transformation_time,is_cache_hit,cached_on_miss = next(train_iterator)
         input_ids, targets = batch
         wait_for_data_time = time.perf_counter() - iter_t0
+        
+
         if isinstance(train_dataloader.dataset, CustomStreamingDataset):
                 data_load_time = float(data_loading_time.sum())
                 transformation_time = float(transformation_time.sum())
                 cache_hit_samples = int(is_cache_hit.sum())
                 cache_hit_bacth = 1 if cache_hit_samples == len(is_cache_hit) else 0
-      
+        if isinstance(train_dataloader.dataset, SUPERTextDataset):
+                data_load_time = float(data_loading_time.sum())
+                transformation_time = float(transformation_time.sum())
+                cache_hit_samples = int(is_cache_hit.sum())
+                cache_hit_bacth = 1 if cache_hit_samples == len(is_cache_hit) else 0
+        gpu_processing_started = time.perf_counter()
+
         is_accumulating = iter_num % train.gradient_accumulation_iters(devices) != 0
 
-        gpu_processing_started = time.perf_counter()
         with fabric.no_backward_sync(model, enabled=is_accumulating):
             logits = model(input_ids, lm_head_chunk_size=128)
             # shift the targets such that output n predicts token n+1
@@ -373,10 +382,10 @@ def fit(
         total_lengths += input_ids.numel()
         if iter_num % train.log_interval == 0:
             t1 = time.perf_counter()
-            throughput.update(
-                time=t1 - total_t0, batches=iter_num, samples=iter_num * train.micro_batch_size, lengths=total_lengths
-            )
-            
+        #    throughput.update(
+        #         time=t1 - total_t0, batches=iter_num, samples=iter_num * train.micro_batch_size, lengths=total_lengths
+        #     )
+             
             # throughput.compute_and_log(step=iter_num)
             metrics= OrderedDict({
                             "Elapsed Time (s)": time.perf_counter() - train_start_time,
@@ -502,7 +511,7 @@ def get_dataloaders(
     train_dataloader = None
     val_dataloader = None
 
-    if config.dataloader.name == 'litgpt' or 'pytorch':
+    if config.dataloader.name == 'litgpt' or config.dataloader.name == 'pytorch':
         from litdata.streaming import StreamingDataLoader, TokensLoader
         from dataloading.litdata.custom_streming_dataset import CustomStreamingDataset
         if train.run_training:
@@ -541,49 +550,39 @@ def get_dataloaders(
                 drop_last=True
             )
             val_dataloader = fabric.setup_dataloaders(val_dataloader, move_to_device=True)
+    elif config.dataloader.name == 'super':
+        if train.run_training:
+            train_dataset = SUPERTextDataset(
+                job_id=config.job_id,
+                s3_data_dir=config.workload.s3_train_prefix,
+                tokenizer=tokenizer,
+                transform=None,
+                block_size=train.max_seq_length,
+                grpc_server_address=config.dataloader.grpc_server_address,
+                world_size=fabric.world_size,
+                cache_address=config.dataloader.cache_address,
+               shuffle=config.dataloader.shuffle
+            )
+            train_dataloader = DataLoader(train_dataset, 
+                                          batch_size=train.batch_size(devices=config.workload.devices), 
+                                          num_workers=config.workload.num_pytorch_workers)
+            train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
 
+        if val.run_validation:
+            val_dataset = SUPERTextDataset(
+                job_id=config.job_id,
+                s3_data_dir=config.workload.s3_val_prefix,
+                tokenizer=tokenizer,
+                transform=None,
+                block_size=train.max_seq_length,
+                grpc_server_address=config.dataloader.grpc_server_address,
+                world_size=fabric.world_size,
+                cache_address=config.dataloader.cache_address,
+                shuffle=config.dataloader.shuffle
+            )
+            val_dataloader = DataLoader(val_dataset, batch_size=None, shuffle=False, num_workers=config.workload.num_pytorch_workers)
+            val_dataloader = fabric.setup_dataloaders(val_dataloader, move_to_device=True)
 
-    # if dataloader_name == 'super':
-    #     if run_training:
-    #         train_dataset = SUPERMappedDataset(s3_data_dir=config.workload.s3_train_prefix, 
-    #                                             transform=train_transform,
-    #                                             cache_address=config.dataloader.cache_address)
-
-    #         train_sampler = SUPERSampler(
-    #                 dataset=train_dataset,
-    #                 grpc_server_address=config.dataloader.grpc_server_address,
-    #                 batch_size=config.workload.batch_size
-    #                 )
-    #         train_dataloader = DataLoader(train_dataset, batch_size=None, sampler=train_sampler, num_workers=config.workload.num_pytorch_workers)
-    #         train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
-        
-    #     if run_validation:
-    #         val_dataset = SUPERMappedDataset(s3_data_dir=config.workload.s3_val_prefix, 
-    #                                          transform=val_transform,
-    #                                          cache_address=config.dataloader.cache_address)
-    #         val_sampler = SUPERSampler(
-    #             dataset=val_dataset,
-    #             grpc_server_address=config.dataloader.grpc_server_address,
-    #             batch_size=config.workload.batch_size
-    #             )
-    #         val_dataloader =  DataLoader(val_dataset, batch_size=None, sampler=val_sampler, num_workers=config.workload.num_pytorch_workers)
-    #         val_dataloader = fabric.setup_dataloaders(val_dataloader,move_to_device=True)
-    
-    # elif dataloader_name == 'litgpt':
-    #     litdata_data.connect(tokenizer=tokenizer, batch_size=train.micro_batch_size, max_seq_length=train.max_seq_length)
-    #     with fabric.rank_zero_first():
-    #         litdata_data.prepare_data()
-    #         litdata_data.connect(tokenizer=tokenizer, batch_size=train.micro_batch_size, max_seq_length=train.max_seq_length)
-    #         with fabric.rank_zero_first():
-    #             litdata_data.prepare_data()
-    #         litdata_data.setup()
-
-    #         if run_training:
-    #             train_dataloader = litdata_data.train_dataloader()
-    #             train_dataloader = fabric.setup_dataloaders(train_dataloader)
-    #         if run_validation:
-    #             val_dataloader = litdata_data.val_dataloader()
-    #             val_dataloader = fabric.setup_dataloaders(val_dataloader)
     
     return train_dataloader, val_dataloader
 

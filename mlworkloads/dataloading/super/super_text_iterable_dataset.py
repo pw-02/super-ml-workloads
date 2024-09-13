@@ -20,6 +20,7 @@ import time
 import boto3
 import json
 import lz4.frame
+import numpy as np
 
 class S3Url(object):
     def __init__(self, url):
@@ -62,22 +63,19 @@ class SUPERTextDataset(IterableDataset):
                 tokenizer: PreTrainedTokenizer, 
                 transform, 
                 block_size: int, 
-                batch_size: int, 
                 grpc_server_address:str,
                 world_size:int,
                 cache_address:str = None,
-                simulate_delay = None):
+                shuffle:bool = False):
         super().__init__()
         self.job_id = str(job_id)
         self.grpc_server_address = grpc_server_address
-        self.batch_size = batch_size
         self.total_batches = None
         self.s3_bucket = S3Url(s3_data_dir).bucket
         self.s3_prefix = S3Url(s3_data_dir).key
         self.s3_data_dir = s3_data_dir
         self.transform = transform
         self.samples: Dict[str, List[str]] = self._get_sample_list_from_s3(False, False)
-        
         if cache_address is not None:
             self.cache_host, self.cache_port = cache_address.split(":")
             self.cache_port = int(self.cache_port)
@@ -90,7 +88,6 @@ class SUPERTextDataset(IterableDataset):
         self.stub = self._create_grpc_stub()
         self._register_dataset_with_super()
 
-        self.simulate_delay = simulate_delay
         self.index = 0
         self.cache_host, self.cache_port = None,None
         if cache_address:
@@ -195,76 +192,57 @@ class SUPERTextDataset(IterableDataset):
             workloads = [per_worker + 1 if i < remaining_work else per_worker for i in range(num_workers)]
             return self.__iter_non_distributed__(workloads[worker_info.id])
 
-
     def __iter_non_distributed__(self, num_files):
         current_file_idx = 0
-        current_tokens = None
-        current_position = 0
+        tokenized_samples = [] 
         while current_file_idx < num_files:
-            fetch_start_time = time.perf_counter()
-            if current_tokens is None:
-                current_tokens, data_loading_time, transformation_time, cache_hit, cached_after_fetch = self._load_next_file_tokens()
+            start = time.perf_counter()
+
+            if not tokenized_samples or len(tokenized_samples) == 0:
+                tokenized_samples, data_loading_time, transformation_time, cache_hit, cached_after_fetch = self._load_next_chunk_samples()
                 current_file_idx +=1
-                current_position = 0
-            required_size = (self.block_size +1) * self.batch_size
-            remaining_tokens = current_tokens[current_position:]
-
-            while len(remaining_tokens) < required_size:
-                next_tokens, data_loading_time, transformation_time, cache_hit, cached_after_fetch = self._load_next_file_tokens()
-                current_file_idx +=1
-                current_position = 0
-                remaining_tokens = torch.cat((remaining_tokens, next_tokens), dim=0)
-        
-            batch_tokens = remaining_tokens[:required_size]
-            current_position += required_size
-            current_tokens = remaining_tokens[required_size:]
-
-            data = batch_tokens[:(self.block_size +1) * self.batch_size].reshape(self.batch_size, (self.block_size+1))
-            input_ids = data[:, 0 : self.block_size].contiguous().long()
-            targets = data[:, 1 : (self.block_size + 1)].contiguous().long()
-            
-            yield input_ids, targets, data_loading_time, transformation_time, cache_hit, cached_after_fetch
-
-
+                input_ids, targets = tokenized_samples.pop(0)
+                yield (input_ids, targets), data_loading_time, transformation_time, cache_hit, cached_after_fetch
+            else:
+                input_ids, targets = tokenized_samples.pop(0), time.perf_counter() - start, 0, cache_hit, cached_after_fetch
+           
         current_file_idx = 0
     
-    def _load_next_file_tokens(self):
+    def _load_next_chunk_samples(self):
         response = self.stub.GetNextBatchForJob(minibatch_service_pb2.GetNextBatchForJobRequest(
                         job_id=self.job_id,
                         data_dir=self.s3_data_dir))          
+        
         cache_key = response.batch.batch_id
-        file_idx = list(response.batch.indicies)[0]
+        chunk_idx = list(response.batch.indicies)[0]
         is_cached = response.batch.is_cached
-        file_content = None
-
+        tokenized_samples = None
+        cached_after_fetch = False
         # Start data loading timer
         start_loading_time = time.perf_counter()
         if is_cached and self.cache_client is not None:
-            file_content = self._load_batch_from_cache(cache_key)
+            tokenized_samples = self._load_batch_from_cache(cache_key)
+
         # If data is fetched from cache and it's in the correct format
-        if file_content  is not None and (isinstance(file_content , bytes) or isinstance(file_content , str)):
+        if tokenized_samples  is not None and (isinstance(tokenized_samples , bytes) or isinstance(tokenized_samples , str)):
             start_transformation_time   = time.perf_counter()
-            tokens = self._bytes_to_torch_batch(file_content)
+            tokenized_samples = self._bytes_to_torch_batch(tokenized_samples)
             transformation_time  =  time.perf_counter() - start_transformation_time 
             cache_hit = True
         else:
             # Fetch data from S3
-            file_content = self._load_batch_from_s3(file_idx)
+            data_chunk = self._load_chunk_from_s3(chunk_idx)
 
-            # Apply transformations if provided
             start_transformation_time = time.perf_counter()
-            if self.transform is not None:
-                tokens = self.transform(file_content)
+            tokenized_chunk = self.tokenize_data_chunk(io.BytesIO(data_chunk))
+            tokenized_samples = self._gen_samples(tokenized_chunk)
             transformation_time =  time.perf_counter() - start_transformation_time
             cache_hit = False
-
-            # Convert to tensors
-            tokens = torch.stack(tokens)
              # Cache the data if enabled
             if self.use_cache:
                 try:
                     self._initialize_cache_client()
-                    tokens_as_bytes = self._torch_batch_to_bytes(tokens)
+                    tokens_as_bytes = self._torch_tenors_to_bytes(tokenized_samples)
                     self.cache_client.set(cache_key, tokens_as_bytes)
                     cached_after_fetch = True
                 except Exception as e:
@@ -272,15 +250,20 @@ class SUPERTextDataset(IterableDataset):
 
         # Calculate data loading time excluding transformation time
         data_loading_time  = time.perf_counter() - start_loading_time - transformation_time
-        return tokens, data_loading_time, transformation_time, cache_hit, cached_after_fetch
+        return tokenized_samples, data_loading_time, transformation_time, cache_hit, cached_after_fetch
+    
+    
+    def _initialize_cache_client(self):
+        """Initialize Redis cache client if not already connected."""
+        if self.cache_client is None:
+            self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
 
 
-    def _torch_batch_to_bytes(self, samples: torch.Tensor) -> str:
+    def _torch_tenors_to_bytes(self, tokenized_data: torch.Tensor) -> str:
         with io.BytesIO() as buffer:
-            torch.save(samples, buffer)
-            bytes_minibatch = buffer.getvalue()
-            bytes_minibatch = lz4.frame.compress(bytes_minibatch)
-        return bytes_minibatch
+            torch.save(tokenized_data, buffer)
+            compressed_byte_data = lz4.frame.compress(buffer.getvalue())
+        return compressed_byte_data
     
     def _bytes_to_torch_batch(self, bytes_minibatch) -> tuple:
         compressed_batch = lz4.frame.decompress(bytes_minibatch)
@@ -296,43 +279,68 @@ class SUPERTextDataset(IterableDataset):
             print(f"Error fetching from cache: {e}")
             return None
         
-    def _load_batch_from_s3(self, idx) -> Tuple[List[torch.Tensor], List[int]]:
+    def tokenize_data_chunk(self, data_chunk:io.BytesIO):
+        tokenized_docs = []
+        index = 0
+        while True:
+            offset = (1 + (index - 0) if index >= 0 else index + 1) * 4
+            # Read the entire content of the binary file
+            data_chunk.seek(offset)
+            pair = data_chunk.read(8)
+            begin, end = np.frombuffer(pair, np.uint32)
+            if begin.item() == len(data_chunk.getvalue()):
+                break
+            data_chunk.seek(begin)
+            raw_item_data = data_chunk.read(end - begin)
+
+            shift_idx = 4
+            sizes = np.frombuffer(raw_item_data[:shift_idx], np.uint32)
+            data = ""
+            for size, data_format in zip(sizes, 'str'):
+                # size = size.item()
+                data_bytes = raw_item_data[shift_idx : shift_idx + size]
+                data += data_bytes.decode('utf-8')
+                shift_idx += size
+            index += 1
+            tokenized_docs.append(self.tokenizer.encode(data, eos=True))
+        return tokenized_docs
+    
+
+    def _gen_samples(self, tokenized_data):
+        # Create a list to hold samples of size self.context_size
+        samples = []
+        for item in tokenized_data:
+            chunk_size = self.block_size + 1  # Define the chunk size
+            # Split ids into chunks of size block_size+1
+            for i in range(0, item.size(0), chunk_size):
+                # Extract a chunk from the ids
+                chunk = item[i:i + chunk_size]
+                # Pad the last chunk if it is smaller than block_size+1
+                if chunk.size(0) < chunk_size:
+                    padding_length = chunk_size - chunk.size(0)
+                    padding = torch.full((padding_length,), fill_value=0, dtype=torch.long)
+                    chunk = torch.cat((chunk, padding))
+
+                input_ids = chunk[0:self.block_size].contiguous().long()
+                targets = chunk[1:self.block_size + 1].contiguous().long()
+                samples.append((input_ids, targets))
+
+        return samples
+    
+
+    def _load_chunk_from_s3(self, idx) -> Tuple[List[torch.Tensor], List[int]]:
         s3_client = boto3.client('s3')
         data_path, _ = self._classed_items[idx]
-        obj = s3_client.get_object(Bucket=self.s3_bucket, Key=data_path)
-        content = obj['Body'].read().decode('utf-8')
+        response = s3_client.get_object(Bucket=self.s3_bucket, Key=data_path)
+        content = response['Body'].read()
         return content
-   
     
-# Example Usage
-if __name__ == "__main__":
-    from transformers import GPT2Tokenizer
-    from torch.utils.data import DataLoader
-
-    data_dir = 's3://owtchunks/train/'  # Adjust the path to your .txt files
-    tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-    block_size = 512
-    batch_size = 4
-
-    dataset = SUPERTextDataset(
-        job_id=1,
-        s3_data_dir=data_dir,
-        tokenizer=tokenizer,
-        transform=None,
-        block_size=block_size,
-        batch_size=batch_size,
-        grpc_server_address="localhost:50051",
-        world_size=1,
-        cache_address=None,
-        simulate_delay=None)
-        
-    dataloader = DataLoader(dataset, batch_size=None, shuffle=False, num_workers=0)
-
-    for input_ids, targets, fetch, transform in dataloader:
-        print(f"Input IDs: {input_ids.shape}")
-        print(f"targets: {targets.shape}")
-
-        print(f"fetch: {fetch}")
-        print(f"transform: {transform}")
-
-        # break
+    def _truncate_or_pad_sequence(self, sequence, max_length):
+        # Truncate sequence if longer than max_length
+        if sequence.size(1) > max_length:
+            return sequence[:, :max_length]
+        # Pad sequence if shorter than max_length
+        elif sequence.size(1) < max_length:
+            pad_length = max_length - sequence.size(1)
+            return torch.cat([sequence, torch.zeros(sequence.size(0), pad_length, dtype=sequence.dtype)], dim=1)
+        return sequence
