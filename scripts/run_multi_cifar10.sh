@@ -1,14 +1,13 @@
 #!/bin/bash
 set -e
 
-workload="cifar10_resnet18" # Define your workload 
-#imagenet_resnet50, cifar10_resnet18, lora_finetine_owt
+workload="cifar10_resnet18" # Define your workload imagenet_resnet50, cifar10_resnet18, laora_finetine_owt
 dataloder="super" # Define your dataloader
 
 # Define an array of GPU indices
-gpu_indices=(0)
+gpu_indices=(0 1 2 3)
 # Define an array of learning rates
-learning_rates=(0.001 0.01 0.1 1.0)
+learning_rates=(0.001 0.01 0.1 0.0006)
 
 current_datetime=$(date +"%Y-%m-%d_%H-%M-%S") # Get the current date and time
 
@@ -37,8 +36,7 @@ for i in "${gpu_indices[@]}"; do
     gpu_index=${gpu_indices[$i]}
     lr=${learning_rates[$i]}
     echo "Starting job on GPU $gpu_index with learning rate $lr and exp_id $expid"
-    # CUDA_VISIBLE_DEVICES="$gpu_index" python mlworkloads/run.py workload="$workload" workload.learning_rate="$lr" exp_id="$expid" job_id="$gpu_index" dataloader="$dataloder" &
-     python mlworkloads/run.py workload="$workload" workload.learning_rate="$lr" exp_id="$expid" job_id="$gpu_index" dataloader="$dataloder" &
+    CUDA_VISIBLE_DEVICES="$gpu_index" python mlworkloads/run.py workload="$workload" workload.learning_rate="$lr" exp_id="$expid" job_id="$gpu_index" dataloader="$dataloder" &
     job_pids+=($!)  # Save the PID of the background job
     sleep 2  # Adjust as necessary
 done
