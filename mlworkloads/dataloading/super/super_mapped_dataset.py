@@ -34,15 +34,15 @@ class S3Url(object):
 
 
 class SUPERMappedDataset(Dataset):
-    def __init__(self, s3_data_dir: str, transform=None, cache_address= None):
+    def __init__(self, s3_data_dir: str, transform=None, cache_address= None, simulate_mode=False, simulate_time_for_cache_miss=0.25, simulate_time_for_cache_hit=0.045):
         self.s3_bucket = S3Url(s3_data_dir).bucket
         self.s3_prefix = S3Url(s3_data_dir).key
         self.s3_data_dir = s3_data_dir
         self.transform = transform
         self.samples = self._get_sample_list_from_s3()
-        # self.simulate_mode = simulate_mode
-        # self._simlute_time_for_cache_miss = simulate_time_for_cache_miss
-        # self._simlute_time_for_cache_hit = simulate_time_for_cache_hit
+        self.simulate_mode = simulate_mode
+        self._simlute_time_for_cache_miss = simulate_time_for_cache_miss
+        self._simlute_time_for_cache_hit = simulate_time_for_cache_hit
 
         if cache_address is not None:
             self.cache_host, self.cache_port = cache_address.split(":")
@@ -118,6 +118,14 @@ class SUPERMappedDataset(Dataset):
 
         # Start data loading timer
         start_loading_time = time.perf_counter()
+
+        if self.simulate_mode:
+            if is_cached:
+                time.sleep(self._simlute_time_for_cache_hit)
+            else:
+                cached_after_fetch = True
+                time.sleep(self._simlute_time_for_cache_miss)
+            return batch_id, time.perf_counter() - start_loading_time, 0, is_cached, cached_after_fetch
 
         # Check cache if caching is enabled
         if is_cached and self.use_cache:

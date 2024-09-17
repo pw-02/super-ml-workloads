@@ -1,16 +1,22 @@
 #!/bin/bash
 set -e
 
-workload="lora_finetune_tiny_llama" # Define your workload 
-#imagenet_resnet50, cifar10_resnet18, lora_finetine_owt
-dataloder="litgpt" # Define your dataloader
+# Check if required arguments are provided
+if [ "$#" -ne 2 ]; then
+    echo "Usage: $0 <workload> <dataloader>"
+    echo "Example: $0 imagenet_resnet50 shade"
+    exit 1
+fi
+
+workload="$1"  # imagenet_resnet50, cifar10_resnet18, laora_finetine_owt
+dataloader="$2"  # shade, coordl, litdata
 
 # Define an array of GPU indices
-gpu_indices=(0)
+gpu_indices=(0 1 2 3)
 # Define an array of learning rates
 learning_rates=(0.001 0.01 0.1 1.0)
 
-current_datetime=$(date +"%Y-%m-%d_%H-%M-%S") # Get the current date and time
+current_datetime=$(date +"%Y-%m-%d_%H-%M-%S")  # Get the current date and time
 
 # Define experiment ID
 expid="multi_job_$current_datetime"
@@ -37,8 +43,7 @@ for i in "${gpu_indices[@]}"; do
     gpu_index=${gpu_indices[$i]}
     lr=${learning_rates[$i]}
     echo "Starting job on GPU $gpu_index with learning rate $lr and exp_id $expid"
-    # CUDA_VISIBLE_DEVICES="$gpu_index" python mlworkloads/run.py workload="$workload" workload.learning_rate="$lr" exp_id="$expid" job_id="$gpu_index" dataloader="$dataloder" &
-     python mlworkloads/run.py workload="$workload" workload.learning_rate="$lr" exp_id="$expid" job_id="$gpu_index" dataloader="$dataloder" &
+    CUDA_VISIBLE_DEVICES="$gpu_index" python mlworkloads/run.py workload="$workload" workload.learning_rate="$lr" exp_id="$expid" job_id="$gpu_index" dataloader="$dataloder" &
     job_pids+=($!)  # Save the PID of the background job
     sleep 2  # Adjust as necessary
 done

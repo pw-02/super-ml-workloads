@@ -13,7 +13,12 @@ if __name__ == "__main__":
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
 
-    dataset = SUPERMappedDataset(s3_data_dir="s3://sdl-cifar10/test/", transform=transform, cache_address=None)
+    dataset = SUPERMappedDataset(s3_data_dir="s3://sdl-cifar10/test/", 
+                                 transform=transform, 
+                                 cache_address=None,
+                                 simulate_mode=True,
+                                 simulate_time_for_cache_miss=0.2,
+                                 simulate_time_for_cache_hit=0.02)
     sampler = SUPERSampler(dataset, "localhost:50051")
     dataloader:DataLoader = DataLoader(dataset, sampler=sampler, num_workers=0, batch_size=None)  # batch_size=None since sampler provides batches
     cache_hits = 0
