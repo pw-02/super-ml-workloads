@@ -2,7 +2,7 @@ import redis
 
 
 
-cache_client =redis.StrictRedis = redis.StrictRedis(host="p-rdior4.serverless.usw2.cache.amazonaws.com:",
+cache_client =redis.StrictRedis = redis.StrictRedis(host="p-rdior4.serverless.usw2.cache.amazonaws.com",
                                                      port=6379,
                                                      ssl=True
                                                 )
