@@ -113,7 +113,7 @@ def save_dict_list_to_csv(dict_list, output_file):
             writer.writerow(data)
 
 if __name__ == "__main__":
-    folder_path = "C:\\Users\\pw\\Desktop\\experiment_results\\logs\\\\imagenet_resnet50"
+    folder_path = "C:\\Users\\pw\\Desktop\\\super_project_results\\cifar10_resnet18"
     subfolders = glob.glob(os.path.join(folder_path, '*'))
     
     overall_summary = []
