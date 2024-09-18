@@ -4,6 +4,7 @@ import time
 import argparse
 from datetime import datetime
 from datetime import datetime, timezone
+import concurrent.futures
 
 def export_logs_to_s3(log_group_name, s3_bucket_name, s3_prefix, start_time_str, end_time = None):
 
@@ -39,7 +40,7 @@ def export_logs_to_s3(log_group_name, s3_bucket_name, s3_prefix, start_time_str,
         if status in ['COMPLETED', 'FAILED']:
             break  
         # Wait for a while before checking the status again
-        time.sleep(5)
+        time.sleep(10)
     print(f"Export task created: {response['taskId']} for log group {log_group_name}")
 
 def download_logs_from_s3(s3_bucket_name, s3_prefix, download_path):
@@ -71,17 +72,48 @@ def get_cloud_watch_logs_for_experiment(download_dir, s3_bucket_name, start_time
     logs_client = boto3.client('logs')
     os.makedirs(download_dir, exist_ok=True)
     log_groups = logs_client.describe_log_groups(logGroupNamePrefix='/')['logGroups']
-    for log_group in log_groups:
-        log_group_name = log_group['logGroupName']
-        # Export logs to S3
-        s3_prefix = f'cloudwatchlogs/{log_group_name.replace("/", "_")}'
-        export_logs_to_s3(log_group_name, s3_bucket_name, s3_prefix, start_time_str, end_time_str)
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        # Export logs in parallel
+        futures = []
+        # for log_group in log_groups:
+        #     log_group_name = log_group['logGroupName']
+        #     s3_prefix = f'cloudwatchlogs/{log_group_name.replace("/", "_")}'
+        #     futures.append(executor.submit(export_logs_to_s3, log_group_name, s3_bucket_name, s3_prefix, start_time_str, end_time_str))
+        
+        # # Wait for all export tasks to complete
+        # for future in concurrent.futures.as_completed(futures):
+        #     try:
+        #         future.result()  # re-raise any exceptions that occurred during export
+        #     except Exception as e:
+        #         print(f'Exception during log export: {e}')
 
-        # Download logs from S3
-        download_logs_from_s3(s3_bucket_name, s3_prefix, download_dir)
+        # Download logs from S3 in parallel
+        for log_group in log_groups:
+            log_group_name = log_group['logGroupName']
+            s3_prefix = f'cloudwatchlogs/{log_group_name.replace("/", "_")}'
+            executor.submit(download_logs_from_s3, s3_bucket_name, s3_prefix, download_dir)
+            
+        # Wait for all download tasks to complete
+        # (You may need to use additional synchronization here depending on your needs)
 
-        # Optionally delete logs from CloudWatch
-        # delete_log_group(log_group_name)
+
+
+# def get_cloud_watch_logs_for_experiment(download_dir, s3_bucket_name, start_time_str, end_time_str=None):
+#     logs_client = boto3.client('logs')
+#     os.makedirs(download_dir, exist_ok=True)
+#     log_groups = logs_client.describe_log_groups(logGroupNamePrefix='/')['logGroups']
+#     for log_group in log_groups:
+#         log_group_name = log_group['logGroupName']
+#         # Export logs to S3
+#         s3_prefix = f'cloudwatchlogs/{log_group_name.replace("/", "_")}'
+#         export_logs_to_s3(log_group_name, s3_bucket_name, s3_prefix, start_time_str, end_time_str)
+
+#         # Download logs from S3
+    
+#     download_logs_from_s3(s3_bucket_name, s3_prefix, download_dir)
+
+
 
 def convert_to_milliseconds(date_str):
     # Parse the input string as a naive datetime object
@@ -97,8 +129,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Export CloudWatch logs to S3 and download them.")
     parser.add_argument("--download_dir", help="Directory to download the logs to", default="logs")
     parser.add_argument("--s3_bucket_name", help="S3 bucket name for exporting logs", default="supercloudwtachexports")
-    parser.add_argument("--start_time", help="", default='2024-09-03_22-59-33')
-    parser.add_argument("--end_time", help="",  default='2024-09-03_23-00-02')
+    parser.add_argument("--start_time", help="", default='2024-09-16_20-03-03')
+    parser.add_argument("--end_time", help="",  default='2024-09-17_20-03-03')
 
     args = parser.parse_args()
     get_cloud_watch_logs_for_experiment(args.download_dir, args.s3_bucket_name, args.start_time, args.end_time)

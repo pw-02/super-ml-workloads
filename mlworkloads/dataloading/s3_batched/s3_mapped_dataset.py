@@ -32,12 +32,18 @@ class S3Url(object):
 
 
 class S3MappedDataset(Dataset):
-    def __init__(self, s3_data_dir: str, transform=None):
+    def __init__(self, s3_data_dir: str, transform=None,  cache_address= None):
 
         self.s3_bucket = S3Url(s3_data_dir).bucket
         self.s3_prefix = S3Url(s3_data_dir).key
         self.s3_data_dir = s3_data_dir
         self.transform = transform
+        if cache_address is not None:
+            self.cache_host, self.cache_port = cache_address.split(":")
+            self.cache_port = int(self.cache_port)
+            self.use_cache = True
+        else:
+            self.use_cache = False
         
         # Initialize S3 client
 

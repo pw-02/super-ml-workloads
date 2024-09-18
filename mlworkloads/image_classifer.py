@@ -10,13 +10,11 @@ from omegaconf import DictConfig
 from lightning.fabric import Fabric, seed_everything
 from lightning.fabric.loggers import CSVLogger
 from torchvision.models import get_model
-from dataloading.s3.s3_mapped_dataset import S3MappedDataset
+from dataloading.s3_redis.s3redis_dataset import S3RedisDataset
 from dataloading.super.super_sampler import SUPERSampler
 from dataloading.super.super_mapped_dataset import SUPERMappedDataset
-from dataloading.s3.batch_sampler import BatchSamplerWithID
-# from mlworkloads.datalaoding.s3.s3_mapped_dataset import S3MappedDataset
-# from mlworkloads.datalaoding.super.super_sampler import SUPERSampler
-# from mlworkloads.datalaoding.super.super_mapped_dataset import SUPERMappedDataset
+# from dataloading.s3.batch_sampler import BatchSamplerWithID
+# from mlworkloads.datalaoding.s3.s3_mapped_dataset import S3MappedDatasett
 # from mlworkloads.datalaoding.s3.batch_sampler import BatchSamplerWithID
 from torch.utils.data import RandomSampler, SequentialSampler
 import time
@@ -117,28 +115,22 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
     elif config.dataloader.name == 'pytorch':
         # PyTorch DataLoader
         if config.workload.run_training:
-            train_dataset = S3MappedDataset(s3_data_dir=config.workload.s3_train_prefix, transform=train_transform)
-
-            train_sampler = BatchSamplerWithID(
-                data_source=train_dataset,
-                batch_size=config.workload.batch_size,
-                drop_last=config.dataloader.drop_last,
-                shuffle=config.dataloader.shuffle,
-                seed=None #already set in seed_everything
-             )
+            train_dataset = S3RedisDataset(s3_data_dir=config.workload.s3_train_prefix, transform=train_transform, cache_address=config.dataloader.cache_address)
+            if config.dataloader.shuffle:
+                train_sampler = RandomSampler(data_source=train_dataset)
+            else:
+                train_sampler = SequentialSampler(data_source=train_dataset)
         
-            train_dataloader = DataLoader(train_dataset, batch_size=None, sampler=train_sampler, num_workers=config.workload.num_pytorch_workers)
+            train_dataloader = DataLoader(train_dataset, batch_size=config.workload.batch_size, sampler=train_sampler, num_workers=config.workload.num_pytorch_workers)
             train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
         
         if config.workload.run_validation:
-            val_dataset = S3MappedDataset(s3_prefix=config.workload.s3_val_prefix, transform=val_transform)
-            val_sampler = BatchSamplerWithID(
-                sampler= SequentialSampler(data_source=val_dataset),
-                batch_size=config.workload.batch_size, 
-                drop_last=config.dataloader.drop_last
-                )
-
-            val_dataloader =  DataLoader(val_dataset, batch_size=None, sampler=val_sampler, num_workers=config.workload.num_pytorch_workers)
+            val_dataset = S3RedisDataset(s3_prefix=config.workload.s3_val_prefix, transform=val_transform, cache_address=config.dataloader.cache_address)
+            if config.dataloader.shuffle:
+                val_sampler = RandomSampler(data_source=val_dataset)
+            else:
+                val_sampler = SequentialSampler(data_source=val_dataset)
+            val_dataloader =  DataLoader(val_dataset, batch_size=config.workload.batch_size, sampler=val_sampler, num_workers=config.workload.num_pytorch_workers)
             val_dataloader = fabric.setup_dataloaders(val_dataloader,move_to_device=True)
 
     # # # Start training
@@ -264,7 +256,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                 break
             
              # Unpack batch
-            if isinstance(train_dataloader.sampler, ShadeSampler):
+            if isinstance(train_dataloader.sampler, ShadeSampler) or isinstance(train_dataloader.dataset, S3RedisDataset):
                 inputs, labels = batch
             elif isinstance(train_dataloader.sampler, SUPERSampler):
                 inputs, labels, batch_id = batch
@@ -300,18 +292,20 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
             # Calculate average loss and accuracy across all batches
             avg_train_loss = total_train_loss / total_samples
             
-            if not isinstance(train_dataloader.sampler, ShadeSampler):
+            if isinstance(train_dataloader.sampler, SUPERSampler):
                 cache_hit_samples = batch[0].size(0) if is_cache_hit == True else 0
                 cache_hit_bacth = 1 if is_cache_hit == True else 0
 
-            if isinstance(train_dataloader.sampler, ShadeSampler):
+            if isinstance(train_dataloader.sampler, ShadeSampler) or isinstance(train_dataloader.dataset, S3RedisDataset):
                 data_load_time = float(data_load_time.sum())
                 transformation_time = float(transformation_time.sum())
                 cache_hit_samples = int(is_cache_hit.sum())
                 cache_hit_bacth = 1 if cache_hit_samples == len(is_cache_hit) else 0
 
-                train_dataloader.sampler.pass_batch_important_scores(item_loss.cpu())
-                sorted_img_indices = train_dataloader.sampler.get_sorted_index_list()
+                if isinstance(train_dataloader.sampler, ShadeSampler):
+                    train_dataloader.sampler.pass_batch_important_scores(item_loss.cpu())
+                    sorted_img_indices = train_dataloader.sampler.get_sorted_index_list()
+
                 if isinstance(train_dataloader.dataset, ShadeDataset):
                     key_id_map = redis.StrictRedis(host=train_dataloader.dataset.cache_host, port=train_dataloader.dataset.cache_port)
                     global ghost_cache

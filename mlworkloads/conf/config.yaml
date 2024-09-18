@@ -1,7 +1,7 @@
 
 defaults:
   - _self_
-  - dataloader: super #pytorch, super, shade, litgpt
+  - dataloader: pytorch #pytorch, super, shade, litgpt
   - workload: cifar10_resnet18  
   
   #lora_finetune_tiny_llama 

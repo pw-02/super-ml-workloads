@@ -1,5 +1,5 @@
 name: pytorch
-cache_address: null
+cache_address: 127.0.0.1:6379
 source_system: s3
 drop_last: False
-shuffle: False
+shuffle: True
