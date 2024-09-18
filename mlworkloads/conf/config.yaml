@@ -12,7 +12,7 @@ defaults:
   - override hydra/job_logging: disabled
   - override hydra/hydra_logging: disabled  
 
-seed: 42 # Seed for reproducibility
+seed: null # 42 # Seed for reproducibility
 accelerator: 'gpu' # 'cpu', 'gpu', 'tpu'
 devices: 1 # Number of devices to use for training (e.g. GPUs) per job
 log_interval: 1 # flush Log every N steps
