@@ -44,7 +44,9 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
 
     if config.seed is not None:
         seed_everything(config.seed) # instead of torch.manual_seed(...)
-    
+    else:
+        seed_everything(config.job_id) # instead of torch.manual_seed(...)
+
     model = get_model(name=config.workload.model_architecture, weights=None, num_classes=config.workload.num_classes)
     optimizer = optim.Adam(model.parameters(), lr=config.workload.learning_rate)
     model, optimizer = fabric.setup(model, optimizer)
