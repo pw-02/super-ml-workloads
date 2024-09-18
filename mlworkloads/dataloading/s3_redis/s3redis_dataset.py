@@ -106,7 +106,7 @@ class S3RedisDataset(Dataset):
     def _initialize_cache_client(self):
         """Initialize Redis cache client if not already connected."""
         if self.cache_client is None:
-            self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
+            self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port, tls=True)
     
     def _load_item_from_cache(self, key):
         try:
