@@ -283,11 +283,16 @@ class ShadeSampler(Sampler[T_co]):
     def prepare_hits(self,r):
         hit_list = []
         miss_list = []
-        for ind in self.indices:
-            if self.key_id_map.exists(ind):
-                hit_list.append(ind)
-            else:
-                miss_list.append(ind)
+
+        if self.epoch > 0:
+            for ind in self.indices:
+                if self.key_id_map.exists(ind):
+                    hit_list.append(ind)
+                else:
+                    miss_list.append(ind)
+        else:
+            miss_list = self.indices
+
         # print(f'hit_list_len: {len(hit_list)}')
         # print(f'miss_list_len: {len(miss_list)}')
 
