@@ -246,6 +246,9 @@ def main(fabric: Fabric,
 
     if config.seed is not None:
         seed_everything(config.seed) # instead of torch.manual_seed(...)
+    else:
+        seed_everything(config.job_id) # instead of torch.manual_seed(...)
+
 
     checkpoint_path = os.path.join(checkpoint_dir, "lit_model.pth")
     with fabric.init_module(empty_init=(fabric.world_size > 1)):
@@ -532,7 +535,7 @@ def get_dataloaders(
             input_dir=config.workload.s3_train_prefix,
             item_loader=None,
             shuffle=config.dataloader.shuffle,
-            max_cache_size="100GB",
+            max_cache_size="1GB",
             tokenizer=tokenizer,
             batch_size=train.micro_batch_size,
             seq_length=train.max_seq_length

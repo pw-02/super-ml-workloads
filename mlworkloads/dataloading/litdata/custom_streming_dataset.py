@@ -140,7 +140,7 @@ class CustomStreamingDataset(StreamingDataset):
         drop_last: Optional[bool] = None,
         seed: int = 42,
         serializers: Optional[Dict[str, Serializer]] = None,
-        max_cache_size: Union[int, str] = "5GB",
+        max_cache_size: Union[int, str] = "10GB",
         subsample: float = 1.0,
         encryption: Optional[Encryption] = None,
         storage_options: Optional[Dict] = {},
