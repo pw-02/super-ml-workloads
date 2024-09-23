@@ -57,7 +57,8 @@ class ShadeDataset(Dataset):
         self.ghost_cache = ghost_cache
         self.key_counter = 0
         self.key_id_map:redis.StrictRedis = None
-        self.s3_client = boto3.client('s3')
+        self.s3_client = None
+        # self.s3_client = boto3.client('s3')
     
     @functools.cached_property
     def _classed_items(self) -> List[Tuple[str, int]]:
@@ -87,7 +88,7 @@ class ShadeDataset(Dataset):
     
     def cache_and_evict(self, path, target, index):
         if self.key_id_map is None:
-            self.key_id_map = redis.StrictRedis(host=self.cache_host, port=self.cache_port, db=0)
+            self.key_id_map = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
         fetch_start_time = time.perf_counter()
         cache_hit = False
         cached_after_fetch = False
@@ -115,7 +116,7 @@ class ShadeDataset(Dataset):
                 # print('miss %d' % (index))
             # image = Image.open(path)
             image = self.fetch_image_from_s3(path)
-            keys_cnt = self.key_counter + 50
+            keys_cnt = self.key_id_map.dbsize() + 50
 
             if keys_cnt >= self.cache_portion:
                 try:
@@ -151,7 +152,8 @@ class ShadeDataset(Dataset):
         Returns:
             tuple: (sample, target, index) where target is class_index of the target class.
         """
-
+        if self.s3_client is None:
+            self.s3_client = boto3.client('s3')
         path, target = self._classed_items[index]
         insertion_time = datetime.now()
         insertion_time = insertion_time.strftime("%H:%M:%S")
