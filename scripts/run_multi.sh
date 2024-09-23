@@ -1,22 +1,15 @@
 #!/bin/bash
 set -e
 
-# Check if required arguments are provided
-if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <workload> <dataloader>"
-    echo "Example: $0 imagenet_resnet50 shade"
-    exit 1
-fi
-
-workload="$1"  # imagenet_resnet50, cifar10_resnet18, laora_finetine_owt
-dataloader="$2"  # shade, coordl, litdata
+workload="imagenet_resnet50" # Define your workload imagenet_resnet50, cifar10_resnet18, laora_finetine_owt
+dataloder="super" # Define your dataloader
 
 # Define an array of GPU indices
 gpu_indices=(0 1 2 3)
 # Define an array of learning rates
-learning_rates=(0.001 0.01 0.1 1.0)
+learning_rates=(0.001 0.01 0.1 0.0006)
 
-current_datetime=$(date +"%Y-%m-%d_%H-%M-%S")  # Get the current date and time
+current_datetime=$(date +"%Y-%m-%d_%H-%M-%S") # Get the current date and time
 
 # Define experiment ID
 expid="multi_job_$current_datetime"
