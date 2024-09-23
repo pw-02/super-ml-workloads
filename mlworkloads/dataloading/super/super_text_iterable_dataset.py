@@ -84,8 +84,8 @@ class SUPERTextDataset(IterableDataset):
             self.use_cache = False
 
         self.cache_client = None
+        self.stub = None
 
-        self.stub = self._create_grpc_stub()
         self._register_dataset_with_super()
 
         self.index = 0
@@ -159,7 +159,8 @@ class SUPERTextDataset(IterableDataset):
 
     def _register_dataset_with_super(self):
         try:
-            response = self.stub.RegisterDataset(minibatch_service_pb2.RegisterDatasetRequest(
+            stub = self._create_grpc_stub()
+            response = stub.RegisterDataset(minibatch_service_pb2.RegisterDatasetRequest(
                 data_dir=self.s3_data_dir,
                 dataset_kind='text'))
            
@@ -182,6 +183,7 @@ class SUPERTextDataset(IterableDataset):
         return sum(len(class_items) for class_items in self.samples.values())
 
     def __iter__(self):
+
         worker_info = get_worker_info()
         if worker_info is None:  # single-process data loading, return the full iterator
             return self.__iter_non_distributed__(len(self))
@@ -212,6 +214,10 @@ class SUPERTextDataset(IterableDataset):
         current_file_idx = 0
     
     def _load_next_chunk_samples(self):
+        if self.stub is None:
+            self.stub = self._create_grpc_stub()
+
+
         response = self.stub.GetNextBatchForJob(minibatch_service_pb2.GetNextBatchForJobRequest(
                         job_id=self.job_id,
                         data_dir=self.s3_data_dir))          
