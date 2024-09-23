@@ -2,7 +2,8 @@
 set -e
 
 workload="imagenet_resnet50" # Define your workload imagenet_resnet50, cifar10_resnet18, laora_finetine_owt
-dataloder="super" # Define your dataloader
+dataloder="super
+" # Define your dataloader
 
 # Define an array of GPU indices
 gpu_indices=(0 1 2 3)
