@@ -76,6 +76,8 @@ class SUPERTextDataset(IterableDataset):
         self.s3_data_dir = s3_data_dir
         self.transform = transform
         self.samples: Dict[str, List[str]] = self._get_sample_list_from_s3(False, False)
+        self.cache_host, self.cache_port = None,None
+
         if cache_address is not None:
             self.cache_host, self.cache_port = cache_address.split(":")
             self.cache_port = int(self.cache_port)
@@ -89,7 +91,6 @@ class SUPERTextDataset(IterableDataset):
         self._register_dataset_with_super()
 
         self.index = 0
-        self.cache_host, self.cache_port = None,None
     
         self.tokenizer:PreTrainedTokenizer = tokenizer
         self.block_size = block_size
