@@ -90,11 +90,7 @@ class SUPERTextDataset(IterableDataset):
 
         self.index = 0
         self.cache_host, self.cache_port = None,None
-        if cache_address:
-            self.cache_host, self.cache_port = cache_address.split(":")
-        if self.cache_host:
-            self.setup_cache_client()
-        self.super_client = None
+    
         self.tokenizer:PreTrainedTokenizer = tokenizer
         self.block_size = block_size
         self.dataset_length = len(self)
