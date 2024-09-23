@@ -2,7 +2,7 @@
 defaults:
   - _self_
   - dataloader: litgpt #pytorch, super, shade, litgpt
-  - workload: laora_finetine_owt  
+  - workload: lora_finetune_owt  
   
   #lora_finetune_tiny_llama 
   #lora_finetune_owt  

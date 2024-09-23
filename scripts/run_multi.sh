@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-workload="laora_finetine_owt" # Define your workload imagenet_resnet50, cifar10_resnet18, laora_finetine_owt
+workload="lora_finetune_owt" # Define your workload imagenet_resnet50, cifar10_resnet18, lora_finetune_owt
 dataloder="litdata" # Define your dataloader shade, super, litdata
 
 # Define an array of GPU indices
