@@ -347,6 +347,8 @@ class SUPERTextDataset(IterableDataset):
                                  gpu_time: float, 
                                  cached_batch_on_miss: bool):
         try:
+            if self.stub is None:
+                self.stub = self._create_grpc_stub()
             self.stub.JobUpdate(minibatch_service_pb2.JobUpdateRequest(
                 job_id=self.job_id,
                 data_dir=self.s3_data_dir,
