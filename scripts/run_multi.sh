@@ -7,7 +7,7 @@ dataloder="litgpt" # Define your dataloader shade, super, litdata
 # Define an array of GPU indices
 gpu_indices=(0 1 2 3)
 # Define an array of learning rates
-learning_rates=(0.001 0.01 0.1 0.0006)
+learning_rates=(0.001 0.01 0.005 0.0006)
 
 current_datetime=$(date +"%Y-%m-%d_%H-%M-%S") # Get the current date and time
 
