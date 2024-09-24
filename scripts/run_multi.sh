@@ -2,7 +2,7 @@
 set -e
 
 workload="lora_finetune_owt" # Define your workload imagenet_resnet50, cifar10_resnet18, lora_finetune_owt
-dataloder="super" # Define your dataloader shade, super, litdata
+dataloder="litgpt" # Define your dataloader shade, super, litgpt
 
 # Define an array of GPU indices
 gpu_indices=(0 1 2 3)
