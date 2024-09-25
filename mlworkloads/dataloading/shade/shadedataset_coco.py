@@ -60,7 +60,8 @@ class ShadeDatasetCOCO(Dataset):
         self.samples = self._get_sample_list_from_s3()
         self.image_transform = image_transform
         self.text_transform = text_transform
-        self.cache_host, self.cache_port = cache_address.split(":")
+        if cache_address is not None:
+            self.cache_host, self.cache_port = cache_address.split(":")
         self.cache_data = True if cache_address is not None else False
         self.wss = wss
         self.cache_portion = self.wss * len(self)
