@@ -288,9 +288,9 @@ def train_loop(fabric: Fabric, job_id: str, train_logger: CSVLogger, model, opti
         global_step_count +=1
 
         if isinstance(train_dataloader.dataset, S3RedisRetrievalTrainingDataset):
-                data_load_time = float(data_load_time.sum())
-                transformation_time = float(transformation_time.sum())
-                cache_hit_samples = int(is_cache_hit.sum())
+                data_load_time = sum(data_load_time)
+                transformation_time = sum(transformation_time)
+                cache_hit_samples = sum(is_cache_hit)
                 cache_hit_bacth = 1 if cache_hit_samples == len(is_cache_hit) else 0
 
         metrics= OrderedDict({
@@ -351,7 +351,7 @@ def retrieval_train_collate_fn(
         fetch_duration_list.append(fetch_duration)
         cache_hit_list.append(cache_hit)
         cached_after_fetch_list.append(cached_after_fetch)
-        print(f'Image shape: {image.shape}, Text shape: {text.shape}, Index: {idx}')
+        # print(f'Image shape: {image.shape}, Text shape: {text.shape}, Index: {idx}')
     images = torch.stack(image_list, dim=0)
     text = pad_sequence(text_list, batch_first=True)  # You can specify your padding value
     text_atts = (text != 0).type(torch.long)
