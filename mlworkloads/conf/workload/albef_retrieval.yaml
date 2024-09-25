@@ -1,0 +1,74 @@
+# dataloading configuration
+name: albef_retrieval
+s3_bucket: owt-5mb-text-chunks
+s3_train_prefix: s3://coco-dataset/
+s3_val_prefix: s3://coco-dataset/val2014/
+train_annotation_file: s3://coco-dataset/data/coco_train.json
+val_annotation_file: s3://coco-dataset/data/coco_val.json
+num_pytorch_workers: 0
+warmup_steps: 1
+log_interval: 1
+devices: 1
+num_nodes: 1
+run_training: True
+run_validation: False
+precision: 16-mixed
+
+alpha: 0.4
+weight_decay: 0.02
+lr: 1e-5
+min_lr: 1e-6
+max_epochs: 5
+step_size: 100
+max_steps: null
+batch_size: 4 #Number of samples between optimizer steps across data-parallel ranks
+limit_train_batches: null
+limit_val_batches: null
+
+
+# Anchor definitions (replace these with your actual values)
+hidden_size: &hidden_size 768
+vocab_size: &vocab_size 30522
+type_vocab_size: &type_vocab_size 2
+max_position_embeddings: &max_position_embeddings 512
+pad_token_id: &pad_token_id 0
+embed_size: &embed_size 256
+
+vision_encoder_args:
+  hidden_size: *hidden_size
+  image_size: 384
+  patch_size: 16
+  num_hidden_layers: 12
+  num_attention_heads: 12
+  mlp_dim: 3072
+  dropout: 0.0
+  attention_dropout: 0.0
+  layer_norm_eps: 1e-6
+
+text_encoder_args:
+  vocab_size: *vocab_size
+  hidden_size: *hidden_size
+  type_vocab_size: *type_vocab_size
+  max_position_embeddings: *max_position_embeddings
+  pad_token_id: *pad_token_id
+  num_hidden_layers: 6
+  num_attention_heads: 12
+  intermediate_size: 3072
+  layer_norm_eps: 1e-12
+  dropout: 0.0
+
+multimodal_encoder_args:
+  hidden_size: *hidden_size
+  num_hidden_layers: 6
+  num_attention_heads: 12
+  intermediate_size: 3072
+  layer_norm_eps: 1e-12
+
+projection_args:
+  in_features: *hidden_size
+  out_features: *embed_size
+
+similarity_args:
+  embed_size: *embed_size
+  queue_size: 65536
+  temp: 0.07

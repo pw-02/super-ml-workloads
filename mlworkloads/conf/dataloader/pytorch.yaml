@@ -1,5 +1,5 @@
 name: pytorch
-cache_address: p-rdior4.serverless.usw2.cache.amazonaws.com:6379
+cache_address: null # p-rdior4.serverless.usw2.cache.amazonaws.com:6379
 source_system: s3
 drop_last: False
 shuffle: True
