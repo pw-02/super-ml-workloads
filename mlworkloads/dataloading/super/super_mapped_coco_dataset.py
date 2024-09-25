@@ -58,6 +58,8 @@ class SUPERMappedCocoDataset(Dataset):
         self.s3_client = None
         self.simulate_mode = None
         self.samples = self._get_sample_list_from_s3()
+        self._simlute_time_for_cache_hit = 0
+        self._simlute_time_for_cache_miss = 0
 
     
     @functools.cached_property
@@ -71,16 +73,7 @@ class SUPERMappedCocoDataset(Dataset):
         index_object = s3_client.get_object(Bucket=self.s3_bucket, Key=self.annotation_file)
         file_content = index_object['Body'].read().decode('utf-8')
         # samples = json.loads(file_content)
-        samples = json.loads(file_content)
-        paired_samples = {}
-        for idx, sample in enumerate(samples):
-            image_path = sample['image']
-            image_id = sample["image_id"]
-            image_path =  self.s3_prefix + os.path.basename(image_path)
-            caption = sample['caption']
-            if image_id not in paired_samples:
-                    paired_samples[image_id] = []
-            paired_samples[image_id].append((image_path, caption))
+        paired_samples = json.loads(file_content)
         return paired_samples
 
     def __len__(self) -> int:
@@ -155,7 +148,8 @@ class SUPERMappedCocoDataset(Dataset):
 
     def _torch_batch_to_bytes(self, images, text,text_atts,ids) -> str:
         with BytesIO() as buffer:
-            torch.save((images, text,text_atts,ids), buffer)
+            mini_batch = images, text,text_atts,ids
+            torch.save(mini_batch, buffer)
             bytes_minibatch = buffer.getvalue()
             bytes_minibatch = lz4.frame.compress(bytes_minibatch)
         return bytes_minibatch
@@ -163,8 +157,8 @@ class SUPERMappedCocoDataset(Dataset):
     def _bytes_to_torch_batch(self, bytes_minibatch) -> tuple:
         compressed_batch = lz4.frame.decompress(bytes_minibatch)
         with BytesIO(compressed_batch) as buffer:
-            data_samples, labels, image_ids = torch.load(buffer)
-        return data_samples, labels, image_ids
+            images, text,text_atts,ids  = torch.load(buffer)
+        return images, text,text_atts,ids 
 
     def _load_batch_from_cache(self, batch_id):
         try:

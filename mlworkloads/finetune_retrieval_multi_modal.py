@@ -28,6 +28,7 @@ from transformers.models.bert.tokenization_bert import BertTokenizer
 from torch.nn.utils.rnn import pad_sequence
 from dataloading.super.super_mapped_coco_dataset import SUPERMappedCocoDataset
 from torchtext.transforms import PadTransform, Sequential, ToTensor, Truncate
+
 import re
 from torchvision import transforms
 import heapdict
@@ -48,33 +49,6 @@ MEAN = (0.48145466, 0.4578275, 0.40821073)
 STD_DEV = (0.26862954, 0.26130258, 0.27577711)
 
 class ALBEFTextTransform:
-    """
-    Remove punctuations and trailing spaces in input text and transform it into
-    a Tensor of token ids using BERTTokenizer.
-
-    Args:
-        pretrained_tokenizer (str): Pretrained tokenizer to use.
-            Default: "bert-base-uncased"
-        do_pre_process (bool): Whether to pre-process input text.
-            Defaults to True.
-        truncate (bool): Whether to truncate input text to max_seq_length.
-            Defaults to False.
-        pad_to_max_seq_len (bool): Whether to pad the sequence to max_seq_length.
-        add_end_token (bool): Whether to add the end-of-sentence token.
-            Defaults to True.
-        max_seq_len (int): The max sequence length after truncating or padding.
-            Defaults to 25.
-        cls_token_id (int): Value to represent the start of each text.
-            Defaults to 101, Hugging Face's BERT cls token id.
-        sep_token_id (int): Value to represent the end of each text.
-            Defaults to 102, Hugging Face's BERT sep token id.
-        pad_token_id (int): Value with which to pad each text so that all texts are the same length.
-            Defaults to 0, Hugging Face's BERT pad token id.
-
-    Inputs:
-        text (Union[List[str], str]): Input text to transform.
-    """
-
     def __init__(
         self,
         pretrained_tokenizer: str = "bert-base-uncased",
@@ -323,6 +297,7 @@ def train_loop(fabric: Fabric, job_id: str, train_logger: CSVLogger, model, opti
         elif isinstance(train_dataloader.sampler, SUPERSampler):
             image, text, text_atts, idx, batch_id = batch
             cache_hit_samples = batch[0].size(0) if is_cache_hit == True else 0
+            cache_hit_bacth=is_cache_hit
 
         gpu_processing_started = time.perf_counter()
         loss = model(image, text, text_atts, idx, alpha, is_train=True)

@@ -35,7 +35,8 @@ class SUPERSampler(Sampler):
     def _register_dataset_with_super(self):
         try:
             response = self.stub.RegisterDataset(minibatch_service_pb2.RegisterDatasetRequest(
-                data_dir=self.dataset.s3_data_dir))
+                data_dir=self.dataset.s3_data_dir,
+                dataset_kind='vision'))
            
             print(f"{response.message}")
             self.total_batches = response.total_batches
