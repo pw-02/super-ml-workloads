@@ -62,6 +62,8 @@ class S3RedisRetrievalTrainingDataset(Dataset):
         self.ann = []
         self.idx = {}
         self.samples = self._get_sample_list_from_s3()
+        # self.samples = self._get_sample_list_from_s3()
+
         pass
 
     @functools.cached_property
@@ -123,7 +125,7 @@ class S3RedisRetrievalTrainingDataset(Dataset):
     #     # return paired_samples
     
     def __len__(self) -> int:
-        # return len(self.ann)
+        return len(self.ann)
         return sum(len(class_items) for class_items in self.samples.values())
 
 
