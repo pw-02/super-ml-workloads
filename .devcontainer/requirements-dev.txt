@@ -17,3 +17,4 @@ pynvml
 # litdata
 # "ray[tune]"
 awscli
+torchmultimodal-nightly
