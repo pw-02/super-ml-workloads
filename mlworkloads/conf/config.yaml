@@ -1,7 +1,7 @@
 
 defaults:
   - _self_
-  - dataloader: pytorch #pytorch, super, shade, litgpt
+  - dataloader: shade #pytorch, super, shade, litgpt
   - workload: albef_retrieval  
   
   #lora_finetune_tiny_llama 

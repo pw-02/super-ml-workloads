@@ -1,9 +1,9 @@
 # dataloading configuration
 name: albef_retrieval
 s3_bucket: owt-5mb-text-chunks
-s3_train_prefix: s3://coco-dataset/
+s3_train_prefix: s3://coco-dataset/train2014/
 s3_val_prefix: s3://coco-dataset/val2014/
-train_annotation_file: s3://coco-dataset/data/coco_train.json
+train_annotation_file: s3://coco-dataset/coco_train.json
 val_annotation_file: s3://coco-dataset/data/coco_val.json
 num_pytorch_workers: 0
 warmup_steps: 1
