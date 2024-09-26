@@ -64,8 +64,12 @@ class CoorDLCocoRetrievalTrainingDataset(Dataset):
         self.samples = self._get_sample_list_from_s3()
         self.wss = wss
         self.cache_portion = self.wss * len(self)
-        self.key_counter = 0
         pass
+
+    def get_num_items_in_cache(self):
+        if self.cache_client is None:
+            self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port,  ssl=True)
+        return self.cache_client.dbsize()
 
     @functools.cached_property
     def _classed_items(self) -> List[Tuple[str, int]]:
@@ -113,7 +117,7 @@ class CoorDLCocoRetrievalTrainingDataset(Dataset):
            
         image = self.fetch_image_from_s3(image_path)
         cache_hit = False
-        if self.use_cache and self.key_counter < self.cache_portion:
+        if self.use_cache and self.get_num_items_in_cache() < self.cache_portion:
             byte_stream = io.BytesIO()
             image.save(byte_stream, format=image.format)
             byte_stream.seek(0)
@@ -124,7 +128,7 @@ class CoorDLCocoRetrievalTrainingDataset(Dataset):
         
         transform_start_time = time.perf_counter()
         if self.image_transform is not None:
-            image = self.image_transform(image)
+                image = self.image_transform(image)
         if self.text_transform is not None:
             caption = self.text_transform(caption)
         transformation_time = time.perf_counter() - transform_start_time
@@ -137,7 +141,7 @@ class CoorDLCocoRetrievalTrainingDataset(Dataset):
     def _initialize_cache_client(self):
         """Initialize Redis cache client if not already connected."""
         if self.cache_client is None:
-            self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port,  ssl=True)
+            self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
     
     def _load_item_from_cache(self, key):
         try:
@@ -152,7 +156,7 @@ class CoorDLCocoRetrievalTrainingDataset(Dataset):
             self.s3_client = boto3.client('s3')
         obj = self.s3_client.get_object(Bucket=self.s3_bucket, Key=data_path)
         img_data = obj['Body'].read()
-        image = Image.open(io.BytesIO(img_data)).convert('RGB')
+        image = Image.open(io.BytesIO(img_data))
         return image
     
 if __name__ == "__main__":

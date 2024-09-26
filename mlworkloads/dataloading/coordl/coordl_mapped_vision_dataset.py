@@ -50,14 +50,19 @@ class CoorDLMappedVisionDataset(Dataset):
         self.samples = self._get_sample_list_from_s3()
         self.wss = wss
         self.cache_portion = self.wss * len(self)
-        self.key_counter = 0
+   
     
     @functools.cached_property
     def _classed_items(self) -> List[Tuple[str, int]]:
         return [(blob, class_index)
             for class_index, blob_class in enumerate(self.samples)
             for blob in self.samples[blob_class]]
-
+    
+    def get_num_items_in_cache(self):
+        if self.cache_client is None:
+            self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port,  ssl=True)
+        return self.cache_client.dbsize()
+    
     def _get_sample_list_from_s3(self, use_index_file=True, images_only=True) -> Dict[str, List[str]]:
         s3_client = boto3.client('s3')
 
@@ -154,7 +159,7 @@ class CoorDLMappedVisionDataset(Dataset):
         sample = self.fetch_image_from_s3(path)
         cache_hit = False
         
-        if self.use_cache and self.key_counter < self.cache_portion:
+        if self.use_cache and self.get_num_items_in_cache() < self.cache_portion:
             byte_stream = io.BytesIO()
             sample.save(byte_stream, format=sample.format)
             byte_stream.seek(0)
