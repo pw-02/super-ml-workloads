@@ -36,7 +36,7 @@ for i in "${job_ids[@]}"; do
     gpu_index=${job_ids[$i]}
     lr=${learning_rates[$i]}
     echo "Starting job $gpu_index with learning rate $lr and exp_id $expid"
-    CUDA_VISIBLE_DEVICES="" python mlworkloads/run.py workload="$workload" workload.learning_rate="$lr" exp_id="$expid" job_id="$gpu_index" dataloader="$dataloder" &
+    python mlworkloads/run.py workload="$workload" workload.learning_rate="$lr" exp_id="$expid" job_id="$gpu_index" dataloader="$dataloder" &
     job_pids+=($!)  # Save the PID of the background job
     sleep 2  # Adjust as necessary
 done
