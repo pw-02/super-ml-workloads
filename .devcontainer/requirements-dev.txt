@@ -18,3 +18,4 @@ pynvml
 # "ray[tune]"
 awscli
 torchmultimodal-nightly
+lz4
