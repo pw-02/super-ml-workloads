@@ -395,7 +395,7 @@ def train_loop(fabric: Fabric, job_id: str, train_logger: CSVLogger, model, opti
 
         wait_for_data_time = time.perf_counter() - end
 
-        if limit_train_batches is not None and batch_idx >= limit_train_batches:
+        if limit_train_batches is not None and batch_idx +1 >= limit_train_batches: #add plus 1 here to skip last batch
                 break
         # Forward pass: Compute model output and loss
         if isinstance(train_dataloader.dataset, ShadeDatasetCOCO) or isinstance(train_dataloader.dataset, S3RedisRetrievalTrainingDataset):
@@ -505,6 +505,8 @@ def train_loop(fabric: Fabric, job_id: str, train_logger: CSVLogger, model, opti
         if max_steps is not None and global_step_count >= max_steps:
                 break
         end = time.perf_counter()
+    if isinstance(train_dataloader.sampler, ShadeSampler):
+        train_dataloader.sampler.on_epoch_end(total_train_loss/batch_idx)
     return global_step_count
 
 def retrieval_train_collate_fn(
@@ -607,8 +609,8 @@ def main(fabric: Fabric, devices: int, config: DictConfig,train_logger: CSVLogge
         if config.workload.max_epochs is not None and current_epoch >= config.workload.max_epochs:
             should_stop = True
 
-    # if isinstance(train_dataloader.sampler, SUPERSampler):
-    #     train_dataloader.sampler.send_job_ended_notfication()
+    if isinstance(train_dataloader.sampler, SUPERSampler):
+        train_dataloader.sampler.send_job_ended_notfication()
 
     elapsed_time = time.perf_counter() - train_start_time
 
