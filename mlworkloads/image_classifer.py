@@ -114,7 +114,7 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
     elif config.dataloader.name == 'coordl':
         # PyTorch DataLoader
         if config.workload.run_training:
-            train_dataset = CoorDLMappedVisionDataset(s3_data_dir=config.workload.s3_train_prefix, transform=train_transform, cache_address=config.dataloader.cache_address, wss=config.dataloader.wss)
+            train_dataset = CoorDLMappedVisionDataset(s3_data_dir=config.workload.s3_train_prefix, transform=train_transform, cache_address=config.dataloader.cache_address)
             if config.dataloader.shuffle:
                 train_sampler = RandomSampler(data_source=train_dataset)
             else:
@@ -124,7 +124,7 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
             train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
         
         if config.workload.run_validation:
-            val_dataset = CoorDLMappedVisionDataset(s3_prefix=config.workload.s3_val_prefix, transform=val_transform, cache_address=config.dataloader.cache_address, wss=config.dataloader.wss)
+            val_dataset = CoorDLMappedVisionDataset(s3_prefix=config.workload.s3_val_prefix, transform=val_transform, cache_address=config.dataloader.cache_address)
             if config.dataloader.shuffle:
                 val_sampler = RandomSampler(data_source=val_dataset)
             else:
