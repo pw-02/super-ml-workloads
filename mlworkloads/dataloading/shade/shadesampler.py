@@ -183,15 +183,15 @@ class ShadeSampler(Sampler[T_co]):
         #create the indices list for processing in the next epoch
         self.indices = cache_hit_list + cache_miss_list[:num_miss_samps]
 
-        print(f'hit_list_len: {len(cache_hit_list)}')
-        print(f'miss_list_len: {len(cache_miss_list[:num_miss_samps])}')
+        # print(f'hit_list_len: {len(cache_hit_list)}')
+        # print(f'miss_list_len: {len(cache_miss_list[:num_miss_samps])}')
 
         #sanity check
         self.indices = self.indices[:self.num_samples]
 
         assert len(self.indices) == self.num_samples
         self.indices_for_process = self.indices
-        print(self.indices)
+        # print(self.indices)
 
         return iter(self.indices)
 
