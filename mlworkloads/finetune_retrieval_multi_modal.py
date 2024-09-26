@@ -18,11 +18,12 @@ import torch
 from multi_modal.albef.model import albef_model_for_retrieval
 # from model import albef_model_for_retrieval
 from torch.utils.data import DataLoader
-from dataloading.s3_redis.s3redis_retrieval_dataset import S3RedisRetrievalTrainingDataset
+# from dataloading.s3_redis.s3redis_retrieval_dataset import S3RedisRetrievalTrainingDataset
+from dataloading.coordl.coordl_coco_dataset import CoorDLCocoRetrievalTrainingDataset
 from dataloading.super.super_sampler import SUPERSampler
 from dataloading.shade.shadesampler import ShadeSampler
 from dataloading.shade.shadedataset_coco import ShadeDatasetCOCO
-from torch.utils.data import RandomSampler
+from torch.utils.data import RandomSampler, SequentialSampler
 import torch.optim as optim
 from transformers.models.bert.tokenization_bert import BertTokenizer
 from torch.nn.utils.rnn import pad_sequence
@@ -314,21 +315,25 @@ def get_dataloaders(
     train_dataloader = None
     val_dataloader = None
 
-    if config.dataloader.name == 'pytorch':
+    if config.dataloader.name == 'coordl':
         if config.workload.run_training:
-            train_dataset = S3RedisRetrievalTrainingDataset(
+            train_dataset = CoorDLCocoRetrievalTrainingDataset(
                 annotation_file=config.workload.train_annotation_file,
                 s3_data_dir=config.workload.s3_train_prefix,
                 image_transform= training_image_transform(),
                 text_transform=ALBEFTextTransform(truncate=True, pad_to_max_seq_len=True, max_seq_len=30, add_end_token=False),
                 cache_address=config.dataloader.cache_address,
+                wss=config.dataloader.wss
             )
-            sampler = RandomSampler(train_dataset)
+            if config.dataloader.shuffle:
+                train_sampler = RandomSampler(data_source=train_dataset)
+            else:
+                train_sampler = SequentialSampler(data_source=train_dataset)
 
             train_dataloader = DataLoader(
                 train_dataset,
                 batch_size=config.workload.batch_size,
-                sampler=sampler,
+                sampler=train_sampler,
                 num_workers=config.workload.num_pytorch_workers,
                 pin_memory=True,
                 collate_fn=retrieval_train_collate_fn
@@ -398,7 +403,7 @@ def train_loop(fabric: Fabric, job_id: str, train_logger: CSVLogger, model, opti
         if limit_train_batches is not None and batch_idx +1 >= limit_train_batches: #add plus 1 here to skip last batch
                 break
         # Forward pass: Compute model output and loss
-        if isinstance(train_dataloader.dataset, ShadeDatasetCOCO) or isinstance(train_dataloader.dataset, S3RedisRetrievalTrainingDataset):
+        if isinstance(train_dataloader.dataset, ShadeDatasetCOCO) or isinstance(train_dataloader.dataset, CoorDLCocoRetrievalTrainingDataset):
             image, text, text_atts, idx = batch
             data_load_time = sum(data_load_time)
             transformation_time = sum(transformation_time)

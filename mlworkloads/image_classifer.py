@@ -10,20 +10,14 @@ from omegaconf import DictConfig
 from lightning.fabric import Fabric, seed_everything
 from lightning.fabric.loggers import CSVLogger
 from torchvision.models import get_model
-from dataloading.s3_redis.s3redis_dataset import S3RedisDataset
+from dataloading.coordl.coordl_mapped_vision_dataset import CoorDLMappedVisionDataset
 from dataloading.super.super_sampler import SUPERSampler
 from dataloading.super.super_mapped_dataset import SUPERMappedDataset
-# from dataloading.s3.batch_sampler import BatchSamplerWithID
-# from mlworkloads.datalaoding.s3.s3_mapped_dataset import S3MappedDatasett
-# from mlworkloads.datalaoding.s3.batch_sampler import BatchSamplerWithID
 from torch.utils.data import RandomSampler, SequentialSampler
 import time
 import os
 from collections import OrderedDict
 import numpy as np
-from resource_monitor import ResourceMonitor
-import datetime
-# from lightning.pytorch.core.saving import save_hparams_to_yaml
 import redis
 import heapdict
 from dataloading.shade.shadedataset import ShadeDataset
@@ -114,20 +108,20 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
             train_dataloader = fabric.setup_dataloaders(train_dataloader,move_to_device=True)
 
 
-    elif config.dataloader.name == 'pytorch':
+    elif config.dataloader.name == 'coordl':
         # PyTorch DataLoader
         if config.workload.run_training:
-            train_dataset = S3RedisDataset(s3_data_dir=config.workload.s3_train_prefix, transform=train_transform, cache_address=config.dataloader.cache_address)
+            train_dataset = CoorDLMappedVisionDataset(s3_data_dir=config.workload.s3_train_prefix, transform=train_transform, cache_address=config.dataloader.cache_address, wss=config.dataloader.wss)
             if config.dataloader.shuffle:
                 train_sampler = RandomSampler(data_source=train_dataset)
             else:
                 train_sampler = SequentialSampler(data_source=train_dataset)
-        
+
             train_dataloader = DataLoader(train_dataset, batch_size=config.workload.batch_size, sampler=train_sampler, num_workers=config.workload.num_pytorch_workers)
             train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
         
         if config.workload.run_validation:
-            val_dataset = S3RedisDataset(s3_prefix=config.workload.s3_val_prefix, transform=val_transform, cache_address=config.dataloader.cache_address)
+            val_dataset = CoorDLMappedVisionDataset(s3_prefix=config.workload.s3_val_prefix, transform=val_transform, cache_address=config.dataloader.cache_address, wss=config.dataloader.wss)
             if config.dataloader.shuffle:
                 val_sampler = RandomSampler(data_source=val_dataset)
             else:
@@ -258,7 +252,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                 break
             
              # Unpack batch
-            if isinstance(train_dataloader.sampler, ShadeSampler) or isinstance(train_dataloader.dataset, S3RedisDataset):
+            if isinstance(train_dataloader.sampler, ShadeSampler) or isinstance(train_dataloader.dataset, CoorDLMappedVisionDataset):
                 inputs, labels = batch
             elif isinstance(train_dataloader.sampler, SUPERSampler):
                 inputs, labels, batch_id = batch
@@ -298,7 +292,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                 cache_hit_samples = batch[0].size(0) if is_cache_hit == True else 0
                 cache_hit_bacth = 1 if is_cache_hit == True else 0
 
-            if isinstance(train_dataloader.sampler, ShadeSampler) or isinstance(train_dataloader.dataset, S3RedisDataset):
+            if isinstance(train_dataloader.sampler, ShadeSampler) or isinstance(train_dataloader.dataset, CoorDLMappedVisionDataset):
                 data_load_time = float(data_load_time.sum())
                 transformation_time = float(transformation_time.sum())
                 cache_hit_samples = int(is_cache_hit.sum())

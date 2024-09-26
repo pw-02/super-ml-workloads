@@ -1,4 +1,4 @@
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 import hydra
 from lightning.fabric.loggers import CSVLogger
 from image_classifer import train_image_classifer
