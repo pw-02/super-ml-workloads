@@ -558,7 +558,7 @@ def main(fabric: Fabric, devices: int, config: DictConfig,train_logger: CSVLogge
     #     optimizer, T_0=args["max_epochs"], eta_min=args["min_lr"]
     # )
 
-    optimizer = optim.Adam(model.parameters(), lr=config.workload.lr)
+    optimizer = optim.Adam(model.parameters(), lr=config.workload.learning_rate)
     model, optimizer = fabric.setup(model, optimizer)
 
     fabric.print(f"Number of trainable parameters: {num_parameters(model, requires_grad=True):,}")
