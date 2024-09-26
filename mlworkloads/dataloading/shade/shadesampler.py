@@ -183,15 +183,16 @@ class ShadeSampler(Sampler[T_co]):
         #create the indices list for processing in the next epoch
         self.indices = cache_hit_list + cache_miss_list[:num_miss_samps]
 
-        # print(f'hit_list_len: {len(cache_hit_list)}')
-        # print(f'miss_list_len: {len(cache_miss_list[:num_miss_samps])}')
-        # print(len(self.indices))
+        print(f'hit_list_len: {len(cache_hit_list)}')
+        print(f'miss_list_len: {len(cache_miss_list[:num_miss_samps])}')
 
         #sanity check
         self.indices = self.indices[:self.num_samples]
 
         assert len(self.indices) == self.num_samples
         self.indices_for_process = self.indices
+        print(self.indices)
+
         return iter(self.indices)
 
     def __len__(self) -> int:
@@ -215,9 +216,13 @@ class ShadeSampler(Sampler[T_co]):
         else:
             cur_loss = metrics
             # assume normal learning curve
-            ls_fac = np.exp((cur_loss - self.prev_loss) / self.prev_loss)
-            self.ls_param = self.ls_param * ls_fac
-            self.prev_loss = cur_loss
+            if self.prev_loss == 0:
+                self.prev_loss = metrics
+                self.ls_param = self.prev_loss * self.ls_init_fac
+            else:
+                ls_fac = np.exp((cur_loss - self.prev_loss) / self.prev_loss)
+                self.ls_param = self.ls_param * ls_fac
+                self.prev_loss = cur_loss
         self.item_curr_pos = 0
 
     def set_importance_per_batch(self, wts):
