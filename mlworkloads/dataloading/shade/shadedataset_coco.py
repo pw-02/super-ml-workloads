@@ -205,5 +205,5 @@ class ShadeDatasetCOCO(Dataset):
             self.s3_client = boto3.client('s3')
         obj = self.s3_client.get_object(Bucket=self.s3_bucket, Key=data_path)
         img_data = obj['Body'].read()
-        image = Image.open(io.BytesIO(img_data)) #.convert('RGB')
+        image = Image.open(io.BytesIO(img_data)).convert('RGB')
         return image

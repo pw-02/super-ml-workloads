@@ -29,7 +29,10 @@ PQ = heapdict.heapdict()
 ghost_cache = heapdict.heapdict()
 
 def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logger: CSVLogger):
-  
+    
+    if config.simulation_mode:
+        config.accelerator = 'cpu'
+        
     fabric = Fabric(
         accelerator=config.accelerator, 
         devices=config.devices, 
@@ -168,7 +171,9 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
             max_steps=config.workload.max_steps,
             limit_train_batches=config.workload.limit_train_batches,
             criterion=nn.CrossEntropyLoss(reduction = 'none'), # if isinstance(train_dataloader.sampler, ShadeSampler) else nn.CrossEntropyLoss(),
-            batch_wts=batch_wts)
+            batch_wts=batch_wts,
+            sim=config.simulation_mode,
+            sim_time=config.workload.gpu_time)
     
         if val_dataloader is not None and current_epoch % config.workload.validation_frequency == 0:
             global_val_step_count=  validate_loop(fabric, 
@@ -237,12 +242,15 @@ def get_transforms(workload_name):
         raise ValueError(f"Invalid workload: {workload_name}")
     return train_transform, val_transform
 
-def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, train_dataloader:DataLoader, train_start_time, current_epoch, global_step_count, max_steps = None, limit_train_batches = np.inf, criterion=nn.CrossEntropyLoss(), batch_wts = None):
+def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, train_dataloader:DataLoader, train_start_time, current_epoch, global_step_count, max_steps = None, 
+               limit_train_batches = np.inf, 
+               criterion=nn.CrossEntropyLoss(), batch_wts = None,
+               sim=False, sim_time=0):
     model.train()
     total_samples = 0
     total_train_loss = 0.0
     correct_preds = 0
-
+    
     end = time.perf_counter()
     for batch_idx, (batch, data_load_time, transformation_time, is_cache_hit, cached_on_miss) in enumerate(train_dataloader):
             
@@ -259,35 +267,36 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
 
             # Forward pass: Compute model output and loss
             gpu_processing_started = time.perf_counter()
-            outputs  = model(inputs)
-            item_loss = criterion(outputs, labels)
-            loss = item_loss.mean()
+            if sim:
+                time.sleep(sim_time)
+            else:
+                outputs  = model(inputs)
+                item_loss = criterion(outputs, labels)
+                loss = item_loss.mean()
 
-            # Backpropagation and optimization
-            optimizer.zero_grad()  # Clear previous gradients
-            fabric.backward(loss)  # Backpropagation
-            optimizer.step()  # Update weights
+                # Backpropagation and optimization
+                optimizer.zero_grad()  # Clear previous gradients
+                fabric.backward(loss)  # Backpropagation
+                optimizer.step()  # Update weights
 
-            # Accumulate metrics directly on GPU to avoid synchronization
-            correct_preds += (outputs.argmax(dim=1) == labels).sum().item()  # No .item(), stays on GPU
-            total_train_loss += loss.item() * inputs.size(0)  # Convert loss to CPU for accumulation
-            
-            if fabric.device.type == 'cuda':
-                torch.cuda.synchronize()
-
+                # Accumulate metrics directly on GPU to avoid synchronization
+                correct_preds += (outputs.argmax(dim=1) == labels).sum().item()  # No .item(), stays on GPU
+                total_train_loss += loss.item() * inputs.size(0)  # Convert loss to CPU for accumulation
+                
+                if fabric.device.type == 'cuda':
+                    torch.cuda.synchronize()
 
              # Track time taken for GPU processing
             gpu_processing_time = time.perf_counter() - gpu_processing_started
             
             # Metrics calculation
             total_samples += inputs.size(0)
-            avg_train_loss = total_train_loss / total_samples
-            avg_train_acc = correct_preds / total_samples
+            avg_train_loss = total_train_loss / total_samples if not sim else 0
+            avg_train_acc = correct_preds / total_samples if not sim else 0
+            # Calculate average loss and accuracy across all batches
+            avg_train_loss = total_train_loss / total_samples if not sim else 0
             global_step_count +=1
 
-            # Calculate average loss and accuracy across all batches
-            avg_train_loss = total_train_loss / total_samples
-            
             if isinstance(train_dataloader.sampler, SUPERSampler):
                 cache_hit_samples = batch[0].size(0) if is_cache_hit == True else 0
                 cache_hit_bacth = 1 if is_cache_hit == True else 0
@@ -298,7 +307,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                 cache_hit_samples = int(is_cache_hit.sum())
                 cache_hit_bacth = 1 if cache_hit_samples == len(is_cache_hit) else 0
 
-                if isinstance(train_dataloader.sampler, ShadeSampler):
+                if isinstance(train_dataloader.sampler, ShadeSampler) and not sim:
                     train_dataloader.sampler.pass_batch_important_scores(item_loss.cpu())
                     sorted_img_indices = train_dataloader.sampler.get_sorted_index_list()
 
