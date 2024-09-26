@@ -12,10 +12,10 @@ visual_map = {
 
 # Define the workloads
 figure_data: Dict[str, Dict[str, float]] = {}
-figure_data['ResNet-18/Cifar10'] = {'CoorDL': 12,'Shade': 10, r'$\bf{SUPER}$': 14}
-figure_data['ResNet-50/Cifar10'] = {'CoorDL': 12,'Shade': 10, r'$\bf{SUPER}$': 14}
-figure_data['Pythia-14m/OpenWebText'] = {'LiData': 10, r'$\bf{SUPER}$': 14}
-figure_data['Pythia-70m/OpenWebText'] = {'LiData': 10, r'$\bf{SUPER}$': 14}
+figure_data['ResNet-18/Cifar10'] = {'CoorDL': 1989,'Shade': 1989, r'$\bf{SUPER}$': 4179}
+figure_data['ResNet-50/Cifar10'] = {'CoorDL': 202,'Shade': 202, r'$\bf{SUPER}$': 489}
+figure_data['Albef/COCO'] ={'CoorDL': 202,'Shade': 202, r'$\bf{SUPER}$': 489}
+figure_data['Pythia-14m/OpenWebText'] = {'LiData': 574, r'$\bf{SUPER}$': 1117}
 
 # Plot the results
 fig, axs = plt.subplots(1, 4, figsize=(16, 2.3))  # Create a 1x4 grid of subplots wXh=1x4

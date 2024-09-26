@@ -1,3 +1,4 @@
+from typing import Dict
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Patch
@@ -11,12 +12,20 @@ visual_map = {
 }
 
 # Define the workloads and corresponding data
-figure_data = {
-    'ResNet-18': {'CoorDL': 12, 'Shade': 10, r'$\bf{SUPER}$': 14},
-    'ResNet-50': {'CoorDL': 12, 'Shade': 10, r'$\bf{SUPER}$': 14},
-    'Pythia-14m': {'LiData': 10, r'$\bf{SUPER}$': 14},
-    'Pythia-70m': {'LiData': 10, r'$\bf{SUPER}$': 14},
-}
+
+# Define the workloads
+figure_data: Dict[str, Dict[str, float]] = {}
+figure_data['ResNet-18/Cifar10'] = {'CoorDL': 15,'Shade': 15, r'$\bf{SUPER}$': 32}
+figure_data['ResNet-50/Cifar10'] = {'CoorDL': 202,'Shade': 1.5, r'$\bf{SUPER}$': 3.8}
+figure_data['Albef/COCO'] ={'CoorDL': 202,'Shade': 202, r'$\bf{SUPER}$': 489}
+figure_data['Pythia-14m/OpenWebText'] = {'LiData': 574, r'$\bf{SUPER}$': 1117}
+
+
+# figure_data = {
+#     'ResNet-18': {'CoorDL': 12, 'Shade': 10, r'$\bf{SUPER}$': 14},
+#     'ResNet-50': {'CoorDL': 12, 'Shade': 10, r'$\bf{SUPER}$': 14},
+#     'Albef/COCO':{'CoorDL': 12,'Shade': 10, r'$\bf{SUPER}$': 14},
+#     'Pythia-14m': {'LiData': 10, r'$\bf{SUPER}$': 14}}
 
 # Create a new figure and set of axes
 fig, ax = plt.subplots(figsize=(8, 4)) 
@@ -65,7 +74,7 @@ ax.tick_params(axis='y', labelsize=12)  # Set font size for y-tick labels
 
 # Add the legend with custom handles
 ax.legend(handles=legend_handles, ncol=4, loc='upper center')
-ax.set_ylim(0, 17)
+ax.set_ylim(0, 4400)
 
 # Display the plot
 plt.tight_layout()
