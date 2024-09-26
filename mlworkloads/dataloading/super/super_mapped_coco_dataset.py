@@ -181,7 +181,7 @@ class SUPERMappedCocoDataset(Dataset):
 
             obj = self.s3_client.get_object(Bucket=self.s3_bucket, Key=data_path)
             img_data = obj['Body'].read()
-            image = Image.open(io.BytesIO(img_data)) #.convert('RGB')
+            image = Image.open(io.BytesIO(img_data)).convert('RGB')
             # image = Image.open(io.BytesIO(img_data)).convert('RGB')
             data_samples.append(image)
             captions.append(caption)  # Simplified; adjust based on your label extraction
