@@ -465,7 +465,7 @@ def train_loop(fabric: Fabric, job_id: str, train_logger: CSVLogger, model, opti
                 train_dataloader.sampler.send_job_update_to_super(
                     batch_id,
                     wait_for_data_time,
-                    is_cache_hit,
+                    cache_hit_bacth,
                     gpu_processing_time,
                     cached_on_miss
                     )
