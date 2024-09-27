@@ -279,6 +279,8 @@ def launch_finetune(config: DictConfig, train_logger: CSVLogger, val_logger: CSV
     devices = parse_devices(config.workload.devices)
     precision = config.workload.precision or get_default_supported_precision(training=True)
     strategy = "auto"
+    if config.simulation_mode:
+        config.accelerator = 'cpu'
     fabric = Fabric(
         devices=devices,
         num_nodes=config.workload.num_nodes,
