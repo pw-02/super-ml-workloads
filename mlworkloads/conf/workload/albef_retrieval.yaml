@@ -5,7 +5,7 @@ s3_train_prefix: s3://coco-dataset/train2014/
 s3_val_prefix: s3://coco-dataset/val2014/
 train_annotation_file: s3://coco-dataset/coco_train.json
 val_annotation_file: s3://coco-dataset/data/coco_val.json
-num_pytorch_workers: 0
+num_pytorch_workers: 4
 warmup_steps: 1
 log_interval: 1
 devices: 1
@@ -21,7 +21,7 @@ min_lr: 1e-6
 max_epochs: 2
 step_size: 100
 max_steps: null
-batch_size: 4 #Number of samples between optimizer steps across data-parallel ranks
+batch_size: 128 #Number of samples between optimizer steps across data-parallel ranks
 limit_train_batches: null
 limit_val_batches: null
 
