@@ -390,7 +390,12 @@ def get_dataloaders(
 
     return train_dataloader, val_dataloader
 
-def train_loop(fabric: Fabric, job_id: str, train_logger: CSVLogger, model, optimizer, train_dataloader:DataLoader, train_start_time, current_epoch, global_step_count, max_steps, limit_train_batches, criterion, batch_wts):
+def train_loop(fabric: Fabric, job_id: str, train_logger: CSVLogger, model, 
+               optimizer, train_dataloader:DataLoader, 
+               train_start_time, current_epoch, global_step_count, 
+               max_steps, limit_train_batches, criterion, 
+               batch_wts,
+               sim=False, sim_time=0):
     model.train()
     total_samples = 0
     total_train_loss = 0.0
@@ -416,23 +421,27 @@ def train_loop(fabric: Fabric, job_id: str, train_logger: CSVLogger, model, opti
             cache_hit_bacth=is_cache_hit
 
         gpu_processing_started = time.perf_counter()
-        loss = model(image, text, text_atts, idx, alpha, is_train=True)
-        # Backpropagation and optimization
-        optimizer.zero_grad()  # Clear previous gradients
-        fabric.backward(loss)  # Backpropagation
-        optimizer.step()  # Update weights
-        total_train_loss += loss.item() * image.size(0)
-        if fabric.device.type == 'cuda':
-                torch.cuda.synchronize()
+        if sim:
+                time.sleep(sim_time)
+        else:
+            loss = model(image, text, text_atts, idx, alpha, is_train=True)
+            # Backpropagation and optimization
+            optimizer.zero_grad()  # Clear previous gradients
+            fabric.backward(loss)  # Backpropagation
+            optimizer.step()  # Update weights
+            total_train_loss += loss.item() * image.size(0)
+            
+            if fabric.device.type == 'cuda':
+                    torch.cuda.synchronize()
 
         # Track time taken for GPU processing
         gpu_processing_time = time.perf_counter() - gpu_processing_started
         # Metrics calculation
         total_samples += image.size(0)
-        avg_train_loss = total_train_loss / total_samples
+        avg_train_loss = total_train_loss / total_samples if not sim else 0
         global_step_count +=1
 
-        if isinstance(train_dataloader.sampler, ShadeSampler):
+        if isinstance(train_dataloader.sampler, ShadeSampler) and not sim:
             # Calculate the individual loss for each sample
             individual_loss = loss / loss.itemsize
             loss_tensor = individual_loss.repeat(loss.itemsize)
@@ -607,7 +616,10 @@ def main(fabric: Fabric, devices: int, config: DictConfig,train_logger: CSVLogge
             max_steps=config.workload.max_steps,
             limit_train_batches=config.workload.limit_train_batches,
             criterion=nn.CrossEntropyLoss(reduction = 'none'), # if isinstance(train_dataloader.sampler, ShadeSampler) else nn.CrossEntropyLoss(),
-            batch_wts=batch_wts)
+            batch_wts=batch_wts,
+            sim=config.simulation_mode,
+            sim_time=config.workload.gpu_time
+            )
         
         if config.workload.max_steps is not None and global_train_step_count >= config.workload.max_steps:
             should_stop = True
