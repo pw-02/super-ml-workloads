@@ -190,7 +190,7 @@ class SUPERMappedDataset(Dataset):
             self._initialize_cache_client()   
             return self.cache_client.get(batch_id)
         except Exception as e:
-            print(f"Error fetching from cache: {e}")
+            print(f"Error fetching from cache: {e}, batch_id: {batch_id}")
             return None
 
     def _load_batch_from_s3(self, batch_indices: List[str]) -> Tuple[List[torch.Tensor], List[int]]:
