@@ -325,7 +325,6 @@ def get_dataloaders(
                 image_transform= training_image_transform(),
                 text_transform=ALBEFTextTransform(truncate=True, pad_to_max_seq_len=True, max_seq_len=30, add_end_token=False),
                 cache_address=config.dataloader.cache_address,
-                wss=config.dataloader.wss
             )
             if config.dataloader.shuffle:
                 train_sampler = RandomSampler(data_source=train_dataset)

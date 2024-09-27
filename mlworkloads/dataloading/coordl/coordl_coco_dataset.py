@@ -42,7 +42,7 @@ class S3Url(object):
 
 class CoorDLCocoRetrievalTrainingDataset(Dataset):
 
-    def __init__(self, annotation_file, s3_data_dir: str, image_transform=None, text_transform=None,  cache_address= None, wss=0.1):
+    def __init__(self, annotation_file, s3_data_dir: str, image_transform=None, text_transform=None,  cache_address= None):
         
         self.s3_bucket = S3Url(s3_data_dir).bucket
         self.s3_prefix = S3Url(s3_data_dir).key
@@ -62,8 +62,6 @@ class CoorDLCocoRetrievalTrainingDataset(Dataset):
         self.ann = []
         self.idx = {}
         self.samples = self._get_sample_list_from_s3()
-        self.wss = wss
-        self.cache_portion = self.wss * len(self)
         pass
 
     def get_num_items_in_cache(self):
@@ -117,14 +115,17 @@ class CoorDLCocoRetrievalTrainingDataset(Dataset):
            
         image = self.fetch_image_from_s3(image_path)
         cache_hit = False
-        if self.use_cache and self.get_num_items_in_cache() < self.cache_portion:
+        if self.use_cache:
             byte_stream = io.BytesIO()
             image.save(byte_stream, format=image.format)
             byte_stream.seek(0)
             byte_image = byte_stream.read()
-            self.cache_client.set(image_path, byte_image)
-            cached_after_fetch = True
-            image = image.convert('RGB')
+            try:
+                self.cache_client.set(image_path, byte_image)
+                cached_after_fetch = True
+            except Exception as e:
+                pass
+        image = image.convert('RGB')
         
         transform_start_time = time.perf_counter()
         if self.image_transform is not None:
