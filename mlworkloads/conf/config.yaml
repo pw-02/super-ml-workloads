@@ -1,8 +1,8 @@
 
 defaults:
   - _self_
-  - dataloader: shade #coordl, super, shade, litgpt
-  - workload: cifar10_resnet18  
+  - dataloader: super #coordl, super, shade, litgpt
+  - workload: imagenet_resnet50  
   #albef_retrieval
   #lora_finetune_tiny_llama 
   #lora_finetune_owt  
