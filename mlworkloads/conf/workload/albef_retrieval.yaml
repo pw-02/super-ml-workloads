@@ -5,7 +5,7 @@ s3_train_prefix: s3://coco-dataset/train2014/
 s3_val_prefix: s3://coco-dataset/val2014/
 train_annotation_file: s3://coco-dataset/coco_train.json
 val_annotation_file: s3://coco-dataset/data/coco_val.json
-num_pytorch_workers: 0
+num_pytorch_workers: 2
 warmup_steps: 1
 log_interval: 1
 devices: 1
