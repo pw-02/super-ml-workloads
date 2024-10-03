@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import boto3
 import io
 import json
@@ -192,6 +193,25 @@ class SUPERMappedDataset(Dataset):
         except Exception as e:
             print(f"Error fetching from cache: {e}, batch_id: {batch_id}")
             return None
+    
+    # def _load_batch_from_s3(self, batch_indices: List[str]) -> Tuple[List[torch.Tensor], List[int]]:
+    #     data_samples, labels = [], []
+    #     s3_client = boto3.client('s3')
+    #     with ThreadPoolExecutor() as executor:
+    #         futures = {executor.submit(self.get_data_sample, idx, s3_client): idx for idx in batch_indices}
+    #         for future in as_completed(futures):
+    #             data_sample, label = future.result()
+    #             data_samples.append(data_sample)
+    #             labels.append(label)
+    #     return data_samples, labels
+
+    
+    # def get_data_sample(self,idx, s3_client) -> tuple:  
+    #     data_path, label = self._classed_items[idx]
+    #     obj = s3_client.get_object(Bucket=self.s3_bucket, Key=data_path)
+    #     data = Image.open(BytesIO(obj['Body'].read())).convert("RGB")
+    #     return data, label
+
 
     def _load_batch_from_s3(self, batch_indices: List[str]) -> Tuple[List[torch.Tensor], List[int]]:
         s3_client = boto3.client('s3')
