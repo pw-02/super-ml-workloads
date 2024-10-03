@@ -2,9 +2,9 @@ import redis
 
 
 
-cache_client =redis.StrictRedis = redis.StrictRedis(host="p-rdior4.serverless.usw2.cache.amazonaws.com",
-                                                     port=6379,
-                                                     ssl=True
+cache_client =redis.StrictRedis = redis.StrictRedis(host="54.202.145.114",
+                                                     port=6378,
+                                              
                                                 )
 
 def put_in_cache(batch_id):
@@ -23,5 +23,8 @@ def fetch_from_cache(batch_id):
         
 
 if __name__ == "__main__":
-      put_in_cache('batch_id')
-      print(fetch_from_cache('batch_id'))
+      while True:
+          for i in range(1000):
+            batch_id = 'batch_id{}'.format(2)
+            put_in_cache(batch_id)
+            print(fetch_from_cache(batch_id))
