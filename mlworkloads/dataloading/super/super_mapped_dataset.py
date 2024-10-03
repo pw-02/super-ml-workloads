@@ -161,7 +161,7 @@ class SUPERMappedDataset(Dataset):
                     self.cache_client.set(batch_id, batch_as_bytes)
                     cached_after_fetch = True
                 except Exception as e:
-                    print(f"Error saving to cache: {e}")
+                    print(f"Error saving to cache: {e}, batch_id: {batch_id}")
         
         # Calculate data loading time excluding transformation time
         data_loading_time  = time.perf_counter() - start_loading_time - transformation_time
