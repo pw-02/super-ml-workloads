@@ -129,7 +129,7 @@ class SUPERMappedDataset(Dataset):
             return batch_id, time.perf_counter() - start_loading_time, 0, is_cached, cached_after_fetch
 
         # Check cache if caching is enabled
-        if self.use_cache:
+        if is_cached and self.use_cache:
             
             # next_minibatch = self.load_batch_with_retries(batch_id, max_retries=5)
             next_minibatch = self._load_batch_from_cache(batch_id)
