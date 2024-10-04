@@ -207,6 +207,7 @@ class SUPERMappedDataset(Dataset):
             time.sleep(0.1)  # Sleep for 1 second before retrying
 
         return next_minibatch
+    
     def _load_batch_from_cache(self, batch_id):
         try:
             self._initialize_cache_client()   
