@@ -130,6 +130,7 @@ class SUPERMappedDataset(Dataset):
 
         # Check cache if caching is enabled
         if is_cached and self.use_cache:
+            
             next_minibatch = self._load_batch_from_cache(batch_id)
 
         # If data is fetched from cache and it's in the correct format
@@ -185,7 +186,27 @@ class SUPERMappedDataset(Dataset):
         with BytesIO(compressed_batch) as buffer:
             data_samples, labels = torch.load(buffer)
         return data_samples, labels
+    
+    def load_batch_with_retries(self, batch_id, max_retries=3):
+        """Attempts to load a batch from cache, retrying if it fails."""
+        attempt = 0
+        next_minibatch = None
+        while attempt < max_retries:
+            try:
+                next_minibatch = self._load_batch_from_cache(batch_id)
+                # If successfully loaded, break out of the loop
+                if next_minibatch:
+                    break
+            except Exception as e:
+                # Handle exception (log it, etc.)
+                # print(f"Attempt {attempt + 1} failed with error: {e}")
+                pass
+            
+            # Increment retry count
+            attempt += 1
+            time.sleep(0.1)  # Sleep for 1 second before retrying
 
+        return next_minibatch
     def _load_batch_from_cache(self, batch_id):
         try:
             self._initialize_cache_client()   

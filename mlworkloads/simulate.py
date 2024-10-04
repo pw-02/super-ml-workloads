@@ -9,16 +9,15 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Constants
-DL_TIME_FOR_CACHE_MISS = 13
-DL_TIME_FOR_CACHE_HIT = 0.25
-GPU_TIME = 0.3
+DL_TIME_FOR_CACHE_MISS = 1.4
+DL_TIME_FOR_CACHE_HIT = 0.001
+GPU_TIME = 0.01
 NUM_JOBS = 1 # Number of parallel jobs to simulate
-NUM_PYTORCH_WORKERS = 0 # Number of workers for PyTorch DataLoader
+NUM_PYTORCH_WORKERS = 4 # Number of workers for PyTorch DataLoader
 DELAY_BETWEEN_JOBS_START = 2  # Delay in seconds between the start of each job
 MAX_BATCHES_PER_JOB = 10000  # Number of batches each job will process
-MAX_EPOCHS = 10  # Number of epochs each job will run
+MAX_EPOCHS = 3  # Number of epochs each job will run
 LOG_ITERATION = 20  # Log every n iterations
-
 
 
 def simulate_training_job(job_id):
