@@ -3,7 +3,7 @@
 name: cifar10_resnet18
 s3_train_prefix: s3://sdl-cifar10/train/
 s3_val_prefix: s3://sdl-cifar10/test/
-num_pytorch_workers: 4
+num_pytorch_workers: 16
 
 #model configuration
 model_architecture: resnet18

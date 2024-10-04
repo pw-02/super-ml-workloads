@@ -131,7 +131,8 @@ class SUPERMappedDataset(Dataset):
         # Check cache if caching is enabled
         if is_cached and self.use_cache:
             
-            next_minibatch = self.load_batch_with_retries(batch_id, max_retries=5)
+            # next_minibatch = self.load_batch_with_retries(batch_id, max_retries=5)
+            next_minibatch = self._load_batch_from_cache(batch_id)
 
         # If data is fetched from cache and it's in the correct format
         if next_minibatch  is not None and (isinstance(next_minibatch , bytes) or isinstance(next_minibatch , str)):
