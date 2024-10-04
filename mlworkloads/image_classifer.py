@@ -371,7 +371,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                     f" Job {job_id} | Epoch: {metrics['Epoch Index']}({metrics['Batch Index']}/{min(len(train_dataloader),limit_train_batches)}) |"
                     # f" loss train: {metrics['Train Loss']:.3f} |"
                     # f" val: {val_loss} |"
-                    # f" batch{batch_id} |"
+                    f" batch{batch_id} |"
                     f" iter:{metrics['Iteration Time (s)']:.2f}s |"
                     f" data_delay:{metrics['Wait for Data Time (s)']:.2f}s |"
                     f" gpu:{metrics['GPU Processing Time (s)']:.2f}s |"
