@@ -350,7 +350,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                 )
 
             metrics= OrderedDict({
-                            "Batch Id": batch_id,
+                            # "Batch Id": batch_id,
                             "Elapsed Time (s)": time.perf_counter() - train_start_time,
                             "Num Torch Workers": train_dataloader.num_workers,
                             "Device": fabric.global_rank,
