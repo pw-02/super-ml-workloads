@@ -19,3 +19,4 @@ pynvml
 awscli
 torchmultimodal-nightly
 lz4
+heapdict
