@@ -15,8 +15,8 @@ visual_map = {
 
 # Define the workloads
 figure_data: Dict[str, Dict[str, float]] = {}
-figure_data['ResNet-18/Cifar10'] = {'CoorDL': 15,'Shade': 15, r'$\bf{SUPER}$': 32}
-figure_data['ResNet-50/Cifar10'] = {'CoorDL': 202,'Shade': 1.5, r'$\bf{SUPER}$': 3.8}
+# figure_data['ResNet-18/Cifar10'] = {'CoorDL': 15,'Shade': 15, r'$\bf{SUPER}$': 32}
+figure_data['ResNet-50/ImageNet'] = {'CoorDL': 202,'Shade': 202, r'$\bf{SUPER}$': 489}
 figure_data['Albef/COCO'] ={'CoorDL': 202,'Shade': 202, r'$\bf{SUPER}$': 489}
 figure_data['Pythia-14m/OpenWebText'] = {'LiData': 574, r'$\bf{SUPER}$': 1117}
 
