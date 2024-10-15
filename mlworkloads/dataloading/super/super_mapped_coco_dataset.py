@@ -189,25 +189,25 @@ class SUPERMappedCocoDataset(Dataset):
         return data_samples, captions, image_ids
     
     
-    def _load_batch_from_s3(self, batch_indices: List[str]) -> Tuple[List[torch.Tensor], List[int]]:
-        if self.s3_client is None:
-            self.s3_client = boto3.client('s3')
+    # def _load_batch_from_s3(self, batch_indices: List[str]) -> Tuple[List[torch.Tensor], List[int]]:
+    #     if self.s3_client is None:
+    #         self.s3_client = boto3.client('s3')
         
-        data_samples = []
-        captions = []
-        image_ids = []
-        for idx in batch_indices:
-            sample, image_id = self._classed_items[idx]
-            data_path, caption = sample
+    #     data_samples = []
+    #     captions = []
+    #     image_ids = []
+    #     for idx in batch_indices:
+    #         sample, image_id = self._classed_items[idx]
+    #         data_path, caption = sample
 
-            obj = self.s3_client.get_object(Bucket=self.s3_bucket, Key=data_path)
-            img_data = obj['Body'].read()
-            image = Image.open(io.BytesIO(img_data)).convert('RGB')
-            # image = Image.open(io.BytesIO(img_data)).convert('RGB')
-            data_samples.append(image)
-            captions.append(caption)  # Simplified; adjust based on your label extraction
-            image_ids.append(image_id)
-        return data_samples, captions, image_ids
+    #         obj = self.s3_client.get_object(Bucket=self.s3_bucket, Key=data_path)
+    #         img_data = obj['Body'].read()
+    #         image = Image.open(io.BytesIO(img_data)).convert('RGB')
+    #         # image = Image.open(io.BytesIO(img_data)).convert('RGB')
+    #         data_samples.append(image)
+    #         captions.append(caption)  # Simplified; adjust based on your label extraction
+    #         image_ids.append(image_id)
+    #     return data_samples, captions, image_ids
 
 
 if __name__ == "__main__":
