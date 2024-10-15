@@ -19,7 +19,7 @@ log_interval: 1 # flush Log every N steps
 log_dir: logs # Directory to save logs
 checkpoint_dir: checkpoints # Save a checkpoint every N steps
 precision: 32 # 16, 32, 64
-simulation_mode: True
+simulation_mode: False
 # num_workers_per_job: 0 # Number of workers per job
 exp_id: single_job
 job_id: 1
