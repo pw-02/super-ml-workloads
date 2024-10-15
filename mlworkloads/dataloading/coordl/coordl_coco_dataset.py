@@ -121,7 +121,7 @@ class CoorDLCocoRetrievalTrainingDataset(Dataset):
             byte_stream.seek(0)
             byte_image = byte_stream.read()
             try:
-                self.cache_client.set(image_path, byte_image)
+                self.cache_client.set(index, byte_image)
                 cached_after_fetch = True
             except Exception as e:
                 pass
