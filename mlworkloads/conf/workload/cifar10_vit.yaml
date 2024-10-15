@@ -1,0 +1,26 @@
+#dataloading configuration
+name: cifar10_vit
+
+s3_bucket: imagenet1k-sdl
+s3_train_prefix: s3://sdl-cifar10/train/
+s3_val_prefix: s3://sdl-cifar10/test/
+num_pytorch_workers: 4
+
+#model configuration
+model_architecture: vit_b_32
+learning_rate: 6e-4
+weight_decay: 1e-1
+precision: 32 # 16, 32, 64
+num_classes: 1000
+
+#training configuration
+run_training: True
+run_validation: False
+validation_frequency: 1000000 #every n epochs
+checkpoint_frequency: .inf #every n epochs
+max_epochs: 2
+max_steps: null
+batch_size: 128 #Number of samples between optimizer steps across data-parallel ranks
+limit_train_batches: null
+limit_val_batches: .inf
+gpu_time: 0.340841602

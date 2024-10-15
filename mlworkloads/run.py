@@ -18,7 +18,7 @@ def main(config: DictConfig):
     train_logger = CSVLogger(root_dir=log_dir, name="train", prefix='', flush_logs_every_n_steps=config.log_interval)
     val_logger = CSVLogger(root_dir=log_dir, name="val", prefix='', flush_logs_every_n_steps=config.log_interval)
 
-    if config.workload.name == 'cifar10_resnet18' or config.workload.name  == 'imagenet_resnet50':
+    if config.workload.name == 'cifar10_vit' or config.workload.name  == 'imagenet_resnet50':
         train_image_classifer(config, train_logger,val_logger)
 
     elif config.workload.name  == 'lora_finetune_owt':

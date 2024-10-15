@@ -1,14 +1,14 @@
 
 defaults:
   - _self_
-  - dataloader: super #coordl, super, shade, litgpt
-  - workload: imagenet_resnet50  
+  - dataloader: coordl #coordl, super, shade, litgpt, 
+  - workload: cifar10_vit  
   #albef_retrieval
   #lora_finetune_tiny_llama 
   #lora_finetune_owt  
   #imagenet_resnet50, 
   #cifar10_resnet18
-
+  # cifar10_vit
   - override hydra/job_logging: disabled
   - override hydra/hydra_logging: disabled  
 
