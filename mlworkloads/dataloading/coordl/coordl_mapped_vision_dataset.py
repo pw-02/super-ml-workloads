@@ -162,9 +162,12 @@ class CoorDLMappedVisionDataset(Dataset):
             sample.save(byte_stream, format=sample.format)
             byte_stream.seek(0)
             byte_image = byte_stream.read()
-            self.cache_client.set(path, byte_image)
-            cached_after_fetch = True
-            sample = sample.convert('RGB')
+            try:
+                self.cache_client.set(path, byte_image)
+                cached_after_fetch = True
+            except Exception as e:
+                pass
+        sample = sample.convert('RGB')
  
         
         transform_start_time = time.perf_counter()

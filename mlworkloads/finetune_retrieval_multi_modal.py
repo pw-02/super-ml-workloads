@@ -39,6 +39,7 @@ from litgpt.utils import (
     parse_devices,
     save_hyperparameters,
 )
+from datetime import datetime, timezone
 
 #Initialization of local cache, PQ and ghost cache (for shade)
 PQ = heapdict.heapdict()
@@ -500,6 +501,8 @@ def train_loop(fabric: Fabric, job_id: str, train_logger: CSVLogger, model,
                             "Cache_Hits (Samples)": cache_hit_samples,
                             "Train Loss (Avg)": avg_train_loss, #calculates the average training loss across all batches.
                             "Train Accuracy (Avg)": 0, #calculates the average training accuracy across all batches.
+                            "Timestamp (UTC)": datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')  # Adds UTC timestamp
+
                             })
         train_logger.log_metrics(metrics,step=global_step_count)
 
