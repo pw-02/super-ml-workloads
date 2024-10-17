@@ -131,8 +131,8 @@ class SUPERMappedDataset(Dataset):
         # Check cache if caching is enabled
         if is_cached and self.use_cache:
             
-            # next_minibatch = self.load_batch_with_retries(batch_id, max_retries=5)
-            next_minibatch = self._load_batch_from_cache(batch_id)
+            next_minibatch = self.get_cached_minibatch_with_retries(batch_id, max_retries=5)
+            # next_minibatch = self._load_batch_from_cache(batch_id)
 
         # If data is fetched from cache and it's in the correct format
         if next_minibatch  is not None and (isinstance(next_minibatch , bytes) or isinstance(next_minibatch , str)):
@@ -188,27 +188,44 @@ class SUPERMappedDataset(Dataset):
             data_samples, labels = torch.load(buffer)
         return data_samples, labels
     
-    def load_batch_with_retries(self, batch_id, max_retries=3):
-        """Attempts to load a batch from cache, retrying if it fails."""
-        attempt = 0
-        next_minibatch = None
-        while attempt < max_retries:
-            try:
-                next_minibatch = self._load_batch_from_cache(batch_id)
-                # If successfully loaded, break out of the loop
-                if next_minibatch:
-                    break
-            except Exception as e:
-                # Handle exception (log it, etc.)
-                # print(f"Attempt {attempt + 1} failed with error: {e}")
-                pass
+    # def load_batch_with_retries(self, batch_id, max_retries=3):
+    #     """Attempts to load a batch from cache, retrying if it fails."""
+    #     attempt = 0
+    #     next_minibatch = None
+    #     while attempt < max_retries:
+    #         try:
+    #             next_minibatch = self._load_batch_from_cache(batch_id)
+    #             # If successfully loaded, break out of the loop
+    #             if next_minibatch:
+    #                 break
+    #         except Exception as e:
+    #             # Handle exception (log it, etc.)
+    #             # print(f"Attempt {attempt + 1} failed with error: {e}")
+    #             pass
             
-            # Increment retry count
-            attempt += 1
-            time.sleep(0.1)  # Sleep for 1 second before retrying
+    #         # Increment retry count
+    #         attempt += 1
+    #         time.sleep(0.1)  # Sleep for 1 second before retrying
 
-        return next_minibatch
+    #     return next_minibatch
     
+    def get_cached_minibatch_with_retries(self, batch_id, max_retries=4, retry_interval=0.1):
+        self._initialize_cache_client()   
+        retries = 0
+        while retries < max_retries:
+            try:
+                # Attempt to cache the minibatch in Redis
+                data = self.cache_client.get(batch_id)
+                if data:
+                    return data
+            except Exception as e:
+                pass
+            # Increment the retry count
+            retries += 1
+            # Wait before retrying
+            time.sleep(retry_interval)
+
+
     def _load_batch_from_cache(self, batch_id):
         try:
             self._initialize_cache_client()   
