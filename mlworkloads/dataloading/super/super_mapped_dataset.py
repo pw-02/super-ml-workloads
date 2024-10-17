@@ -162,7 +162,7 @@ class SUPERMappedDataset(Dataset):
                     self._initialize_cache_client()
                     batch_as_bytes = self._torch_batch_to_bytes(data_samples, labels)
                     # self.cache_client.set(batch_id, batch_as_bytes)
-                    cached_after_fetch = self.cache_minibatch_with_retries(batch_id, batch_as_bytes):
+                    cached_after_fetch = self.cache_minibatch_with_retries(batch_id, batch_as_bytes)
 
                 except Exception as e:
                     print(f"Error saving to cache: {e}, batch_id: {batch_id}")
