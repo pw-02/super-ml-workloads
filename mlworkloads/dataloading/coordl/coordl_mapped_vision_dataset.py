@@ -32,8 +32,8 @@ class S3Url(object):
 
 
 class CoorDLMappedVisionDataset(Dataset):
-    def __init__(self, s3_data_dir: str, transform=None, cache_address= None):
-
+    def __init__(self, s3_data_dir: str, transform=None, cache_address= None, wss=1.0):
+        self.wss = wss
         self.s3_bucket = S3Url(s3_data_dir).bucket
         self.s3_prefix = S3Url(s3_data_dir).key
         self.s3_data_dir = s3_data_dir
@@ -48,7 +48,8 @@ class CoorDLMappedVisionDataset(Dataset):
         self.cache_client = None
         self.s3_client = None
         self.samples = self._get_sample_list_from_s3()
-   
+        self.cache_portion = self.wss * len(self)
+        self.cache_portion = int(self.cache_portion // 1)
     
     @functools.cached_property
     def _classed_items(self) -> List[Tuple[str, int]]:
@@ -156,8 +157,10 @@ class CoorDLMappedVisionDataset(Dataset):
             
         sample = self.fetch_image_from_s3(path)
         cache_hit = False
+
+        keys_cnt = self.get_num_items_in_cache()
         
-        if self.use_cache:
+        if self.use_cache and keys_cnt <= self.cache_portion:
             byte_stream = io.BytesIO()
             sample.save(byte_stream, format=sample.format)
             byte_stream.seek(0)
