@@ -159,7 +159,8 @@ class SUPERMappedDataset(Dataset):
             labels = torch.tensor(labels)
             
             # Cache the data if enabled
-            if self.use_cache and not is_cached: 
+            # if self.use_cache and not is_cached: 
+            if self.use_cache: 
                 try:
                     self._initialize_cache_client()
                     batch_as_bytes = self._torch_batch_to_bytes(data_samples, labels)
