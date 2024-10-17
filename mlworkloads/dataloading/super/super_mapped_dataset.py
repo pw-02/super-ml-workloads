@@ -133,6 +133,8 @@ class SUPERMappedDataset(Dataset):
             
             next_minibatch = self.get_cached_minibatch_with_retries(batch_id, max_retries=5)
             # next_minibatch = self._load_batch_from_cache(batch_id)
+        else:
+            print(f"Batch {batch_id} has a 'not cached' flag. Fetching from S3...")
 
         # If data is fetched from cache and it's in the correct format
         if next_minibatch  is not None and (isinstance(next_minibatch , bytes) or isinstance(next_minibatch , str)):
