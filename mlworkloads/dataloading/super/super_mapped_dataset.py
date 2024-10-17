@@ -161,8 +161,9 @@ class SUPERMappedDataset(Dataset):
                 try:
                     self._initialize_cache_client()
                     batch_as_bytes = self._torch_batch_to_bytes(data_samples, labels)
-                    self.cache_client.set(batch_id, batch_as_bytes)
-                    cached_after_fetch = True
+                    # self.cache_client.set(batch_id, batch_as_bytes)
+                    cached_after_fetch = self.cache_minibatch_with_retries(batch_id, batch_as_bytes):
+
                 except Exception as e:
                     print(f"Error saving to cache: {e}, batch_id: {batch_id}")
         
@@ -188,6 +189,20 @@ class SUPERMappedDataset(Dataset):
             data_samples, labels = torch.load(buffer)
         return data_samples, labels
     
+    def cache_minibatch_with_retries(self, batch_id, minibatch, max_retries=4, retry_interval=0.1):
+        retries = 0
+        while retries < max_retries:
+            try:
+                # Attempt to cache the minibatch in Redis
+                self.cache_client.set(batch_id, minibatch)
+                return True # Exit the function on success
+            except Exception as e:
+                print(f"Error saving to cache: {e}, batch_id: {batch_id}, retrying {retries}...")
+            # Increment the retry count
+            retries += 1
+            # Wait before retrying
+            time.sleep(retry_interval)
+        return False
     # def load_batch_with_retries(self, batch_id, max_retries=3):
     #     """Attempts to load a batch from cache, retrying if it fails."""
     #     attempt = 0
