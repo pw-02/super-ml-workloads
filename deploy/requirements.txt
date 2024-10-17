@@ -6,7 +6,11 @@ hydra-core
 psutil
 pynvml
 awscli
-
+torchmultimodal-nightly
+lz4
+heapdict
+redis
+grpcio-tools
 # torchvision
 # lightning
 # # jsonargparse
