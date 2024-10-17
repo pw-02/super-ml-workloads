@@ -236,7 +236,7 @@ class SUPERMappedDataset(Dataset):
                 if data:
                     return data
             except Exception as e:
-                pass
+                print(f"Error fetching from cache: {e}, batch_id: {batch_id}, retrying {retries}...")
             # Increment the retry count
             retries += 1
             # Wait before retrying
