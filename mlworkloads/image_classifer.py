@@ -351,7 +351,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                 )
 
             metrics= OrderedDict({
-                            "Batch Id": batch_id,
+                            # "Batch Id": batch_id,
                             "Elapsed Time (s)": time.perf_counter() - train_start_time,
                             "Num Torch Workers": train_dataloader.num_workers,
                             "Device": fabric.global_rank,
@@ -375,7 +375,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                     f" Job {job_id} | Epoch: {metrics['Epoch Index']}({metrics['Batch Index']}/{min(len(train_dataloader),limit_train_batches)}) |"
                     # f" loss train: {metrics['Train Loss']:.3f} |"
                     # f" val: {val_loss} |"
-                    f" batch:{batch_id} |"
+                    # f" batch:{batch_id} |"
                     f" iter:{metrics['Iteration Time (s)']:.2f}s |"
                     f" data_delay:{metrics['Wait for Data Time (s)']:.2f}s |"
                     f" gpu:{metrics['GPU Processing Time (s)']:.2f}s |"
