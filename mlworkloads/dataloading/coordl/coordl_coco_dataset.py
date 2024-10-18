@@ -42,7 +42,7 @@ class S3Url(object):
 
 class CoorDLCocoRetrievalTrainingDataset(Dataset):
 
-    def __init__(self, annotation_file, s3_data_dir: str, image_transform=None, text_transform=None,  cache_address= None):
+    def __init__(self, annotation_file, s3_data_dir: str, image_transform=None, text_transform=None,  cache_address= None, wss=1.0):
         
         self.s3_bucket = S3Url(s3_data_dir).bucket
         self.s3_prefix = S3Url(s3_data_dir).key
@@ -56,12 +56,16 @@ class CoorDLCocoRetrievalTrainingDataset(Dataset):
             self.use_cache = True
         else:
             self.use_cache = False
+        self.wss = wss
+
 
         self.cache_client = None
         self.s3_client = None
         self.ann = []
         self.idx = {}
         self.samples = self._get_sample_list_from_s3()
+        self.cache_portion = self.wss * len(self)
+        self.cache_portion = int(self.cache_portion // 1)
         pass
 
     def get_num_items_in_cache(self):
@@ -115,7 +119,9 @@ class CoorDLCocoRetrievalTrainingDataset(Dataset):
            
         image = self.fetch_image_from_s3(image_path)
         cache_hit = False
-        if self.use_cache:
+        keys_cnt = self.get_num_items_in_cache()
+
+        if self.use_cache and keys_cnt <= self.cache_portion:
             byte_stream = io.BytesIO()
             image.save(byte_stream, format=image.format)
             byte_stream.seek(0)
