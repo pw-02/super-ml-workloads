@@ -15,7 +15,7 @@ current_key_count = len(all_keys)
 print(f'Current number of keys in cache: {current_key_count}')
 
 # Step 2: Calculate how many keys we need to keep (50%)
-min_keys_to_keep = max(int(total_keys * 0.25), 1)  # Ensure at least 1 key remains
+min_keys_to_keep = max(int(total_keys * 0.1), 1)  # Ensure at least 1 key remains
 print(f'Minimum keys to keep in cache: {min_keys_to_keep}')
 
 # Step 3: Calculate how many keys to remove
