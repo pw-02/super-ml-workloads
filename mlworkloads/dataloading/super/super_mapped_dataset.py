@@ -13,7 +13,10 @@ from urllib.parse import urlparse
 import redis
 from io import BytesIO
 import lz4.frame
+import botocore.config
+import sys
 
+import zlib
 class S3Url(object):
     def __init__(self, url):
         self._parsed = urlparse(url, allow_fragments=False)
@@ -39,20 +42,26 @@ class SUPERMappedDataset(Dataset):
         self.s3_bucket = S3Url(s3_data_dir).bucket
         self.s3_prefix = S3Url(s3_data_dir).key
         self.s3_data_dir = s3_data_dir
+        self.s3_client = None
         self.transform = transform
         self.samples = self._get_sample_list_from_s3()
         self.simulate_mode = simulate_mode
         self._simlute_time_for_cache_miss = simulate_time_for_cache_miss
         self._simlute_time_for_cache_hit = simulate_time_for_cache_hit
-
         if cache_address is not None:
             self.cache_host, self.cache_port = cache_address.split(":")
             self.cache_port = int(self.cache_port)
             self.use_cache = True
         else:
             self.use_cache = False
+        
 
         self.cache_client = None
+    
+    def check_s3_client(self):
+        if self.s3_client is None:
+            self.s3_client = boto3.client('s3', config=botocore.config.Config(
+                max_pool_connections=100))
 
     
     @functools.cached_property
@@ -183,13 +192,22 @@ class SUPERMappedDataset(Dataset):
         with BytesIO() as buffer:
             torch.save((data_samples, labels), buffer)
             bytes_minibatch = buffer.getvalue()
-            bytes_minibatch = lz4.frame.compress(bytes_minibatch)
+            print(f"Serialized minibatch size: {sys.getsizeof(bytes_minibatch)} bytes")
+            # bytes_minibatch = lz4.frame.compress(bytes_minibatch,  compression_level=0)
+            # bytes_minibatch = zlib.compress(bytes_minibatch,level=0)
+
+            print(f"Compressed minibatch size: {sys.getsizeof(bytes_minibatch)} bytes)")
         return bytes_minibatch
     
     def _bytes_to_torch_batch(self, bytes_minibatch) -> tuple:
-        compressed_batch = lz4.frame.decompress(bytes_minibatch)
-        with BytesIO(compressed_batch) as buffer:
+        time_start = time.perf_counter()
+        # compressed_batch = lz4.frame.decompress(bytes_minibatch)
+        # compressed_batch = zlib.decompress(bytes_minibatch)
+        # print(f"Decompression time: {time.perf_counter() - time_start}")
+        # time_start = time.perf_counter()
+        with BytesIO(bytes_minibatch) as buffer:
             data_samples, labels = torch.load(buffer)
+        print(f"Deserialization time: {time.perf_counter() - time_start}")
         return data_samples, labels
     
     def cache_minibatch_with_retries(self, batch_id, minibatch, max_retries=4, retry_interval=0.1):
@@ -254,9 +272,9 @@ class SUPERMappedDataset(Dataset):
     
     def _load_batch_from_s3(self, batch_indices: List[str]) -> Tuple[List[torch.Tensor], List[int]]:
         data_samples, labels = [], []
-        s3_client = boto3.client('s3')
+        self.check_s3_client()
         with ThreadPoolExecutor() as executor:
-            futures = {executor.submit(self.get_data_sample, idx, s3_client): idx for idx in batch_indices}
+            futures = {executor.submit(self.get_data_sample, idx): idx for idx in batch_indices}
             for future in as_completed(futures):
                 data_sample, label = future.result()
                 data_samples.append(data_sample)
@@ -264,9 +282,9 @@ class SUPERMappedDataset(Dataset):
         return data_samples, labels
 
     
-    def get_data_sample(self,idx, s3_client) -> tuple:  
+    def get_data_sample(self,idx) -> tuple:  
         data_path, label = self._classed_items[idx]
-        obj = s3_client.get_object(Bucket=self.s3_bucket, Key=data_path)
+        obj = self.s3_client.get_object(Bucket=self.s3_bucket, Key=data_path)
         data = Image.open(BytesIO(obj['Body'].read())).convert("RGB")
         return data, label
 

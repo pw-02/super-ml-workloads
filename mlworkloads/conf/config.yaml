@@ -2,7 +2,7 @@
 defaults:
   - _self_
   - dataloader: super #coordl, super, shade, litgpt, 
-  - workload: albef_retrieval  
+  - workload: cifar10_vit  
   #albef_retrieval
   #lora_finetune_tiny_llama 
   #lora_finetune_owt  
