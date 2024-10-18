@@ -21,7 +21,7 @@ min_lr: 1e-6
 max_epochs: 2
 step_size: 100
 max_steps: null
-batch_size: 32 #Number of samples between optimizer steps across data-parallel ranks
+batch_size: 128 #Number of samples between optimizer steps across data-parallel ranks
 limit_train_batches: null
 limit_val_batches: null
 
