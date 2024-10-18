@@ -1,5 +1,5 @@
 name: shade
 cache_address:  coco.rdior4.ng.0001.usw2.cache.amazonaws.com:6379    #c1.rdior4.ng.0001.usw2.cache.amazonaws.com:6379 # 127.0.0.1:6379 #rs10.rdior4.ng.0001.usw2.cache.amazonaws.com:6379 #127.0.0.1:6379 # null #
-wss: 0.75
+wss: 0.5
 rep_factor: 1.5
 shuffle: True
