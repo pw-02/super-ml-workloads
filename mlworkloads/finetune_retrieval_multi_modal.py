@@ -571,7 +571,7 @@ def main(fabric: Fabric, devices: int, config: DictConfig,train_logger: CSVLogge
         seed_everything(config.job_id) # instead of torch.manual_seed(...)
 
     
-    model = albef_model_for_retrieval(config.workload, pretrained=True)
+    model = albef_model_for_retrieval(config.workload, pretrained=False)
 
     # optimizer = AdamW(optimizer_params, lr=args["lr"])
     # scheduler = CosineAnnealingWarmRestarts(
