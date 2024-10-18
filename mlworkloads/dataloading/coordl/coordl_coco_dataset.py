@@ -121,16 +121,16 @@ class CoorDLCocoRetrievalTrainingDataset(Dataset):
         cache_hit = False
         keys_cnt = self.get_num_items_in_cache()
 
-        if self.use_cache and keys_cnt <= self.cache_portion:
-            byte_stream = io.BytesIO()
-            image.save(byte_stream, format=image.format)
-            byte_stream.seek(0)
-            byte_image = byte_stream.read()
-            try:
-                self.cache_client.set(index, byte_image)
-                cached_after_fetch = True
-            except Exception as e:
-                pass
+        # if self.use_cache and keys_cnt <= self.cache_portion:
+        #     byte_stream = io.BytesIO()
+        #     image.save(byte_stream, format=image.format)
+        #     byte_stream.seek(0)
+        #     byte_image = byte_stream.read()
+        #     try:
+        #         self.cache_client.set(index, byte_image)
+        #         cached_after_fetch = True
+        #     except Exception as e:
+        #         pass
         image = image.convert('RGB')
         
         transform_start_time = time.perf_counter()

@@ -13,7 +13,7 @@ num_nodes: 1
 run_training: True
 run_validation: False
 precision: 16-mixed
-gpu_time: 0.5823022
+gpu_time: 0.24
 alpha: 0.4
 weight_decay: 0.02
 learning_rate: 1e-5
