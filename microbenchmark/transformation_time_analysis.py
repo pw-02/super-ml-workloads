@@ -218,11 +218,11 @@ def main():
     bucket_name = "imagenet1k-sdl"
     prefix = "train/"
     num_tests = 5
-    report_file = os.path.join('microbenchmark', 'transformation_time_analysis.csv')
+    report_file = os.path.join('microbenchmark', 'transformation_time_analysis2.csv')
     
     transform = get_transforms('imagenet') if 'imagenet' in bucket_name else get_transforms('cifar10')
     
-    for batch_size in [8,16,32,64]:
+    for batch_size in [128]:
         print(f"Running tests for batch size: {batch_size}")
         batch = load_batch_from_s3(bucket_name, prefix, max_images=batch_size)
         for compression_lib in [None, 'zlib', 'zstandard', 'snappy', 'lz4']:

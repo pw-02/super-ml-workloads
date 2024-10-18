@@ -14,9 +14,8 @@ import redis
 from io import BytesIO
 import lz4.frame
 import botocore.config
-import sys
+import zstandard as zstd
 
-import zlib
 class S3Url(object):
     def __init__(self, url):
         self._parsed = urlparse(url, allow_fragments=False)
@@ -54,10 +53,18 @@ class SUPERMappedDataset(Dataset):
             self.use_cache = True
         else:
             self.use_cache = False
-        
+
 
         self.cache_client = None
+        self.compressor = None
+        self.decompressor = None
     
+    def set_compesor(self):
+        if self.compressor is None:
+            self.compressor = zstd.ZstdCompressor(level=-1)
+        if self.decompressor is None:
+            self.decompressor = zstd.ZstdDecompressor()
+
     def check_s3_client(self):
         if self.s3_client is None:
             self.s3_client = boto3.client('s3', config=botocore.config.Config(
@@ -125,7 +132,7 @@ class SUPERMappedDataset(Dataset):
         batch_id, batch_indices, is_cached = idx
         next_minibatch  = None
         cached_after_fetch = False
-
+        self.set_compesor()
         # Start data loading timer
         start_loading_time = time.perf_counter()
 
@@ -197,6 +204,7 @@ class SUPERMappedDataset(Dataset):
             # bytes_minibatch = zlib.compress(bytes_minibatch,level=0)
 
             # print(f"Compressed minibatch size: {sys.getsizeof(bytes_minibatch)} bytes)")
+            bytes_minibatch = self.compressor.compress(bytes_minibatch)
         return bytes_minibatch
     
     def _bytes_to_torch_batch(self, bytes_minibatch) -> tuple:
@@ -205,6 +213,7 @@ class SUPERMappedDataset(Dataset):
         # compressed_batch = zlib.decompress(bytes_minibatch)
         # print(f"Decompression time: {time.perf_counter() - time_start}")
         # time_start = time.perf_counter()
+        bytes_minibatch = self.decompressor.decompress(bytes_minibatch)
         with BytesIO(bytes_minibatch) as buffer:
             data_samples, labels = torch.load(buffer)
         # print(f"Deserialization time: {time.perf_counter() - time_start}")
