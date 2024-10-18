@@ -2,7 +2,7 @@ import redis
 import random
 
 # Connect to Redis
-redis_client = redis.Redis(host='coco.rdior4.ng.0001.usw2.cache.amazonaws.com:6379', port=6379, db=0)  # Adjust parameters as needed
+redis_client = redis.Redis(host='coco.rdior4.ng.0001.usw2.cache.amazonaws.com', port=6379, db=0)  # Adjust parameters as needed
 
 # Step 1: Get all keys in the cache
 all_keys = redis_client.keys('*')
