@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-workload="imagenet_resnet50" # Define your workload imagenet_resnet50, cifar10_resnet18, lora_finetune_owt, albef_retrieval, cifar10_vit
-dataloder="super" # Define your dataloader shade, super, litgpt, coordl
+workload="albef_retrieval" # Define your workload imagenet_resnet50, cifar10_resnet18, lora_finetune_owt, albef_retrieval, cifar10_vit
+dataloder="shade" # Define your dataloader shade, super, litgpt, coordl
 
 # Define an array of GPU indices
 gpu_indices=(0 1 2 3)
