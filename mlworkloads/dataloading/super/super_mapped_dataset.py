@@ -192,11 +192,11 @@ class SUPERMappedDataset(Dataset):
         with BytesIO() as buffer:
             torch.save((data_samples, labels), buffer)
             bytes_minibatch = buffer.getvalue()
-            print(f"Serialized minibatch size: {sys.getsizeof(bytes_minibatch)} bytes")
+            # print(f"Serialized minibatch size: {sys.getsizeof(bytes_minibatch)} bytes")
             # bytes_minibatch = lz4.frame.compress(bytes_minibatch,  compression_level=0)
             # bytes_minibatch = zlib.compress(bytes_minibatch,level=0)
 
-            print(f"Compressed minibatch size: {sys.getsizeof(bytes_minibatch)} bytes)")
+            # print(f"Compressed minibatch size: {sys.getsizeof(bytes_minibatch)} bytes)")
         return bytes_minibatch
     
     def _bytes_to_torch_batch(self, bytes_minibatch) -> tuple:
@@ -248,6 +248,7 @@ class SUPERMappedDataset(Dataset):
     def get_cached_minibatch_with_retries(self, batch_id, max_retries=4, retry_interval=0.05):
         self._initialize_cache_client()   
         retries = 0
+        exception = None
         while retries < max_retries:
             try:
                 # Attempt to cache the minibatch in Redis
@@ -255,11 +256,12 @@ class SUPERMappedDataset(Dataset):
                 if data:
                     return data
             except Exception as e:
-                print(f"Error fetching from cache: {e}, batch_id: {batch_id}, retrying {retries}...")
+                exception = e
             # Increment the retry count
             retries += 1
             # Wait before retrying
             time.sleep(retry_interval)
+        print(f"Error fetching from cache: {exception}, batch_id: {batch_id}")
 
 
     def _load_batch_from_cache(self, batch_id):
