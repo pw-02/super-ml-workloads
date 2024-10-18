@@ -200,14 +200,14 @@ class SUPERMappedDataset(Dataset):
         return bytes_minibatch
     
     def _bytes_to_torch_batch(self, bytes_minibatch) -> tuple:
-        time_start = time.perf_counter()
+        # time_start = time.perf_counter()
         # compressed_batch = lz4.frame.decompress(bytes_minibatch)
         # compressed_batch = zlib.decompress(bytes_minibatch)
         # print(f"Decompression time: {time.perf_counter() - time_start}")
         # time_start = time.perf_counter()
         with BytesIO(bytes_minibatch) as buffer:
             data_samples, labels = torch.load(buffer)
-        print(f"Deserialization time: {time.perf_counter() - time_start}")
+        # print(f"Deserialization time: {time.perf_counter() - time_start}")
         return data_samples, labels
     
     def cache_minibatch_with_retries(self, batch_id, minibatch, max_retries=4, retry_interval=0.1):
