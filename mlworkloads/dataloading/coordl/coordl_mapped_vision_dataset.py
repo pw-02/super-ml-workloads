@@ -32,7 +32,7 @@ class S3Url(object):
 
 
 class CoorDLMappedVisionDataset(Dataset):
-    def __init__(self, s3_data_dir: str, transform=None, cache_address= None, wss=1.0):
+    def __init__(self, s3_data_dir: str, transform=None, cache_address= None, wss=1.0, max_dataset_size=None):
         self.wss = wss
         self.s3_bucket = S3Url(s3_data_dir).bucket
         self.s3_prefix = S3Url(s3_data_dir).key
@@ -47,25 +47,30 @@ class CoorDLMappedVisionDataset(Dataset):
         
         self.cache_client = None
         self.s3_client = None
-        self.samples = self._get_sample_list_from_s3()
+        self.samples = self._get_sample_list_from_s3(use_index_file=True, images_only=True, max_dataset_size = max_dataset_size)
         self.cache_portion = self.wss * len(self)
         self.cache_portion = int(self.cache_portion // 1)
-    
+
+        #trim samples to match size of cache portion
+
     @functools.cached_property
     def _classed_items(self) -> List[Tuple[str, int]]:
         return [(blob, class_index)
-            for class_index, blob_class in enumerate(self.samples)
-            for blob in self.samples[blob_class]]
+                for class_index, blob_class in enumerate(self.samples)
+                for blob in self.samples[blob_class]]
     
     def get_num_items_in_cache(self):
         if self.cache_client is None:
             self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port,  ssl=True)
         return self.cache_client.dbsize()
     
-    def _get_sample_list_from_s3(self, use_index_file=True, images_only=True) -> Dict[str, List[str]]:
+    def _get_sample_list_from_s3(self, use_index_file=True, images_only=True, max_dataset_size = None) -> Dict[str, List[str]]:
         s3_client = boto3.client('s3')
+        if max_dataset_size:
+            index_file_key = f"{self.s3_prefix}_paired_index_{max_dataset_size}GB.json"
+        else:
+            index_file_key = f"{self.s3_prefix}_paired_index.json"
 
-        index_file_key = f"{self.s3_prefix}_paired_index.json"
         paired_samples = {}
 
         if use_index_file:
@@ -78,8 +83,14 @@ class CoorDLMappedVisionDataset(Dataset):
                 print(f"Error reading index file '{index_file_key}': {e}")
 
         paginator = s3_client.get_paginator('list_objects_v2')
+        total_size_gb = 0
+
         for page in paginator.paginate(Bucket=self.s3_bucket, Prefix=self.s3_prefix):
+            if max_dataset_size and total_size_gb >= max_dataset_size:
+                    break
             for blob in page.get('Contents', []):
+                if max_dataset_size and total_size_gb >= max_dataset_size:
+                    break
                 blob_path = blob.get('Key')
                 
                 if blob_path.endswith("/"):
@@ -99,6 +110,7 @@ class CoorDLMappedVisionDataset(Dataset):
                 if blob_class not in paired_samples:
                     paired_samples[blob_class] = []
                 paired_samples[blob_class].append(blob_path)
+                total_size_gb += blob['Size'] / 1024 / 1024 / 1024
 
         if use_index_file and paired_samples:
             s3_client.put_object(

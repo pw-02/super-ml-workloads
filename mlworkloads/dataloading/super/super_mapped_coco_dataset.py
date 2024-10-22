@@ -191,7 +191,7 @@ class SUPERMappedCocoDataset(Dataset):
     def _load_batch_from_s3(self, batch_indices: List[str]) -> Tuple[List[torch.Tensor], List[int]]:
         data_samples,captions, image_ids = [], [], []
         s3_client = boto3.client('s3')
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=10) as executor:
             futures = {executor.submit(self.get_data_sample, idx, s3_client): idx for idx in batch_indices}
             for future in as_completed(futures):
                 data_sample, caption, image_id = future.result()

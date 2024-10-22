@@ -118,7 +118,8 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
             train_dataset = CoorDLMappedVisionDataset(s3_data_dir=config.workload.s3_train_prefix,
                                                        transform=train_transform,
                                                          cache_address=config.dataloader.cache_address,
-                                                         wss=config.dataloader.wss)
+                                                         wss=config.dataloader.wss,
+                                                         max_dataset_size=config.workload.max_dataset_size)
             if config.dataloader.shuffle:
                 train_sampler = RandomSampler(data_source=train_dataset)
             else:

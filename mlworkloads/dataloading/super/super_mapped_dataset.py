@@ -14,7 +14,7 @@ import redis
 from io import BytesIO
 import lz4.frame
 import botocore.config
-import zstandard as zstd
+# import zstandard as zstd
 
 class S3Url(object):
     def __init__(self, url):
@@ -59,11 +59,11 @@ class SUPERMappedDataset(Dataset):
         self.compressor = None
         self.decompressor = None
     
-    def set_compesor(self):
-        if self.compressor is None:
-            self.compressor = zstd.ZstdCompressor(level=-1)
-        if self.decompressor is None:
-            self.decompressor = zstd.ZstdDecompressor()
+    # def set_compesor(self):
+    #     if self.compressor is None:
+    #         self.compressor = zstd.ZstdCompressor(level=-1)
+    #     if self.decompressor is None:
+    #         self.decompressor = zstd.ZstdDecompressor()
 
     def check_s3_client(self):
         if self.s3_client is None:
@@ -132,7 +132,7 @@ class SUPERMappedDataset(Dataset):
         batch_id, batch_indices, is_cached = idx
         next_minibatch  = None
         cached_after_fetch = False
-        self.set_compesor()
+        # self.set_compesor()
         # Start data loading timer
         start_loading_time = time.perf_counter()
 
@@ -200,20 +200,20 @@ class SUPERMappedDataset(Dataset):
             torch.save((data_samples, labels), buffer)
             bytes_minibatch = buffer.getvalue()
             # print(f"Serialized minibatch size: {sys.getsizeof(bytes_minibatch)} bytes")
-            # bytes_minibatch = lz4.frame.compress(bytes_minibatch,  compression_level=0)
+            bytes_minibatch = lz4.frame.compress(bytes_minibatch,  compression_level=0)
             # bytes_minibatch = zlib.compress(bytes_minibatch,level=0)
 
             # print(f"Compressed minibatch size: {sys.getsizeof(bytes_minibatch)} bytes)")
-            bytes_minibatch = self.compressor.compress(bytes_minibatch)
+            #bytes_minibatch = self.compressor.compress(bytes_minibatch)
         return bytes_minibatch
     
     def _bytes_to_torch_batch(self, bytes_minibatch) -> tuple:
         # time_start = time.perf_counter()
-        # compressed_batch = lz4.frame.decompress(bytes_minibatch)
+        bytes_minibatch = lz4.frame.decompress(bytes_minibatch)
         # compressed_batch = zlib.decompress(bytes_minibatch)
         # print(f"Decompression time: {time.perf_counter() - time_start}")
         # time_start = time.perf_counter()
-        bytes_minibatch = self.decompressor.decompress(bytes_minibatch)
+        # bytes_minibatch = self.decompressor.decompress(bytes_minibatch)
         with BytesIO(bytes_minibatch) as buffer:
             data_samples, labels = torch.load(buffer)
         # print(f"Deserialization time: {time.perf_counter() - time_start}")

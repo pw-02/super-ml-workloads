@@ -5,6 +5,7 @@ s3_bucket: imagenet1k-sdl
 s3_train_prefix: s3://imagenet1k-sdl/train/
 s3_val_prefix: s3://imagenet1k-sdl/val/
 num_pytorch_workers: 4
+max_dataset_size: 30 #gb
 
 #model configuration
 model_architecture: resnet50
