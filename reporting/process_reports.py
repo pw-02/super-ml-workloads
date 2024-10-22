@@ -8,6 +8,21 @@ def convert_csv_to_dict(csv_file):
     df = pd.read_csv(csv_file)
     return df.to_dict(orient='list')
 
+
+def cacluate_redis_serverless_cost(duartion, cache_size_gb, request_rate, size_per_request):
+    # Duration is in seconds
+    # Memory size is in GB
+    # Cost is in USD
+    hours_in_a_month = 730
+    data_storage_cost_monthly = cache_size_gb * hours_in_a_month * 0.125
+    data_transfer_cost_monthly = 0
+
+    cache_size_kb = cache_size_gb * 1024 * 1024
+    
+
+
+
+
 def convert_all_csv_to_dict_text(folder_path):
     folder_name = os.path.basename(os.path.normpath(subfolder))
     metrics = OrderedDict({
