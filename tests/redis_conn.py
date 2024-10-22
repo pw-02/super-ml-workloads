@@ -2,7 +2,7 @@ import redis
 
 
 cache_client =redis.StrictRedis = redis.StrictRedis(host="cache-rdior4.serverless.usw2.cache.amazonaws.com",
-                                                     port=6379,
+                                                     port=6379, ssl=True
                                            )
 
 def put_in_cache(batch_id):
