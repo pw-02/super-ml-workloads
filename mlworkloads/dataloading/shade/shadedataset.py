@@ -42,12 +42,12 @@ T = TypeVar('T')
 
 
 class ShadeDataset(Dataset):
-    def __init__(self, s3_data_dir: str, transform=None, cache_address= None, PQ=None, ghost_cache=None, wss=0.1):
+    def __init__(self, s3_data_dir: str, transform=None, cache_address= None, PQ=None, ghost_cache=None, wss=0.1, max_dataset_size=None):
         self.s3_bucket = S3Url(s3_data_dir).bucket
         self.s3_prefix = S3Url(s3_data_dir).key
         self.s3_data_dir = s3_data_dir
         self.transform = transform
-        self.samples = self._get_sample_list_from_s3()
+        self.samples = self._get_sample_list_from_s3(use_index_file=True, images_only=True, max_dataset_size = max_dataset_size)
         self.cache_host, self.cache_port = cache_address.split(":")
         self.cache_data = True if cache_address is not None else False
         self.wss = wss
@@ -172,7 +172,6 @@ class ShadeDataset(Dataset):
         return sum(len(class_items) for class_items in self.samples.values())
     
     def fetch_image_from_s3(self, data_path):
-        
         if self.s3_client is None:
             self.s3_client = boto3.client('s3')
         obj = self.s3_client.get_object(Bucket=self.s3_bucket, Key=data_path)
@@ -180,10 +179,13 @@ class ShadeDataset(Dataset):
         image = Image.open(io.BytesIO(img_data)) #.convert('RGB')
         return image
     
-    def _get_sample_list_from_s3(self, use_index_file=True, images_only=True) -> Dict[str, List[str]]:
+    def _get_sample_list_from_s3(self, use_index_file=True, images_only=True, max_dataset_size = None) -> Dict[str, List[str]]:
         s3_client = boto3.client('s3')
+        if max_dataset_size:
+            index_file_key = f"{self.s3_prefix}_paired_index_{max_dataset_size}GB.json"
+        else:
+            index_file_key = f"{self.s3_prefix}_paired_index.json"
 
-        index_file_key = f"{self.s3_prefix}_paired_index.json"
         paired_samples = {}
 
         if use_index_file:
@@ -196,8 +198,14 @@ class ShadeDataset(Dataset):
                 print(f"Error reading index file '{index_file_key}': {e}")
 
         paginator = s3_client.get_paginator('list_objects_v2')
+        total_size_gb = 0
+
         for page in paginator.paginate(Bucket=self.s3_bucket, Prefix=self.s3_prefix):
+            if max_dataset_size and total_size_gb >= max_dataset_size:
+                    break
             for blob in page.get('Contents', []):
+                if max_dataset_size and total_size_gb >= max_dataset_size:
+                    break
                 blob_path = blob.get('Key')
                 
                 if blob_path.endswith("/"):
@@ -217,6 +225,7 @@ class ShadeDataset(Dataset):
                 if blob_class not in paired_samples:
                     paired_samples[blob_class] = []
                 paired_samples[blob_class].append(blob_path)
+                total_size_gb += blob['Size'] / 1024 / 1024 / 1024
 
         if use_index_file and paired_samples:
             s3_client.put_object(
@@ -226,7 +235,6 @@ class ShadeDataset(Dataset):
             )
 
         return paired_samples
-
        
 
 

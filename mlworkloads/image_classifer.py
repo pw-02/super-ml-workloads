@@ -92,7 +92,8 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
                                         cache_address=config.dataloader.cache_address,
                                         PQ=PQ,
                                         ghost_cache=ghost_cache,
-                                        wss=config.dataloader.wss)
+                                        wss=config.dataloader.wss,
+                                        max_dataset_size=config.workload.max_dataset_size)
             train_sampler = ShadeSampler(
                 dataset=train_dataset,
                 num_replicas=1,
