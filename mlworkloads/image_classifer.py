@@ -69,7 +69,8 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
                                           batch_size=None,
                                             sampler=train_sampler, 
                                             num_workers=config.workload.num_pytorch_workers,
-                                            prefetch_factor=8)
+                                            prefetch_factor=8,
+                                            pin_memory=True)
             train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
         
         if config.workload.run_validation:
@@ -276,12 +277,15 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
             elif isinstance(train_dataloader.sampler, SUPERSampler):
                 inputs, labels, batch_id = batch
 
+            if fabric.device.type == 'cuda':
+                    torch.cuda.synchronize() # Ensure accurate timing
+
             # Forward pass: Compute model output and loss
             gpu_processing_started = time.perf_counter()
             if sim:
                 time.sleep(sim_time)
             else:
-                time.sleep(1.5) #temporary
+                # time.sleep(1.5) #temporary
                 outputs  = model(inputs)
                 item_loss = criterion(outputs, labels)
                 loss = item_loss.mean()
@@ -295,8 +299,8 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                 correct_preds += (outputs.argmax(dim=1) == labels).sum().item()  # No .item(), stays on GPU
                 total_train_loss += loss.item() * inputs.size(0)  # Convert loss to CPU for accumulation
                 
-                if fabric.device.type == 'cuda':
-                    torch.cuda.synchronize()
+                # if fabric.device.type == 'cuda':
+                #     torch.cuda.synchronize()
 
              # Track time taken for GPU processing
             gpu_processing_time = time.perf_counter() - gpu_processing_started
