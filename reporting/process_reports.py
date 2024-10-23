@@ -9,15 +9,15 @@ def convert_csv_to_dict(csv_file):
     return df.to_dict(orient='list')
 
 
-def cacluate_redis_serverless_cost(duartion, cache_size_gb, request_rate, size_per_request):
-    # Duration is in seconds
-    # Memory size is in GB
-    # Cost is in USD
-    hours_in_a_month = 730
-    data_storage_cost_monthly = cache_size_gb * hours_in_a_month * 0.125
-    data_transfer_cost_monthly = 0
+# def cacluate_redis_serverless_cost(duartion, cache_size_gb, request_rate, size_per_request):
+#     # Duration is in seconds
+#     # Memory size is in GB
+#     # Cost is in USD
+#     hours_in_a_month = 730
+#     data_storage_cost_monthly = cache_size_gb * hours_in_a_month * 0.125
 
-    cache_size_kb = cache_size_gb * 1024 * 1024
+#     data_transfer_cost_monthly = 0
+#     cache_size_kb = cache_size_gb * 1024 * 1024
     
 
 
@@ -128,7 +128,7 @@ def save_dict_list_to_csv(dict_list, output_file):
             writer.writerow(data)
 
 if __name__ == "__main__":
-    folder_path = "C:\\Users\\pw\\Desktop\\\\dataloader_project_results_final\\\cifar10_vit"
+    folder_path = "C:\\Users\\pw\\Desktop\\dataloading_gpu_unlimited-cache_results\\imagenet_resnet50\coordl"
     subfolders = glob.glob(os.path.join(folder_path, '*'))
     
     overall_summary = []
