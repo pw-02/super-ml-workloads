@@ -281,7 +281,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
             if sim:
                 time.sleep(sim_time)
             else:
-                time.sleep(0.5) #temporary
+                time.sleep(1.5) #temporary
                 outputs  = model(inputs)
                 item_loss = criterion(outputs, labels)
                 loss = item_loss.mean()
