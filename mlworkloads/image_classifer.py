@@ -131,7 +131,10 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
             else:
                 train_sampler = SequentialSampler(data_source=train_dataset)
 
-            train_dataloader = DataLoader(train_dataset, batch_size=config.workload.batch_size, sampler=train_sampler, num_workers=config.workload.num_pytorch_workers)
+            train_dataloader = DataLoader(train_dataset, batch_size=config.workload.batch_size, 
+                                          sampler=train_sampler, 
+                                          num_workers=config.workload.num_pytorch_workers,
+                                          pin_memory=True)
             train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
         
         if config.workload.run_validation:
