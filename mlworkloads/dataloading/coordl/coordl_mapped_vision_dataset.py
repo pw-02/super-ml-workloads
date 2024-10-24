@@ -170,9 +170,8 @@ class CoorDLMappedVisionDataset(Dataset):
         sample = self.fetch_image_from_s3(path)
         cache_hit = False
 
-        keys_cnt = self.get_num_items_in_cache()
-        
         if self.use_cache and keys_cnt <= self.cache_portion:
+            keys_cnt = self.get_num_items_in_cache()
             byte_stream = io.BytesIO()
             sample.save(byte_stream, format=sample.format)
             byte_stream.seek(0)
