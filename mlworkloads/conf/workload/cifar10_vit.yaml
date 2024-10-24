@@ -13,6 +13,7 @@ weight_decay: 1e-1
 precision: 32 # 16, 32, 64
 num_classes: 1000
 
+max_dataset_size: null 
 #training configuration
 run_training: True
 run_validation: False
