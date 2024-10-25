@@ -152,7 +152,7 @@ class CoorDLMappedVisionDataset(Dataset):
         start_loading_time = time.perf_counter()
 
         if self.use_cache:
-            item_data = self._load_item_from_cache(path)
+            item_data = self._load_item_from_cache(index)
 
         if item_data  is not None and (isinstance(item_data , bytes) or isinstance(item_data , str)):
             start_transformation_time   = time.perf_counter()
@@ -178,7 +178,7 @@ class CoorDLMappedVisionDataset(Dataset):
                 byte_stream.seek(0)
                 byte_image = byte_stream.read()
                 try:
-                    self.cache_client.set(path, byte_image)
+                    self.cache_client.set(index, byte_image)
                     cached_after_fetch = True
                 except Exception as e:
                     pass
