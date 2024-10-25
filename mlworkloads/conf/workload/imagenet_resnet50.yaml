@@ -25,4 +25,4 @@ batch_size: 128 #Number of samples between optimizer steps across data-parallel 
 limit_train_batches: null
 limit_val_batches: .inf
 # gpu_time: 0.340841602
-gpu_time: 0.15
+gpu_time: 0.1
