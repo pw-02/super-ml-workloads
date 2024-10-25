@@ -228,7 +228,7 @@ def get_transforms(workload_name):
         # Set up data transforms for ImageNet
         train_transform = transforms.Compose([
             transforms.Resize(256), 
-            # transforms.RandomResizedCrop(224),
+            transforms.RandomResizedCrop(224),
             # transforms.RandomHorizontalFlip(),
             # transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # Randomly change brightness, contrast, saturation, and hue
             transforms.ToTensor(),
