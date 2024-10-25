@@ -99,8 +99,8 @@ class CoorDLCocoRetrievalTrainingDataset(Dataset):
         cached_after_fetch = False
         start_loading_time = time.perf_counter()
 
-        # if self.use_cache:
-        #   image = self._load_item_from_cache(index)
+        if self.use_cache:
+          image = self._load_item_from_cache(index)
 
         if image  is not None and (isinstance(image , bytes) or isinstance(image , str)):
             start_transformation_time   = time.perf_counter()
