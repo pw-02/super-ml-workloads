@@ -5,7 +5,7 @@ s3_bucket: imagenet1k-sdl
 s3_train_prefix: s3://imagenet1k-sdl/train/
 s3_val_prefix: s3://imagenet1k-sdl/val/
 num_pytorch_workers: 0
-max_dataset_size: null #gb
+max_dataset_size: 30 #gb
 
 #model configuration
 model_architecture: resnet50
@@ -24,5 +24,5 @@ max_steps: null
 batch_size: 128 #Number of samples between optimizer steps across data-parallel ranks
 limit_train_batches: null
 limit_val_batches: .inf
-# gpu_time: 0.340841602
-gpu_time: 0.05
+gpu_time: 0.340841602
+# gpu_time: 0.05
