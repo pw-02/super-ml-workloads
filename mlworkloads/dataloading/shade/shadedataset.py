@@ -71,7 +71,7 @@ class ShadeDataset(Dataset):
 
     def set_num_local_samples(self):
         if self.key_id_map is None:
-            self.key_id_map = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
+            self.key_id_map = redis.StrictRedis(host=self.cache_host, port=self.cache_port,  ssl=True)
         self.key_counter = self.key_id_map.dbsize()
 
     def set_PQ(self, curr_PQ):
@@ -88,7 +88,7 @@ class ShadeDataset(Dataset):
     
     def cache_and_evict(self, path, target, index):
         if self.key_id_map is None:
-            self.key_id_map = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
+            self.key_id_map = redis.StrictRedis(host=self.cache_host, port=self.cache_port,   ssl=True)
         fetch_start_time = time.perf_counter()
         cache_hit = False
         cached_after_fetch = False
