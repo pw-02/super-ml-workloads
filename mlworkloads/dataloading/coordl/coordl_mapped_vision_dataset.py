@@ -151,8 +151,8 @@ class CoorDLMappedVisionDataset(Dataset):
         cached_after_fetch = False
         start_loading_time = time.perf_counter()
 
-        if self.use_cache:
-            item_data = self._load_item_from_cache(index)
+        # if self.use_cache:
+        #     item_data = self._load_item_from_cache(index)
 
         if item_data  is not None and (isinstance(item_data , bytes) or isinstance(item_data , str)):
             start_transformation_time   = time.perf_counter()
