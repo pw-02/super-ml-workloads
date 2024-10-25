@@ -5,7 +5,7 @@ import random
 redis_client = redis.Redis(host='coco.rdior4.ng.0001.usw2.cache.amazonaws.com', port=6379, db=0)  # Adjust parameters as needed
 
 # Total number of keys in the cache
-total_keys = 82688
+total_keys = 50000 #82688
 
 # Step 1: Get all keys in the cache
 all_keys = redis_client.keys('*')
@@ -15,7 +15,7 @@ current_key_count = len(all_keys)
 print(f'Current number of keys in cache: {current_key_count}')
 
 # Step 2: Calculate how many keys we need to keep (50%)
-min_keys_to_keep = max(int(total_keys * 0.1), 1)  # Ensure at least 1 key remains
+min_keys_to_keep = max(int(total_keys * 0.6), 1)  # Ensure at least 1 key remains
 print(f'Minimum keys to keep in cache: {min_keys_to_keep}')
 
 # Step 3: Calculate how many keys to remove
