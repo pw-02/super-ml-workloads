@@ -71,7 +71,7 @@ class ShadeDataset(Dataset):
 
     def set_num_local_samples(self):
         if self.key_id_map is None:
-            self.key_id_map = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
+            self.key_id_map = redis.StrictRedis(host=self.cache_host, port=self.cache_port,  ssl=True)
         self.key_counter = self.key_id_map.dbsize()
 
     def set_PQ(self, curr_PQ):
@@ -88,15 +88,15 @@ class ShadeDataset(Dataset):
     
     def cache_and_evict(self, path, target, index):
         if self.key_id_map is None:
-            self.key_id_map = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
+            self.key_id_map = redis.StrictRedis(host=self.cache_host, port=self.cache_port,   ssl=True)
         fetch_start_time = time.perf_counter()
         cache_hit = False
         cached_after_fetch = False
 
-        if self.cache_data and self.key_id_map.exists(path):
+        if self.cache_data and self.key_id_map.exists(index):
             try:
                 # print('hitting %d' % (index))
-                byte_image = self.key_id_map.get(path)
+                byte_image = self.key_id_map.get(index)
                 byteImgIO = io.BytesIO(byte_image)
                 sample = Image.open(byteImgIO)
                 sample = sample.convert('RGB')
@@ -111,7 +111,7 @@ class ShadeDataset(Dataset):
                 except:
                     print("Could not open even from path. The image file is corrupted.")
         else:
-            if path in self.ghost_cache:
+            if index in self.ghost_cache:
                 pass
                 # print('miss %d' % (index))
             # image = Image.open(path)
@@ -121,7 +121,7 @@ class ShadeDataset(Dataset):
             if keys_cnt >= self.cache_portion:
                 try:
                     peek_item = self.PQ.peekitem()
-                    if self.ghost_cache[path] > peek_item[1]:
+                    if self.ghost_cache[index] > peek_item[1]:
                         evicted_item = self.PQ.popitem()
                         # print("Evicting index: %d Weight: %.4f Frequency: %d" % (evicted_item[0], evicted_item[1][0], evicted_item[1][1]))
 
@@ -137,7 +137,7 @@ class ShadeDataset(Dataset):
                 image.save(byte_stream, format=image.format)
                 byte_stream.seek(0)
                 byte_image = byte_stream.read()
-                self.key_id_map.set(path, byte_image)
+                self.key_id_map.set(index, byte_image)
                 cached_after_fetch = True
                 #print("Index: ", index)
             sample = image.convert('RGB')
