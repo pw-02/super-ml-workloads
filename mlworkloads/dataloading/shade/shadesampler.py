@@ -114,7 +114,7 @@ class ShadeSampler(Sampler[T_co]):
         self.batch_wts = torch.tensor(self.batch_wts)
         self.ls_param = 0
 
-        self.key_id_map =redis.StrictRedis(host=host_ip, port=port_num)
+        self.key_id_map =redis.StrictRedis(host=host_ip, port=port_num, ssl=True)
 
         # #starting the cache.
         # if host_ip == '0.0.0.0':

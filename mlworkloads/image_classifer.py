@@ -350,7 +350,7 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                     train_dataloader.sampler.pass_batch_important_scores(item_loss.cpu())
                     sorted_img_indices = train_dataloader.sampler.get_sorted_index_list()
 
-                    key_id_map = redis.StrictRedis(host=train_dataloader.dataset.cache_host, port=train_dataloader.dataset.cache_port)
+                    key_id_map = redis.StrictRedis(host=train_dataloader.dataset.cache_host, port=train_dataloader.dataset.cache_port, ssl=True)
                     global ghost_cache
                     global PQ
                     track_batch_indx = 0
