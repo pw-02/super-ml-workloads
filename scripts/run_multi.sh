@@ -2,7 +2,7 @@
 set -e
 
 workload="imagenet_resnet50" # Define your workload imagenet_resnet50, cifar10_resnet18, lora_finetune_owt, albef_retrieval, cifar10_vit
-dataloder="coordl" # Define your dataloader shade, super, litgpt, coordl
+dataloder="shade" # Define your dataloader shade, super, litgpt, coordl
 
 # Define an array of GPU indices
 gpu_indices=(0 1 2 3)
@@ -19,13 +19,13 @@ log_dir="$root_log_dir/$workload/$dataloder/$expid"
 
 s3_bucket_for_exports="supercloudwtachexports"
 
-# echo "Cleaning up CloudWatch logs for experiment $expid"
-# python aws_utils/cleanup_cloudwatchlogs_for_experiment.py
-
 # Start the resource monitor in the background
 echo "Starting Resource Monitor..."
 nohup python mlworkloads/resource_monitor.py start --interval 1 --flush_interval 10 --file_path "$log_dir/resource_usage_metrics.json" &
 monitor_pid=$!
+
+# Capture the start time of the experiment
+experiment_start_time=$(date +%s)  # Record the start time in seconds since epoch
 
 # Loop over each job
 job_pids=()  # Array to hold the process IDs of the image classifier jobs
@@ -45,8 +45,19 @@ done
 for pid in "${job_pids[@]}"; do
     wait $pid
 done
+
+# Capture the end time of the experiment
+experiment_end_time=$(date +%s)  # Record the end time in seconds since epoch
+experiment_duration=$((experiment_end_time - experiment_start_time))  # Calculate duration in seconds
+
+# Convert duration to hours, minutes, and seconds
+hours=$((experiment_duration / 3600))
+minutes=$(((experiment_duration % 3600) / 60))
+seconds=$((experiment_duration % 60))
+
 training_ended_datetime=$(date -u +"%Y-%m-%d_%H-%M-%S") # Get the current UTC date and time
 echo "Training ended UTC Time: $training_ended_datetime"
+echo "Total Experiment Duration: $hours hours, $minutes minutes, and $seconds seconds"
 
 # Stop the resource monitor
 echo "Stopping Resource Monitor..."
