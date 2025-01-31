@@ -31,9 +31,8 @@ class S3Url(object):
         return self._parsed.geturl()
 
 
-class CoorDLMappedVisionDataset(Dataset):
-    def __init__(self, s3_data_dir: str, transform=None, cache_address= None, wss=1.0, max_dataset_size=None):
-        self.wss = wss
+class S3RedisDataset(Dataset):
+    def __init__(self, s3_data_dir: str, transform=None,  cache_address= None):
         self.s3_bucket = S3Url(s3_data_dir).bucket
         self.s3_prefix = S3Url(s3_data_dir).key
         self.s3_data_dir = s3_data_dir
@@ -47,23 +46,15 @@ class CoorDLMappedVisionDataset(Dataset):
         
         self.cache_client = None
         self.s3_client = None
-        self.samples = self._get_sample_list_from_s3(use_index_file=True, images_only=True, max_dataset_size = max_dataset_size)
-        self.cache_portion = self.wss * len(self)
-        self.cache_portion = int(self.cache_portion // 1)
-
-        #trim samples to match size of cache portion
-
+        
+        self.samples = self._get_sample_list_from_s3()
+    
     @functools.cached_property
     def _classed_items(self) -> List[Tuple[str, int]]:
         return [(blob, class_index)
-                for class_index, blob_class in enumerate(self.samples)
-                for blob in self.samples[blob_class]]
-    
-    def get_num_items_in_cache(self):
-        if self.cache_client is None:
-            self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port,  ssl=True)
-        return self.cache_client.dbsize()
-    
+            for class_index, blob_class in enumerate(self.samples)
+            for blob in self.samples[blob_class]]
+
     def _get_sample_list_from_s3(self, use_index_file=True, images_only=True, max_dataset_size = None) -> Dict[str, List[str]]:
         s3_client = boto3.client('s3')
         if max_dataset_size:
@@ -124,7 +115,7 @@ class CoorDLMappedVisionDataset(Dataset):
     def _initialize_cache_client(self):
         """Initialize Redis cache client if not already connected."""
         if self.cache_client is None:
-            # self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port, ssl=True)
+            # self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port,  ssl=True)
             self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
 
     def _load_item_from_cache(self, key):
@@ -153,7 +144,7 @@ class CoorDLMappedVisionDataset(Dataset):
         start_loading_time = time.perf_counter()
 
         if self.use_cache:
-            item_data = self._load_item_from_cache(index)
+            item_data = self._load_item_from_cache(path)
 
         if item_data  is not None and (isinstance(item_data , bytes) or isinstance(item_data , str)):
             start_transformation_time   = time.perf_counter()
@@ -170,22 +161,18 @@ class CoorDLMappedVisionDataset(Dataset):
             
         sample = self.fetch_image_from_s3(path)
         cache_hit = False
-
         if self.use_cache:
-            keys_cnt = self.get_num_items_in_cache()
-            if keys_cnt <= self.cache_portion:
-                byte_stream = io.BytesIO()
-                sample.save(byte_stream, format=sample.format)
-                byte_stream.seek(0)
-                byte_image = byte_stream.read()
-                try:
-                    self.cache_client.set(index, byte_image)
-                    cached_after_fetch = True
-                except Exception as e:
-                    pass
-        sample = sample.convert('RGB')
- 
+            byte_stream = io.BytesIO()
+            sample.save(byte_stream, format=sample.format)
+            byte_stream.seek(0)
+            byte_image = byte_stream.read()
+            try:
+                self.cache_client.set(path, byte_image)
+                cached_after_fetch = True
+            except Exception as e:
+                pass
         
+        sample = sample.convert('RGB')
         transform_start_time = time.perf_counter()
         if self.transform is not None:
             sample = self.transform(sample)
@@ -204,6 +191,6 @@ if __name__ == "__main__":
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
-    dataset = CoorDLMappedVisionDataset(s3_bucket="sdl-cifar10", s3_prefix="train/", transform=transform)
+    dataset = S3RedisDataset(s3_bucket="sdl-cifar10", s3_prefix="train/", transform=transform)
     img, label = dataset[0]
     print(img.shape)

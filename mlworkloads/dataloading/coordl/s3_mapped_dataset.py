@@ -9,7 +9,7 @@ from typing import List, Dict, Tuple
 import functools
 import time
 from urllib.parse import urlparse
-import redis
+
 
 class S3Url(object):
     def __init__(self, url):
@@ -31,7 +31,7 @@ class S3Url(object):
         return self._parsed.geturl()
 
 
-class S3RedisDataset(Dataset):
+class S3MappedDataset(Dataset):
     def __init__(self, s3_data_dir: str, transform=None,  cache_address= None):
 
         self.s3_bucket = S3Url(s3_data_dir).bucket
@@ -45,9 +45,9 @@ class S3RedisDataset(Dataset):
         else:
             self.use_cache = False
         
-        self.cache_client = None
-        self.s3_client = None
+        # Initialize S3 client
 
+        # List all files in the S3 bucket under the specified prefix
         self.samples = self._get_sample_list_from_s3()
     
     @functools.cached_property
@@ -103,71 +103,40 @@ class S3RedisDataset(Dataset):
 
         return paired_samples
     
-    def _initialize_cache_client(self):
-        """Initialize Redis cache client if not already connected."""
-        if self.cache_client is None:
-            self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port,  ssl=True)
-    
-    def _load_item_from_cache(self, key):
-        try:
-            self._initialize_cache_client()   
-            return self.cache_client.get(key)
-        except Exception as e:
-            print(f"Error fetching from cache: {e}")
-            return None
-    
     def __len__(self) -> int:
         return sum(len(class_items) for class_items in self.samples.values())
     
-    def fetch_image_from_s3(self, data_path):  
-        if self.s3_client is None:
-            self.s3_client = boto3.client('s3')
-        obj = self.s3_client.get_object(Bucket=self.s3_bucket, Key=data_path)
-        img_data = obj['Body'].read()
-        image = Image.open(io.BytesIO(img_data)) #.convert('RGB')
-        return image
-    
-    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor, float, float]:
-        path, target = self._classed_items[index]
-        item_data  = None
-        cached_after_fetch = False
-        start_loading_time = time.perf_counter()
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, float, float]:
+        batch_id, batch_indices = idx
+        # batch_indices = self._classed_items[idx][0]  # Simplified for demonstration
 
-        if self.use_cache:
-            item_data = self._load_item_from_cache(path)
+        start_loading_time  = time.perf_counter()
 
-        if item_data  is not None and (isinstance(item_data , bytes) or isinstance(item_data , str)):
-            start_transformation_time   = time.perf_counter()
-            byteImgIO = io.BytesIO(item_data)
-            sample = Image.open(byteImgIO)
-            sample = sample.convert('RGB')
+        data_samples, labels = self.fetch_batch_from_s3(batch_indices)
 
-            if self.transform is not None:
-                sample = self.transform(sample)
-            transformation_time = time.perf_counter() - start_transformation_time
-            cache_hit = True
-            fetch_duration  = time.perf_counter() - start_loading_time - transformation_time
-            return (sample, target), fetch_duration, transformation_time, cache_hit, cached_after_fetch
-            
-        image = self.fetch_image_from_s3(path)
-        cache_hit = False
-        if self.use_cache:
-            byte_stream = io.BytesIO()
-            image.save(byte_stream, format=image.format)
-            byte_stream.seek(0)
-            byte_image = byte_stream.read()
-            self.cache_client.set(path, byte_image)
-            cached_after_fetch = True
-            sample = image.convert('RGB')
-        
-        transform_start_time = time.perf_counter()
+        data_loading_time  = time.perf_counter() - start_loading_time
+
+        start_transformation_time  = time.perf_counter()
         if self.transform is not None:
-            sample = self.transform(sample)
-        transformation_time = time.perf_counter() - transform_start_time
-        
-        fetch_duration  = time.perf_counter() - start_loading_time - transformation_time
-        
-        return (sample, target), fetch_duration, transformation_time, cache_hit, cached_after_fetch
+            for i in range(len(data_samples)):
+                data_samples[i] = self.transform(data_samples[i])
+        transformation_time  =  time.perf_counter() - start_transformation_time
+
+        return (torch.stack(data_samples), torch.tensor(labels)), data_loading_time, transformation_time, False, False
+
+    def fetch_batch_from_s3(self, batch_indices: List[str]) -> Tuple[List[torch.Tensor], List[int]]:
+        s3_client = boto3.client('s3')
+
+        data_samples = []
+        labels = []
+        for idx in batch_indices:
+            data_path, label = self._classed_items[idx]
+            obj = s3_client.get_object(Bucket=self.s3_bucket, Key=data_path)
+            img_data = obj['Body'].read()
+            image = Image.open(io.BytesIO(img_data)).convert('RGB')
+            data_samples.append(image)
+            labels.append(label)  # Simplified; adjust based on your label extraction
+        return data_samples, labels
 
 
 if __name__ == "__main__":
@@ -178,6 +147,6 @@ if __name__ == "__main__":
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
-    dataset = S3RedisDataset(s3_bucket="sdl-cifar10", s3_prefix="train/", transform=transform)
+    dataset = S3MappedDataset(s3_bucket="sdl-cifar10", s3_prefix="train/", transform=transform)
     img, label = dataset[0]
     print(img.shape)

@@ -24,7 +24,7 @@ from dataloading.shade.shadedataset import ShadeDataset
 from dataloading.shade.shadesampler import ShadeSampler
 import math
 from datetime import datetime, timezone
-
+from dataloading.s3_single.s3redis_dataset_single import S3RedisDataset
 #Initialization of local cache, PQ and ghost cache (for shade)
 PQ = heapdict.heapdict()
 ghost_cache = heapdict.heapdict()
@@ -146,6 +146,24 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
                 val_sampler = SequentialSampler(data_source=val_dataset)
             val_dataloader =  DataLoader(val_dataset, batch_size=config.workload.batch_size, sampler=val_sampler, num_workers=config.workload.num_pytorch_workers)
             val_dataloader = fabric.setup_dataloaders(val_dataloader,move_to_device=True)
+        
+    elif config.dataloader.name == 'torchs3single':
+            if config.workload.run_training:
+                train_dataset = S3RedisDataset(
+                    s3_data_dir=config.workload.s3_train_prefix, 
+                    transform=train_transform, 
+                    cache_address=config.dataloader.cache_address)
+                if config.dataloader.shuffle:
+                    train_sampler = RandomSampler(data_source=train_dataset)
+                else:
+                    train_sampler = SequentialSampler(data_source=train_dataset)
+                train_dataloader = DataLoader(train_dataset, 
+                                                  batch_size=config.workload.batch_size, 
+                                                  sampler=train_sampler, 
+                                                  num_workers=config.workload.num_pytorch_workers,
+                                                  pin_memory=True)
+                    
+                train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
 
     # # # Start training
     # metric_collector = ResourceMonitor(interval=1, flush_interval=10, file_path= f'{log_dir}/resource_usage_metrics.json')
@@ -299,6 +317,8 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
                 inputs, labels = batch
             elif isinstance(train_dataloader.sampler, SUPERSampler):
                 inputs, labels, batch_id = batch
+            else:
+                inputs, labels = batch
 
             if fabric.device.type == 'cuda':
                     torch.cuda.synchronize() # Ensure accurate timing
@@ -339,8 +359,10 @@ def train_loop(fabric:Fabric, job_id, train_logger:CSVLogger, model, optimizer, 
             if isinstance(train_dataloader.sampler, SUPERSampler):
                 cache_hit_samples = batch[0].size(0) if is_cache_hit == True else 0
                 cache_hit_bacth = 1 if is_cache_hit == True else 0
+          
 
-            if isinstance(train_dataloader.sampler, ShadeSampler) or isinstance(train_dataloader.dataset, CoorDLMappedVisionDataset):
+
+            if isinstance(train_dataloader.sampler, ShadeSampler) or isinstance(train_dataloader.dataset, CoorDLMappedVisionDataset) or isinstance(train_dataloader.dataset, S3RedisDataset):
                 data_load_time = float(data_load_time.sum())
                 transformation_time = float(transformation_time.sum())
                 cache_hit_samples = int(is_cache_hit.sum())

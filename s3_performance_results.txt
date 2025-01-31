@@ -1,0 +1,8 @@
+S3 Performance Results
+Concurrency Level	Throughput (MB/s)	Avg Latency (s)\Toal Size (Mb)
+1			0.55			0.2106			115.2272
+2			0.59			0.1951			230.4544
+4			0.65			0.1774			460.9089
+8			0.70			0.1647			921.8177
+16			0.63			0.1831			1843.6354
+32			0.42			0.2746			3687.2709
