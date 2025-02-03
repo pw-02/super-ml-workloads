@@ -4,6 +4,8 @@ import hashlib
 import torch
 import random
 from mlworkloads.dataloading.coordl.coorl_dl_batched_dataset import CoorDLBatchedDataset
+
+# Custom BatchSampler that generates unique batch IDs for each batch
 class CoorDLBatchSampler(BatchSampler):
     def __init__(self, data_source: Sized, batch_size: int, drop_last: bool, shuffle: bool = False, seed: Optional[int] = None):
         

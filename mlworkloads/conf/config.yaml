@@ -1,14 +1,13 @@
 
 defaults:
   - _self_
-  - dataloader: torchs3single #coordl, super, shade, litgpt, torchs3single
-  - workload: imagenet_resnet50
-  #albef_retrieval
-  #lora_finetune_tiny_llama 
-  #lora_finetune_owt  
-  #imagenet_resnet50, 
+  - dataloader: coordl #coordl, super, shade, litgpt, torchs3single
+  - workload: cifar10_resnet18 
+  #albef_retrieval, 
+  #lora_finetune_tiny_llama,
+  #lora_finetune_owt, 
+  #imagenet_resnet50,
   #cifar10_resnet18
-  # cifar10_vit
   - override hydra/job_logging: disabled
   - override hydra/hydra_logging: disabled  
 
@@ -20,10 +19,8 @@ log_dir: logs # Directory to save logs
 checkpoint_dir: checkpoints # Save a checkpoint every N steps
 precision: 32 # 16, 32, 64
 simulation_mode: False # Run in simulation mode
-# num_workers_per_job: 0 # Number of workers per job
 exp_id: single_job
 job_id: 1
-
 hydra:
   run:
     dir: .  # Current directory or a specific directory where Ray Tune expects to find it
@@ -34,18 +31,3 @@ hydra:
     level: DISABLE  # Disable job-specific logging
   hydra_logging:
     level: DISABLE  # Disable Hydra-specific logging
-
-# hydra:  
-#   output_subdir: null  
-#   run:  
-#     dir: .
-
-# hydra:
-#   mode: MULTIRUN
-#   output_subdir: null
-#   sweeper:
-#     params:
-#       training: resnet18
-#       # training: resnet50, shufflenet, vgg16
-
-# Disable Hydra logging while ensuring Ray Tune can still manage its directories
