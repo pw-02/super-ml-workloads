@@ -46,20 +46,23 @@ class CoorDLMappedDataset(Dataset):
                  simulate_mode=False, 
                  simulate_time_for_cache_miss=0,
                 simulate_time_for_cache_hit=0,
-                cache_transformations=True):
+                cache_transformations=True,
+                use_compression=False,
+                use_local_folder=False):
         
         self.s3_bucket = S3Url(s3_data_dir).bucket
         self.s3_prefix = S3Url(s3_data_dir).key
         self.s3_data_dir = s3_data_dir
         self.s3_client = None
         self.transform = transform
-        self.using_local_folder = False
+        self.using_local_folder = use_local_folder
         self.samples = self._get_sample_list_from_s3()
         self.simulate_mode = simulate_mode
         self._simlute_time_for_cache_miss = simulate_time_for_cache_miss
         self._simlute_time_for_cache_hit = simulate_time_for_cache_hit
         self.cache_transformations = cache_transformations
-        self.cloudwatch = boto3.client("cloudwatch", region_name="us-west-2")
+        self.use_compression = use_compression
+
 
         if cache_address is not None:
             self.cache_host, self.cache_port = cache_address.split(":")
@@ -237,7 +240,8 @@ class CoorDLMappedDataset(Dataset):
             torch.save((data_samples, labels), buffer)
             bytes_minibatch = buffer.getvalue()
             # print(f"Serialized minibatch size: {sys.getsizeof(bytes_minibatch)} bytes")
-            bytes_minibatch = lz4.frame.compress(bytes_minibatch,  compression_level=0)
+            if self.use_compression:
+                bytes_minibatch = lz4.frame.compress(bytes_minibatch,  compression_level=0)
             # bytes_minibatch = zlib.compress(bytes_minibatch,level=0)
 
             # print(f"Compressed minibatch size: {sys.getsizeof(bytes_minibatch)} bytes)")
@@ -246,7 +250,8 @@ class CoorDLMappedDataset(Dataset):
     
     def _bytes_to_torch_batch(self, bytes_minibatch) -> tuple:
         # time_start = time.perf_counter()
-        bytes_minibatch = lz4.frame.decompress(bytes_minibatch)
+        if self.use_compression:
+            bytes_minibatch = lz4.frame.decompress(bytes_minibatch)
         # compressed_batch = zlib.decompress(bytes_minibatch)
         # print(f"Decompression time: {time.perf_counter() - time_start}")
         # time_start = time.perf_counter()

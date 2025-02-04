@@ -68,7 +68,9 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
             train_dataset = CoorDLMappedDataset(s3_data_dir=config.workload.s3_train_prefix,
                                                 transform=train_transform,
                                                 cache_address=config.dataloader.cache_address,
-                                                cache_transformations=True)
+                                                cache_transformations=True,
+                                                use_compression=config.dataloader.use_compression,
+                                                use_local_folder=config.dataloader.use_local_folder,)
             
             train_sampler = CoorDLSampler(
                             dataset=train_dataset,
