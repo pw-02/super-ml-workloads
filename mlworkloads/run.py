@@ -5,8 +5,8 @@ from image_classifer import train_image_classifer
 import os
 from lightning.pytorch.core.saving import save_hparams_to_yaml
 from datetime import datetime
-from lora_finetune import launch_finetune
-from finetune_retrieval_multi_modal import launch_finetune as launch_finetune_retrieval
+# from lora_finetune import launch_finetune
+# from finetune_retrieval_multi_modal import launch_finetune as launch_finetune_retrieval
 @hydra.main(version_base=None, config_path="./conf", config_name="config")
 def main(config: DictConfig):
 
@@ -29,10 +29,10 @@ def main(config: DictConfig):
     if config.workload.name in image_worklaods:
         train_image_classifer(config, train_logger,val_logger)
 
-    elif config.workload.name  == 'lora_finetune_owt':
-        launch_finetune(config, train_logger, val_logger)
-    elif config.workload.name  == 'albef_retrieval':
-        launch_finetune_retrieval(config, train_logger, val_logger)
+    # elif config.workload.name  == 'lora_finetune_owt':
+    #     launch_finetune(config, train_logger, val_logger)
+    # elif config.workload.name  == 'albef_retrieval':
+    #     launch_finetune_retrieval(config, train_logger, val_logger)
     else:
         raise ValueError(f"Invalid workload: {config.workload}")
     save_hparams_to_yaml(os.path.join(log_dir, "hparms.yaml"), config)
