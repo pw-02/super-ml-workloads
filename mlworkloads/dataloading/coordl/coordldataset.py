@@ -105,7 +105,7 @@ class CoorDLMappedDataset(Dataset):
                 # Get memory info
                 # Extract total memory usage in bytes
                 memory_info = self.cache_client.info('memory')
-                print(memory_info)
+                print(f'memory_info - {memory_info}')
                 used_memory =  memory_info['used_memory']
                 return f"{used_memory / (1024**2):.5f}" 
         else:
