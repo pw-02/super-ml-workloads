@@ -22,7 +22,7 @@ workload_type = "image_classification"
 dataloader = "coordl"
 
 # Define workload configurations
-workload_configs = ["cifar10_resnet101"]
+workload_configs = ["cifar10_resnet18"]
 
 # Define GPU indices and learning rates
 job_ids = [0, 1, 2, 3]
@@ -49,11 +49,11 @@ print(f"Training started UTC Time: {training_started_datetime}")
 
 # Loop over jobs
 job_pids = []
-for i, jobid in enumerate(job_ids):
+for i, workload in enumerate(workload_configs):
     workload = workload_configs[i]
     lr = learning_rates[i]
-    print(f"Starting job on GPU {jobid} with workload {workload} and exp_id {expid}_{jobid}")
-    run_cmd = f"CUDA_VISIBLE_DEVICES={jobid} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={jobid} dataloader={dataloader} log_dir={log_dir}"
+    print(f"Starting job on GPU {i} with workload {workload} and exp_id {expid}_{i}")
+    run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir}"
     #run_cmd = f"{python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={jobid} dataloader={dataloader} log_dir={log_dir}"
     process = subprocess.Popen(run_cmd, shell=True)
     job_pids.append(process)
