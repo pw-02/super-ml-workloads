@@ -77,7 +77,9 @@ class CoorDLMappedDataset(Dataset):
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        self.cache_client = redis.Redis(host=self.cache_host, port=self.cache_port)  # Reconnect
+        # self.cache_client = redis.Redis(host=self.cache_host, port=self.cache_port)  # Reconnect
+        self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port,  ssl=True)
+
 
     def check_s3_client(self):
         if self.s3_client is None:
@@ -222,7 +224,9 @@ class CoorDLMappedDataset(Dataset):
     def _initialize_cache_client(self):
         """Initialize Redis cache client if not already connected."""
         if self.cache_client is None:
-            self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
+            # self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
+            self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port,  ssl=True)
+
 
     def _torch_batch_to_bytes(self, data_samples: torch.Tensor, labels: torch.Tensor) -> str:
         with BytesIO() as buffer:
