@@ -22,7 +22,7 @@ workload_type = "image_classification"
 dataloader = "coordl"
 
 # Define workload configurations
-workload_configs = ["cifar10_resnet18", "cifar10_resnet34", "cifar10_resnet50", "cifar10_resnet101"]
+workload_configs = ["cifar10_resnet18", "cifar10_shufflenet_v2_x1_0", "cifar10_resnet50", "cifar10_squeezenet1_0"]
 
 # Define GPU indices and learning rates
 job_ids = [0, 1, 2, 3]
