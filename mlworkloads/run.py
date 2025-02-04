@@ -10,15 +10,23 @@ from finetune_retrieval_multi_modal import launch_finetune as launch_finetune_re
 @hydra.main(version_base=None, config_path="./conf", config_name="config")
 def main(config: DictConfig):
 
+    image_worklaods = ['cifar10_vit', 
+                       'imagenet_resnet50',
+                       'cifar10_resnet18',
+                       'cifar10_resnet34',
+                       'cifar10_resnet50',
+                       'cifar10_resnet101']
+
     # print(OmegaConf.to_yaml(config, resolve=True))
 
-    log_dir = f"{config.log_dir}/{config.workload.name}/{config.dataloader.name}/{config.exp_id}/{config.job_id}".lower()
+    log_dir = f"{config.log_dir}/{config.workload.name}/{config.job_id}".lower()
+    # log_dir = f"{config.log_dir}/{config.workload.name}/{config.dataloader.name}/{config.exp_id}/{config.job_id}".lower()
     log_dir = os.path.normpath(log_dir)  # Normalize path for Windows
     
     train_logger = CSVLogger(root_dir=log_dir, name="train", prefix='', flush_logs_every_n_steps=config.log_interval)
     val_logger = CSVLogger(root_dir=log_dir, name="val", prefix='', flush_logs_every_n_steps=config.log_interval)
 
-    if config.workload.name == 'cifar10_vit' or config.workload.name  == 'imagenet_resnet50' or config.workload.name  == 'cifar10_resnet18':
+    if config.workload.name in image_worklaods:
         train_image_classifer(config, train_logger,val_logger)
 
     elif config.workload.name  == 'lora_finetune_owt':

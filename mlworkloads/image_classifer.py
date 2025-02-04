@@ -136,8 +136,8 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
     if isinstance(train_dataloader.sampler, SUPERSampler):
         train_dataloader.sampler.send_job_ended_notfication()
 
-    elapsed_time = time.perf_counter() - train_start_time
-    fabric.print(f"Training completed in {elapsed_time:.2f} seconds")
+    # elapsed_time = time.perf_counter() - train_start_time
+    # fabric.print(f"Training completed in {elapsed_time:.2f} seconds")
     # metric_collector.stop()
 
 def get_transforms(workload_name):
@@ -188,10 +188,27 @@ def get_transforms(workload_name):
             transforms.ToTensor(),                    # Convert to tensor
             transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])  # Normalize
        ])
+    else:
+           # Set up data transforms for ImageNet
+        train_transform = transforms.Compose([
+            transforms.Resize(224),
+            transforms.RandomHorizontalFlip(),        # Random horizontal flip
+            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # Randomly change brightness, contrast, saturation, and hue
+            transforms.RandomRotation(15),      # Randomly rotate images by up to 15 degrees
+            transforms.ToTensor(),                    # Convert to tensor
+            transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])  # Normalize
+        ])
+        
+        val_transform = transforms.Compose([
+            transforms.Resize(224),
+            transforms.ToTensor(),                    # Convert to tensor
+            transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])  # Normalize
+       ])
+
 
         
-    else:
-        raise ValueError(f"Invalid workload: {workload_name}")
+    # else:
+    #     raise ValueError(f"Invalid workload: {workload_name}")
     return train_transform, val_transform
 
 def train_loop(fabric:Fabric, job_id, 
@@ -293,7 +310,7 @@ def train_loop(fabric:Fabric, job_id,
                             "Cache_Hit (Batch)": cache_hit_bacth,
                             "Cache_Hits (Samples)": cache_hit_samples,
                             "Cache_Size": cache_size,
-                            "Cache_Memory": cache_memory,
+                            "Cache_Memory (Mb)": cache_memory,
                             "Train Loss (Avg)": avg_train_loss, #calculates the average training loss across all batches.
                             "Train Accuracy (Avg)": avg_train_acc, #calculates the average training accuracy across all batches.
                             "Timestamp (UTC)": datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')  # Adds UTC timestamp
@@ -301,15 +318,15 @@ def train_loop(fabric:Fabric, job_id,
             train_logger.log_metrics(metrics,step=global_step_count)
             
             fabric.print(
-                    f" Job {job_id} | Epoch: {metrics['Epoch Index']}({metrics['Batch Index']}/{min(len(train_dataloader),limit_train_batches)}) |"
+                    f" Job {job_id} | Epoch:{metrics['Epoch Index']}({metrics['Batch Index']}/{min(len(train_dataloader),limit_train_batches)}) |"
                     # f" loss train: {metrics['Train Loss']:.3f} |"
                     # f" val: {val_loss} |"
                     # f" batch:{batch_id} |"
                     f" iter:{metrics['Iteration Time (s)']:.2f}s |"
                     f" data_delay:{metrics['Wait for Data Time (s)']:.2f}s |"
                     f" gpu:{metrics['GPU Processing Time (s)']:.2f}s |"
-                    f" data_fetch:{metrics['Data Load Time (s)']:.2f}s |"
-                    f" transform:{metrics['Transformation Time (s)']:.2f}s |"
+                    # f" data_fetch:{metrics['Data Load Time (s)']:.2f}s |"
+                    # f" transform:{metrics['Transformation Time (s)']:.2f}s |"
                     f" elapsed:{metrics['Elapsed Time (s)']:.2f}s |"
                     f" loss: {metrics['Train Loss (Avg)']:.3f} |"
                     f" acc: {metrics['Train Accuracy (Avg)']:.3f} |"

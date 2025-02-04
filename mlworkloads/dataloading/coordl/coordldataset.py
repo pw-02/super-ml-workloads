@@ -14,6 +14,10 @@ import redis
 from io import BytesIO
 import lz4.frame
 import botocore.config
+import os
+
+
+
 
 class S3Url(object):
     def __init__(self, url):
@@ -49,6 +53,7 @@ class CoorDLMappedDataset(Dataset):
         self.s3_data_dir = s3_data_dir
         self.s3_client = None
         self.transform = transform
+        self.using_local_folder = True
         self.samples = self._get_sample_list_from_s3()
         self.simulate_mode = simulate_mode
         self._simlute_time_for_cache_miss = simulate_time_for_cache_miss
@@ -64,6 +69,15 @@ class CoorDLMappedDataset(Dataset):
         self.cache_client = None
         self.compressor = None
         self.decompressor = None
+    def __getstate__(self):
+
+        state = self.__dict__.copy()
+        del state['cache_client']  # Remove the Redis connection before pickling
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.cache_client = redis.Redis(host=self.cache_host, port=self.cache_port)  # Reconnect
 
     def check_s3_client(self):
         if self.s3_client is None:
@@ -71,19 +85,28 @@ class CoorDLMappedDataset(Dataset):
                 max_pool_connections=100))
     
     def get_cache_size(self):
-        self._initialize_cache_client()
-        if self.cache_client is None:
-            return 0
+        if self.use_cache:
+            self._initialize_cache_client()
+            if self.cache_client is None:
+                return 0
+            else:
+             return self.cache_client.dbsize()
         else:
-            return self.cache_client.dbsize()
+            return 0
         
     def get_cache_memory(self):
-        self._initialize_cache_client()
-        if self.cache_client is None:
-            return 0
+        if self.use_cache:
+            self._initialize_cache_client()
+            if self.cache_client is None:
+                return 0
+            else:
+                # Get memory info
+                # Extract total memory usage in bytes
+                memory_info = self.cache_client.info('memory')
+                used_memory =  memory_info['used_memory']
+                return f"{used_memory / (1024**2):.5f}" 
         else:
-            return self.cache_client.memory_usage()
-    
+            return 0
     @functools.cached_property
     def _classed_items(self) -> List[Tuple[str, int]]:
         return [(blob, class_index)
@@ -160,8 +183,6 @@ class CoorDLMappedDataset(Dataset):
         # Check cache if caching is enabled
         if self.use_cache:
             next_minibatch = self.get_cached_minibatch_with_retries(batch_id, max_retries=5)
-        else:
-            print(f"Batch {batch_id} has a 'not cached' flag. Fetching from S3...")
 
         # If data is fetched from cache and it's in the correct format
         if next_minibatch  is not None and (isinstance(next_minibatch , bytes) or isinstance(next_minibatch , str)):
@@ -291,14 +312,25 @@ class CoorDLMappedDataset(Dataset):
     
     def _load_batch_from_s3(self, batch_indices: List[str]) -> Tuple[List[torch.Tensor], List[int]]:
         data_samples, labels = [], []
-        self.check_s3_client()
-        with ThreadPoolExecutor() as executor:
-            futures = {executor.submit(self.get_data_sample, idx): idx for idx in batch_indices}
-            for future in as_completed(futures):
-                data_sample, label = future.result()
-                data_samples.append(data_sample)
+
+        if self.using_local_folder:
+            for idx in batch_indices:
+                data_path, label = self._classed_items[idx]
+                data_path = os.path.join('data/cifar10/', data_path) 
+                with open(data_path, 'rb') as f:
+                    data = Image.open(f).convert("RGB")
+                data_samples.append(data)
                 labels.append(label)
-        return data_samples, labels
+            return data_samples, labels
+        else:
+            self.check_s3_client()
+            with ThreadPoolExecutor() as executor:
+                futures = {executor.submit(self.get_data_sample, idx): idx for idx in batch_indices}
+                for future in as_completed(futures):
+                    data_sample, label = future.result()
+                    data_samples.append(data_sample)
+                    labels.append(label)
+            return data_samples, labels
 
     
     def get_data_sample(self,idx) -> tuple:  

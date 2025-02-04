@@ -89,18 +89,30 @@ class CoorDLSampler(Sampler):
     #     except grpc.RpcError as e:
     #         print(f"Failed to send job update info to SUPER: {e.details()}")
     
-    
+    def get_next_batch(self):
+
+        batch_id = None
+        while batch_id is None:
+            response = self.stub.GetNextBatchForJob(minibatch_service_pb2.GetNextBatchForJobRequest(
+            job_id=self.job_id,
+            data_dir=self.dataset.s3_data_dir))
+
+            if response.batch.batch_id is None:
+                time.sleep(5)
+                continue # Retry fetching the batch if it's None
+            else:
+                batch_id = response.batch.batch_id
+                batch_indices = list(response.batch.indicies)
+                is_cached = response.batch.is_cached
+
+        return batch_id, batch_indices, is_cached
+
+
     def __iter__(self):
         while True:
             for _ in range(self.total_batches):
-                try:  
-                    response = self.stub.GetNextBatchForJob(minibatch_service_pb2.GetNextBatchForJobRequest(
-                        job_id=self.job_id,
-                        data_dir=self.dataset.s3_data_dir))
-                    
-                    batch_id = response.batch.batch_id
-                    batch_indices = list(response.batch.indicies)
-                    is_cached = response.batch.is_cached
+                try:
+                    batch_id, batch_indices, is_cached = self.get_next_batch()
                     self.current_batch += 1
                     yield batch_id, batch_indices, is_cached
 
