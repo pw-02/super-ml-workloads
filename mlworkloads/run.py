@@ -19,6 +19,7 @@ def main(config: DictConfig):
                        'cifar10_shufflenet_v2_x1_0',
                        'cifar10_squeezenet1_0',
                        'cifar10_vgg16',
+                        'imagenet_resnet18',
                        'imagenet_shufflenet_v2_x1_0'
                        'imagenet_vgg16',]
 

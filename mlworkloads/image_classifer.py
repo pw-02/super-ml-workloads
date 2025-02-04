@@ -145,7 +145,7 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
     # metric_collector.stop()
 
 def get_transforms(workload_name):
-    if workload_name == 'imagenet_resnet50':
+    if 'imagenet' in workload_name:
         # Set up data transforms for ImageNet
         train_transform = transforms.Compose([
             transforms.Resize(256), 
