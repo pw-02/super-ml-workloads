@@ -73,7 +73,9 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
             train_sampler = CoorDLSampler(
                             dataset=train_dataset,
                             grpc_server_address=config.dataloader.grpc_server_address,
-                            batch_size=config.workload.batch_size
+                            batch_size=config.workload.batch_size,
+                            job_id=config.job_id,
+                            fabric=fabric,
                             )
             
             train_dataloader = DataLoader(train_dataset, 
@@ -133,11 +135,13 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
         if config.workload.max_epochs is not None and current_epoch >= config.workload.max_epochs:
             should_stop = True
 
-    # if isinstance(train_dataloader.sampler, SUPERSampler):
-    #     train_dataloader.sampler.send_job_ended_notfication()
+    if isinstance(train_dataloader.sampler, SUPERSampler):
+        train_dataloader.sampler.send_job_ended_notfication()
+    if isinstance(train_dataloader.sampler, CoorDLSampler):
+        train_dataloader.sampler.send_job_ended_notfication()
 
-    # elapsed_time = time.perf_counter() - train_start_time
-    # fabric.print(f"Training completed in {elapsed_time:.2f} seconds")
+    elapsed_time = time.perf_counter() - train_start_time
+    fabric.print(f"Training completed in {elapsed_time:.2f} seconds")
     # metric_collector.stop()
 
 def get_transforms(workload_name):
