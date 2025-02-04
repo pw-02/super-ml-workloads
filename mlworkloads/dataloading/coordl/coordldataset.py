@@ -53,7 +53,7 @@ class CoorDLMappedDataset(Dataset):
         self.s3_data_dir = s3_data_dir
         self.s3_client = None
         self.transform = transform
-        self.using_local_folder = True
+        self.using_local_folder = False
         self.samples = self._get_sample_list_from_s3()
         self.simulate_mode = simulate_mode
         self._simlute_time_for_cache_miss = simulate_time_for_cache_miss
