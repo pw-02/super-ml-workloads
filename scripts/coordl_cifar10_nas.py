@@ -52,9 +52,9 @@ job_pids = []
 for i, jobid in enumerate(job_ids):
     workload = workload_configs[i]
     lr = learning_rates[i]
-    print(f"Starting job {jobid} with workload {workload_type} and exp_id {expid}")
-    
-    run_cmd = f"{python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={jobid} dataloader={dataloader} log_dir={log_dir}"
+    print(f"Starting job on GPU {jobid} with workload {workload} and exp_id {expid}_{jobid}")
+    run_cmd = f"CUDA_VISIBLE_DEVICES={jobid} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={jobid} dataloader={dataloader} log_dir={log_dir}"
+    #run_cmd = f"{python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={jobid} dataloader={dataloader} log_dir={log_dir}"
     process = subprocess.Popen(run_cmd, shell=True)
     job_pids.append(process)
     time.sleep(2)  # Adjust as necessary
