@@ -172,13 +172,15 @@ def get_transforms(workload_name):
             transforms.ToTensor(),                    # Convert to tensor
             transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])  # Normalize
        ])
-    elif workload_name == 'cifar10_resnet18':
+    elif 'cifar10' in workload_name:
           # Set up data transforms for ImageNet
         train_transform = transforms.Compose([
             transforms.Resize(224),
-            transforms.RandomHorizontalFlip(),        # Random horizontal flip
-            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # Randomly change brightness, contrast, saturation, and hue
-            transforms.RandomRotation(15),      # Randomly rotate images by up to 15 degrees
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomCrop(32, padding=4),
+             # Random horizontal flip
+            # transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # Randomly change brightness, contrast, saturation, and hue
+            # transforms.RandomRotation(15),      # Randomly rotate images by up to 15 degrees
             transforms.ToTensor(),                    # Convert to tensor
             transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])  # Normalize
         ])
@@ -187,28 +189,9 @@ def get_transforms(workload_name):
             transforms.Resize(224),
             transforms.ToTensor(),                    # Convert to tensor
             transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])  # Normalize
-       ])
+       ])        
     else:
-           # Set up data transforms for ImageNet
-        train_transform = transforms.Compose([
-            transforms.Resize(224),
-            transforms.RandomHorizontalFlip(),        # Random horizontal flip
-            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # Randomly change brightness, contrast, saturation, and hue
-            transforms.RandomRotation(15),      # Randomly rotate images by up to 15 degrees
-            transforms.ToTensor(),                    # Convert to tensor
-            transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])  # Normalize
-        ])
-        
-        val_transform = transforms.Compose([
-            transforms.Resize(224),
-            transforms.ToTensor(),                    # Convert to tensor
-            transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])  # Normalize
-       ])
-
-
-        
-    # else:
-    #     raise ValueError(f"Invalid workload: {workload_name}")
+        raise ValueError(f"Invalid workload: {workload_name}")
     return train_transform, val_transform
 
 def train_loop(fabric:Fabric, job_id, 
