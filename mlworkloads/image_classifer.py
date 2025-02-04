@@ -74,7 +74,7 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
                             dataset=train_dataset,
                             grpc_server_address=config.dataloader.grpc_server_address,
                             batch_size=config.workload.batch_size,
-                            job_id=config.job_id,
+                            job_idx=config.job_id,
                             fabric=fabric,
                             )
             
