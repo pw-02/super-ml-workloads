@@ -1,6 +1,6 @@
 name: coordl
 grpc_server_address: 10.0.21.36:50051  #localhost:50051   #10.0.17.5:50051 #10.0.17.5:50051 # 10.0.17.31:50051  10.0.17.5:50051
-cache_address: 127.0.0.1:6379  # 10.0.17.5:6378  #10.0.17.5:6378 #null # 10.0.17.5:6378  #10.0.17.31:6378 # null # 54.245.179.233:6378 #null
+cache_address: redis-rdior4.serverless.usw2.cache.amazonaws.com:6379  #127.0.0.1:6379  # 10.0.17.5:6378  #10.0.17.5:6378 #null # 10.0.17.5:6378  #10.0.17.31:6378 # null # 54.245.179.233:6378 #null
 drop_last: False
 shuffle: True
 wss: 0.2
