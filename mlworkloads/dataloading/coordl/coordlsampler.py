@@ -97,7 +97,7 @@ class CoorDLSampler(Sampler):
             job_id=self.job_id,
             data_dir=self.dataset.s3_data_dir))
 
-            if response.batch.batch_id is None:
+            if response.batch.batch_id == 'None':
                 time.sleep(5)
                 continue # Retry fetching the batch if it's None
             else:
