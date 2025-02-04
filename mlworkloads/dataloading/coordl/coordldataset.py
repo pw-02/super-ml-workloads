@@ -59,6 +59,8 @@ class CoorDLMappedDataset(Dataset):
         self._simlute_time_for_cache_miss = simulate_time_for_cache_miss
         self._simlute_time_for_cache_hit = simulate_time_for_cache_hit
         self.cache_transformations = cache_transformations
+        self.cloudwatch = boto3.client("cloudwatch", region_name="us-west-2")
+
         if cache_address is not None:
             self.cache_host, self.cache_port = cache_address.split(":")
             self.cache_port = int(self.cache_port)
@@ -97,19 +99,20 @@ class CoorDLMappedDataset(Dataset):
             return 0
         
     def get_cache_memory(self):
-        if self.use_cache:
-            self._initialize_cache_client()
-            if self.cache_client is None:
-                return 0
-            else:
-                # Get memory info
-                # Extract total memory usage in bytes
-                memory_info = self.cache_client.info('memory')
-                print(f'memory_info - {memory_info}')
-                used_memory =  memory_info['used_memory']
-                return f"{used_memory / (1024**2):.5f}" 
-        else:
-            return 0
+        return 0
+        # if self.use_cache:
+        #     self._initialize_cache_client()
+        #     if self.cache_client is None:
+        #         return 0
+        #     else:
+        #         # Get memory info
+        #         # Extract total memory usage in bytes
+        #         memory_info = self.cache_client.info('memory')
+        #         print(f'memory_info - {memory_info}')
+        #         used_memory =  memory_info['used_memory']
+        #         return f"{used_memory / (1024**2):.5f}" 
+        # else:
+        #     return 0
     @functools.cached_property
     def _classed_items(self) -> List[Tuple[str, int]]:
         return [(blob, class_index)
