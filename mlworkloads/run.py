@@ -18,7 +18,9 @@ def main(config: DictConfig):
                        'cifar10_resnet101',
                        'cifar10_shufflenet_v2_x1_0',
                        'cifar10_squeezenet1_0',
-                       'cifar10_vgg16',]
+                       'cifar10_vgg16',
+                       'imagenet_shufflenet_v2_x1_0'
+                       'imagenet_vgg16',]
 
     # print(OmegaConf.to_yaml(config, resolve=True))
 
