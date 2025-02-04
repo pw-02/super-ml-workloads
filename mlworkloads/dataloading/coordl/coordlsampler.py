@@ -7,7 +7,7 @@ import uuid
 import time
 
 class CoorDLSampler(Sampler):
-    def __init__(self, dataset, grpc_server_address, batch_size=32, job_id=None, fabric=None):
+    def __init__(self, dataset, grpc_server_address, batch_size=32, job_idx=None, fabric=None):
         # self.job_id = str(os.getpid())  # Unique job ID for the current process
         self.job_id = str(uuid.uuid4())  # Unique job ID for the current process
         self.batch_size = batch_size
@@ -18,6 +18,7 @@ class CoorDLSampler(Sampler):
         self._register_dataset_with_super()
         self.current_batch = 0
         self.fabric = fabric
+        self.job_idx = job_idx
         self.send_job_ended_notfication()
 
     def _test_grpc_connection(self):
@@ -100,7 +101,7 @@ class CoorDLSampler(Sampler):
             data_dir=self.dataset.s3_data_dir))
 
             if response.batch.batch_id == 'None':
-                self.fabric.print(f"Jobs {self.job_id}: Batch is None. Retrying...")
+                self.fabric.print(f"Jobs {self.job_idx}: Batch is None. Retrying...")
                 # print("Batch is None. Retrying...")
                 time.sleep(5)
                 continue # Retry fetching the batch if it's None
