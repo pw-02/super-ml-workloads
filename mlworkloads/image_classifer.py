@@ -133,8 +133,8 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
         if config.workload.max_epochs is not None and current_epoch >= config.workload.max_epochs:
             should_stop = True
 
-    if isinstance(train_dataloader.sampler, SUPERSampler):
-        train_dataloader.sampler.send_job_ended_notfication()
+    # if isinstance(train_dataloader.sampler, SUPERSampler):
+    #     train_dataloader.sampler.send_job_ended_notfication()
 
     # elapsed_time = time.perf_counter() - train_start_time
     # fabric.print(f"Training completed in {elapsed_time:.2f} seconds")
