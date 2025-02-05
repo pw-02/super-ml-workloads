@@ -1,8 +1,8 @@
 
 defaults:
   - _self_
-  - dataloader: coordl #coordl, super, shade, litgpt, torchs3single
-  - workload: cifar10_vit_b_16
+  - dataloader: super #coordl, super, shade, litgpt, torchs3single
+  - workload: cifar10_resnet18
   #albef_retrieval, 
   #lora_finetune_tiny_llama,
   #lora_finetune_owt, 

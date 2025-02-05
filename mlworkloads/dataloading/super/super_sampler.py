@@ -44,7 +44,6 @@ class SUPERSampler(Sampler):
             print(f"Failed to register dataset: {e.details()}")
             exit(1)
 
-    
     def send_job_ended_notfication(self):
         try:
             self.stub.JobEnded(minibatch_service_pb2.JobEndedRequest(
