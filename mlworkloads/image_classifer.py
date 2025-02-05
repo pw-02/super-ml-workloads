@@ -33,8 +33,8 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
     else:
         seed_everything(config.job_id) # instead of torch.manual_seed(...)
 
-    if config.workload.model_architecture == 'vit_s_16':
-        model = timm.create_model('deit_base_patch16_224', pretrained=False)
+    if config.workload.model_architecture == 'levit_128':
+        model = timm.create_model('levit_128', pretrained=True)
     elif config.workload.model_architecture == 'vit_small_patch32_224':
         model = timm.create_model('vit_small_patch32_224', pretrained=False)
     else:
