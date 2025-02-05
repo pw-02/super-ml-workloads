@@ -193,8 +193,8 @@ def get_transforms(workload_name):
         train_transform = transforms.Compose([
             transforms.Resize(224),
             transforms.RandomHorizontalFlip(),
-            #transforms.RandomCrop(32, padding=4),
-            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # Randomly change brightness, contrast, saturation, and hue
+            transforms.RandomCrop(32, padding=4),
+            # transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # Randomly change brightness, contrast, saturation, and hue
             # transforms.RandomRotation(15),      # Randomly rotate images by up to 15 degrees
             transforms.ToTensor(),                    # Convert to tensor
             transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])  # Normalize

@@ -31,7 +31,13 @@ def main(config: DictConfig):
                        'imagenet_vit_s_16',
                        'imagenet_vit_small_patch32_224',
                        'imagenet_levit_128',
-                       'imagenet_mixer_b32_224']
+                       'imagenet_mixer_b32_224',
+                       'cifar10_vit_b_32',
+                        'cifar10_vit_small_patch32_224',
+                        'cifar10_levit_128',
+                        'cifar10_mixer_b32_224',
+
+                       ]
     
 
     # print(OmegaConf.to_yaml(config, resolve=True))
