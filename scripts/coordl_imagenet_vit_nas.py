@@ -22,7 +22,7 @@ workload_type = "image_classification"
 dataloader = "coordl"
 
 # Define workload configurations
-workload_configs = ["imagenet_vit_s_16", "imagenet_vit_s_32"]
+workload_configs = ["imagenet_vit_b_32", "imagenet_vit_s_32",]
 
 # Define GPU indices and learning rates
 job_ids = [0, 1, 2, 3]
