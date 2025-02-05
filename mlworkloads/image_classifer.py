@@ -37,6 +37,10 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
         model = timm.create_model('levit_128', pretrained=True)
     elif config.workload.model_architecture == 'vit_small_patch32_224':
         model = timm.create_model('vit_small_patch32_224', pretrained=False)
+    elif config.workload.model_architecture == 'vit_b_32':
+        model = timm.create_model('vit_base_patch32_384', pretrained=False)
+    elif config.workload.model_architecture == 'mlp_mixer_b16_224':
+        model = timm.create_model('mlp_mixer_b16_224', pretrained=False)
     else:
         model = get_model(name=config.workload.model_architecture, weights=None, num_classes=config.workload.num_classes)
     optimizer = optim.Adam(model.parameters(), lr=config.workload.learning_rate)
