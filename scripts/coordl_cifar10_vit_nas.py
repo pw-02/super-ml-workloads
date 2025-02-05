@@ -18,7 +18,7 @@ def get_python_command():
             sys.exit(1)
 
 # Define workload type and dataloader
-workload_type = "image_classification"
+workload_type = "image_transfomer"
 dataloader = "coordl"
 
 # Define workload configurations
