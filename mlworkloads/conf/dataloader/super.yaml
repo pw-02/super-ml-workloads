@@ -5,4 +5,4 @@ drop_last: False
 shuffle: True
 use_compression: True
 use_local_folder: False
-ssl_enabled: True
+ssl_enabled: False
