@@ -62,7 +62,7 @@ class CoorDLMappedDataset(Dataset):
         self._simlute_time_for_cache_hit = simulate_time_for_cache_hit
         self.cache_transformations = cache_transformations
         self.use_compression = use_compression
-        self.ssl = False
+        self.ssl = True
 
         if cache_address is not None:
             self.cache_host, self.cache_port = cache_address.split(":")
