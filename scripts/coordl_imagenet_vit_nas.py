@@ -22,7 +22,7 @@ workload_type = "image_classification"
 dataloader = "coordl"
 
 # Define workload configurations
-workload_configs = ["cifar10_vit_b_16", "cifar10_vit_b_32", "cifar10_vit_l_16 ", "cifar10_vit_l_32 "]
+workload_configs = ["imagnet_vit_b_16", "imagenet_vit_b_32", "imagenet_vit_l_16", "imagenet_vit_l_32"]
 
 # Define GPU indices and learning rates
 job_ids = [0, 1, 2, 3]

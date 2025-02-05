@@ -62,7 +62,7 @@ class CoorDLMappedDataset(Dataset):
         self._simlute_time_for_cache_hit = simulate_time_for_cache_hit
         self.cache_transformations = cache_transformations
         self.use_compression = use_compression
-
+        self.ssl = False
 
         if cache_address is not None:
             self.cache_host, self.cache_port = cache_address.split(":")
@@ -82,8 +82,10 @@ class CoorDLMappedDataset(Dataset):
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        # self.cache_client = redis.Redis(host=self.cache_host, port=self.cache_port)  # Reconnect
-        self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port,  ssl=True)
+        if self.ssl:
+            self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port, ssl=True)
+        else:
+            self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
 
 
     def check_s3_client(self):
@@ -232,8 +234,10 @@ class CoorDLMappedDataset(Dataset):
         """Initialize Redis cache client if not already connected."""
         if self.cache_client is None:
             # self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
-            self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port,  ssl=True)
-
+            if self.ssl:
+                self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port, ssl=True)
+            else:
+                self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
 
     def _torch_batch_to_bytes(self, data_samples: torch.Tensor, labels: torch.Tensor) -> str:
         with BytesIO() as buffer:

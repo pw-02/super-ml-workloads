@@ -1,5 +1,5 @@
 #dataloading configuration
-name: cifar10_vit_b_16 
+name: imagnet_vit_b_16 
 
 s3_bucket: imagenet1k-sdl
 s3_train_prefix: s3://imagenet1k-sdl/train/

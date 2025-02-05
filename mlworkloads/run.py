@@ -21,7 +21,13 @@ def main(config: DictConfig):
                        'cifar10_vgg16',
                        'imagenet_resnet18',
                        'imagenet_shufflenet_v2_x1_0',
-                       'imagenet_vgg16',]
+                       'imagenet_vgg16',
+                       'imagnet_vit_b_16',
+                       'imagenet_vit_b_32',
+                       'imagenet_vit_l_16',
+                       'imagenet_vit_l_32',
+                       'cifar10_vit_b_16']
+    
 
     # print(OmegaConf.to_yaml(config, resolve=True))
 
