@@ -19,6 +19,7 @@ import numpy as np
 from datetime import datetime, timezone
 from dataloading.coordl.coordldataset import CoorDLMappedDataset
 from dataloading.coordl.coordlsampler import CoorDLSampler
+import timm
 
 def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logger: CSVLogger):
     
@@ -32,7 +33,12 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
     else:
         seed_everything(config.job_id) # instead of torch.manual_seed(...)
 
-    model = get_model(name=config.workload.model_architecture, weights=None, num_classes=config.workload.num_classes)
+    if config.workload.model_architecture == 'vit_s_16':
+        model = timm.create_model('vit_base_patch16_224', pretrained=False, num_classes=config.workload.num_classes)
+    elif config.workload.model_architecture == 'vit_s_32':
+        model = timm.create_model('vit_small_patch32_224', pretrained=False, num_classes=config.workload.num_classes)
+    else:
+        model = get_model(name=config.workload.model_architecture, weights=None, num_classes=config.workload.num_classes)
     optimizer = optim.Adam(model.parameters(), lr=config.workload.learning_rate)
     model, optimizer = fabric.setup(model, optimizer)
 
