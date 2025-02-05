@@ -34,13 +34,13 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
         seed_everything(config.job_id) # instead of torch.manual_seed(...)
 
     if config.workload.model_architecture == 'levit_128':
-        model = timm.create_model('levit_128', pretrained=True)
+        model = timm.create_model('levit_128', pretrained=False, num_classes=config.workload.num_classes)
     elif config.workload.model_architecture == 'vit_small_patch32_224':
-        model = timm.create_model('vit_small_patch32_224', pretrained=False)
+        model = timm.create_model('vit_small_patch32_224', pretrained=False, num_classes=config.workload.num_classes)
     # elif config.workload.model_architecture == 'vit_b_32':
     #     model = timm.create_model('vit_base_patch32_384', pretrained=False)
     elif config.workload.model_architecture == 'mixer_b32_224':
-        model = timm.create_model('mixer_b32_224', pretrained=False)
+        model = timm.create_model('mixer_b32_224', pretrained=False, num_classes=config.workload.num_classes)
     else:
         model = get_model(name=config.workload.model_architecture, weights=None, num_classes=config.workload.num_classes)
     optimizer = optim.Adam(model.parameters(), lr=config.workload.learning_rate)
