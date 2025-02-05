@@ -16,14 +16,13 @@ from lightning.fabric import Fabric, seed_everything
 from lightning.fabric.loggers import CSVLogger
 import torch
 from multi_modal.albef.model import albef_model_for_retrieval
-# from model import albef_model_for_retrieval
 from torch.utils.data import DataLoader
 # from dataloading.s3_redis.s3redis_retrieval_dataset import S3RedisRetrievalTrainingDataset
 # from dataloading.coordl.coordl_coco_dataset import CoorDLCocoRetrievalTrainingDataset
+from dataloading.coordl.coordlcoco_dataset import CoorDLMappedCocoDataset
+from dataloading.coordl.coordlsampler import CoorDLSampler
+
 from dataloading.super.super_sampler import SUPERSampler
-from dataloading.shade.shadesampler import ShadeSampler
-from dataloading.shade.shadedataset_coco import ShadeDatasetCOCO
-from torch.utils.data import RandomSampler, SequentialSampler
 import torch.optim as optim
 from transformers.models.bert.tokenization_bert import BertTokenizer
 from torch.nn.utils.rnn import pad_sequence
@@ -280,8 +279,10 @@ def launch_finetune(config: DictConfig, train_logger: CSVLogger, val_logger: CSV
     devices = parse_devices(config.workload.devices)
     precision = config.workload.precision or get_default_supported_precision(training=True)
     strategy = "auto"
+    
     if config.simulation_mode:
         config.accelerator = 'cpu'
+    
     fabric = Fabric(
         devices=devices,
         num_nodes=config.workload.num_nodes,
@@ -358,69 +359,43 @@ def get_dataloaders(
                     )
                 train_dataloader = DataLoader(train_dataset, batch_size=None, sampler=train_sampler, num_workers=config.workload.num_pytorch_workers)
                 train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
-    elif config.dataloader.name == 'shade':
-            global PQ
-            # global key_id_map
-            global ghost_cache
-            if config.workload.run_training:
-                    train_dataset = ShadeDatasetCOCO(
-                        annotation_file=config.workload.train_annotation_file,
-                        s3_data_dir=config.workload.s3_train_prefix,
-                        image_transform= training_image_transform(),
-                        text_transform=ALBEFTextTransform(truncate=True, pad_to_max_seq_len=True, max_seq_len=30, add_end_token=False),
-                        cache_address=config.dataloader.cache_address,
-                        PQ=PQ,
-                        ghost_cache=ghost_cache,
-                        wss=config.dataloader.wss
-                        )
-                    train_sampler = ShadeSampler(
-                        dataset=train_dataset,
-                        num_replicas=1,
-                        rank=0,
-                        batch_size=config.workload.batch_size,
-                        seed=config.job_id,
-                        host_ip=config.dataloader.cache_address.split(":")[0],
-                        port_num=config.dataloader.cache_address.split(":")[1],
-                        rep_factor=config.dataloader.rep_factor,
-                        )
-                    train_dataloader = DataLoader(train_dataset, 
-                                          batch_size=config.workload.batch_size,
-                                          sampler=train_sampler, 
-                                          collate_fn=retrieval_train_collate_fn,
-                                          num_workers=config.workload.num_pytorch_workers)
-                    train_dataloader = fabric.setup_dataloaders(train_dataloader,move_to_device=True)
 
     return train_dataloader, val_dataloader
 
-def train_loop(fabric: Fabric, job_id: str, train_logger: CSVLogger, model, 
-               optimizer, train_dataloader:DataLoader, 
-               train_start_time, current_epoch, global_step_count, 
-               max_steps, limit_train_batches, criterion, 
-               batch_wts,
-               sim=False, sim_time=0):
+def train_loop(fabric: Fabric, 
+               job_id: str, 
+               train_logger: CSVLogger, 
+               model, 
+               optimizer, 
+               train_dataloader:DataLoader, 
+               train_start_time, 
+               current_epoch, 
+               global_step_count, 
+               max_steps, 
+               limit_train_batches, 
+               criterion, 
+               sim=False, 
+               sim_time=0):
+    
     model.train()
     total_samples = 0
     total_train_loss = 0.0
     alpha = 0.4
     end = time.perf_counter()
-    for batch_idx, (batch, data_load_time, transformation_time, is_cache_hit, cached_on_miss) in enumerate(train_dataloader):
 
+    for batch_idx, (batch, data_load_time, transformation_time, is_cache_hit, cached_on_miss) in enumerate(train_dataloader):
         wait_for_data_time = time.perf_counter() - end
 
         if limit_train_batches is not None and batch_idx +1 >= limit_train_batches: #add plus 1 here to skip last batch
                 break
         # Forward pass: Compute model output and loss
-        if isinstance(train_dataloader.dataset, ShadeDatasetCOCO):
-            image, text, text_atts, idx = batch
-            data_load_time = sum(data_load_time)
-            transformation_time = sum(transformation_time)
-            cache_hit_samples = sum(is_cache_hit)
-            cache_hit_bacth = 1 if cache_hit_samples == len(is_cache_hit) else 0
+        
+        image, text, text_atts, idx, batch_id = batch
+        cache_hit_samples = batch[0].size(0) if is_cache_hit == True else 0
+        cache_hit_bacth=is_cache_hit
 
-        elif isinstance(train_dataloader.sampler, SUPERSampler):
-            image, text, text_atts, idx, batch_id = batch
-            cache_hit_samples = batch[0].size(0) if is_cache_hit == True else 0
-            cache_hit_bacth=is_cache_hit
+        if fabric.device.type == 'cuda':
+            torch.cuda.synchronize() # Ensure accurate timing
 
         gpu_processing_started = time.perf_counter()
         if sim:
@@ -433,8 +408,8 @@ def train_loop(fabric: Fabric, job_id: str, train_logger: CSVLogger, model,
             optimizer.step()  # Update weights
             total_train_loss += loss.item() * image.size(0)
             
-            if fabric.device.type == 'cuda':
-                    torch.cuda.synchronize()
+            # if fabric.device.type == 'cuda':
+            #         torch.cuda.synchronize()
 
         # Track time taken for GPU processing
         gpu_processing_time = time.perf_counter() - gpu_processing_started
@@ -442,42 +417,8 @@ def train_loop(fabric: Fabric, job_id: str, train_logger: CSVLogger, model,
         total_samples += image.size(0)
         avg_train_loss = total_train_loss / total_samples if not sim else 0
         global_step_count +=1
-
-        if isinstance(train_dataloader.sampler, ShadeSampler) and not sim:
-            # Calculate the individual loss for each sample
-            individual_loss = loss / loss.itemsize
-            loss_tensor = individual_loss.repeat(loss.itemsize)
-            train_dataloader.sampler.pass_batch_important_scores(loss_tensor.cpu())
-            sorted_img_indices = train_dataloader.sampler.get_sorted_index_list()
-            key_id_map = redis.StrictRedis(host=train_dataloader.dataset.cache_host, port=train_dataloader.dataset.cache_port)
-            global ghost_cache
-            global PQ
-            track_batch_indx = 0
-            if current_epoch > 1:
-                PQ = train_dataloader.dataset.get_PQ()
-                ghost_cache = train_dataloader.dataset.get_ghost_cache()
-            for indx in sorted_img_indices:
-                if key_id_map.exists(indx.item()):
-                    if indx.item() in PQ:
-                        PQ[indx.item()] = (batch_wts[track_batch_indx],PQ[indx.item()][1]+1)
-                        ghost_cache[indx.item()] = (batch_wts[track_batch_indx],ghost_cache[indx.item()][1]+1)
-                        track_batch_indx+=1
-                    else:
-                        PQ[indx.item()] = (batch_wts[track_batch_indx],1)
-                        ghost_cache[indx.item()] = (batch_wts[track_batch_indx],1)
-                        track_batch_indx+=1
-                else:
-                    if indx.item() in ghost_cache:
-                        ghost_cache[indx.item()] = (batch_wts[track_batch_indx],ghost_cache[indx.item()][1]+1)
-                        track_batch_indx+=1
-                    else:
-                        ghost_cache[indx.item()] = (batch_wts[track_batch_indx],1)
-                        track_batch_indx+=1
-            train_dataloader.dataset.set_PQ(PQ)
-            train_dataloader.dataset.set_ghost_cache(ghost_cache)
-            train_dataloader.dataset.set_num_local_samples()
         
-        elif isinstance(train_dataloader.sampler, SUPERSampler):
+        if isinstance(train_dataloader.sampler, SUPERSampler) or isinstance(train_dataloader.sampler, CoorDLSampler):
                 train_dataloader.sampler.send_job_update_to_super(
                     batch_id,
                     wait_for_data_time,
@@ -485,7 +426,15 @@ def train_loop(fabric: Fabric, job_id: str, train_logger: CSVLogger, model,
                     gpu_processing_time,
                     cached_on_miss
                     )
+        if isinstance(train_dataloader.dataset, CoorDLMappedCocoDataset):
+                cache_size = train_dataloader.dataset.get_cache_size()
+                cache_memory = train_dataloader.dataset.get_cache_memory()
+        else:
+                cache_size = 0
+                cache_memory = 0
+
         metrics= OrderedDict({
+                            "Batch Id": batch_id,
                             "Elapsed Time (s)": time.perf_counter() - train_start_time,
                             "Num Torch Workers": train_dataloader.num_workers,
                             "Device": fabric.global_rank,
@@ -499,6 +448,8 @@ def train_loop(fabric: Fabric, job_id: str, train_logger: CSVLogger, model,
                             "Transformation Time (s)": transformation_time,
                             "Cache_Hit (Batch)": cache_hit_bacth,
                             "Cache_Hits (Samples)": cache_hit_samples,
+                            "Cache_Size": cache_size,
+                            "Cache_Memory (Mb)": cache_memory,
                             "Train Loss (Avg)": avg_train_loss, #calculates the average training loss across all batches.
                             "Train Accuracy (Avg)": 0, #calculates the average training accuracy across all batches.
                             "Timestamp (UTC)": datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')  # Adds UTC timestamp
@@ -511,20 +462,20 @@ def train_loop(fabric: Fabric, job_id: str, train_logger: CSVLogger, model,
                     f" iter:{metrics['Iteration Time (s)']:.2f}s |"
                     f" data_delay:{metrics['Wait for Data Time (s)']:.2f}s |"
                     f" gpu:{metrics['GPU Processing Time (s)']:.2f}s |"
-                    f" data_fetch:{metrics['Data Load Time (s)']:.2f}s |"
-                    f" transform:{metrics['Transformation Time (s)']:.2f}s |"
+                    # f" data_fetch:{metrics['Data Load Time (s)']:.2f}s |"
+                    # f" transform:{metrics['Transformation Time (s)']:.2f}s |"
                     f" elapsed:{metrics['Elapsed Time (s)']:.2f}s |"
                     f" loss: {metrics['Train Loss (Avg)']:.3f} |"
-                    f" acc: {metrics['Train Accuracy (Avg)']:.3f} |"
+                    # f" acc: {metrics['Train Accuracy (Avg)']:.3f} |"
                     F" cache hit: {metrics['Cache_Hit (Batch)']} |"
                     )
 
         # stopping criterion on step level
         if max_steps is not None and global_step_count >= max_steps:
                 break
+        
         end = time.perf_counter()
-    if isinstance(train_dataloader.sampler, ShadeSampler):
-        train_dataloader.sampler.on_epoch_end(total_train_loss/batch_idx)
+   
     return global_step_count
 
 def retrieval_train_collate_fn(
@@ -570,7 +521,6 @@ def main(fabric: Fabric, devices: int, config: DictConfig,train_logger: CSVLogge
     else:
         seed_everything(config.job_id) # instead of torch.manual_seed(...)
 
-    
     model = albef_model_for_retrieval(config.workload, pretrained=False)
 
     # optimizer = AdamW(optimizer_params, lr=args["lr"])
@@ -583,30 +533,72 @@ def main(fabric: Fabric, devices: int, config: DictConfig,train_logger: CSVLogge
 
     fabric.print(f"Number of trainable parameters: {num_parameters(model, requires_grad=True):,}")
     fabric.print(f"Number of non-trainable parameters: {num_parameters(model, requires_grad=False):,}")
-    train_dataloader, val_dataloader = get_dataloaders(fabric, config)
     
+    train_dataloader = None
+    val_dataloader = None
+
+    if config.dataloader.name == 'super':
+        if config.workload.run_training:
+            train_dataset = SUPERMappedCocoDataset(
+            annotation_file=config.workload.train_annotation_file,
+            s3_data_dir=config.workload.s3_train_prefix,
+            image_transform= training_image_transform(),
+            text_transform=ALBEFTextTransform(truncate=True, pad_to_max_seq_len=True, max_seq_len=30, add_end_token=False),
+            cache_address=config.dataloader.cache_address,
+            )
+            train_sampler = SUPERSampler(
+                dataset=train_dataset,
+                grpc_server_address=config.dataloader.grpc_server_address,
+                batch_size=config.workload.batch_size
+                )
+            train_dataloader = DataLoader(train_dataset, 
+                                          batch_size=None, 
+                                          sampler=train_sampler, 
+                                          num_workers=config.workload.num_pytorch_workers)
+            train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
+            
+    elif config.dataloader.name == 'coordl':
+        # PyTorch DataLoader
+        if config.workload.run_training:
+            train_dataset = CoorDLMappedCocoDataset(
+                annotation_file=config.workload.train_annotation_file,
+                s3_data_dir=config.workload.s3_train_prefix,
+                image_transform= training_image_transform(),
+                text_transform=ALBEFTextTransform(truncate=True, pad_to_max_seq_len=True, max_seq_len=30, add_end_token=False),
+                cache_address=config.dataloader.cache_address,
+                cache_transformations=True,
+                use_compression=config.dataloader.use_compression,
+                use_local_folder=config.dataloader.use_local_folder
+            )
+            
+            train_sampler = CoorDLSampler(
+                            dataset=train_dataset,
+                            grpc_server_address=config.dataloader.grpc_server_address,
+                            batch_size=config.workload.batch_size,
+                            job_idx=config.job_id,
+                            fabric=fabric,
+                            )
+            
+
+            train_dataloader = DataLoader(train_dataset, 
+                                          batch_size=None, 
+                                          sampler=train_sampler, 
+                                          num_workers=config.workload.num_pytorch_workers,
+                                          pin_memory=True)
+            train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
+    
+        
     global_train_step_count = 0
     global_val_step_count = 0
     current_epoch=0
     should_stop = False
     train_start_time = time.perf_counter()
 
-    if config.dataloader.name == 'shade':
-        batch_wts = []
-        for j in range(config.workload.batch_size):
-            batch_wts.append(math.log(j+10))
-    else:
-        batch_wts = None
-    
     if config.workload.limit_train_batches is None:
         config.workload.limit_train_batches = len(train_dataloader)
         
     while not should_stop:
-        # if isinstance(train_dataloader.sampler, ShadeSampler):
-        #     train_dataloader.sampler.set_epoch(current_epoch)
-
         current_epoch += 1
-
         global_train_step_count = train_loop(
             fabric=fabric,
             job_id=config.job_id,
@@ -620,7 +612,6 @@ def main(fabric: Fabric, devices: int, config: DictConfig,train_logger: CSVLogge
             max_steps=config.workload.max_steps,
             limit_train_batches=config.workload.limit_train_batches,
             criterion=nn.CrossEntropyLoss(reduction = 'none'), # if isinstance(train_dataloader.sampler, ShadeSampler) else nn.CrossEntropyLoss(),
-            batch_wts=batch_wts,
             sim=config.simulation_mode,
             sim_time=config.workload.gpu_time
             )
@@ -633,11 +624,11 @@ def main(fabric: Fabric, devices: int, config: DictConfig,train_logger: CSVLogge
     if isinstance(train_dataloader.sampler, SUPERSampler):
         train_dataloader.sampler.send_job_ended_notfication()
 
+    if isinstance(train_dataloader.sampler, CoorDLSampler):
+        train_dataloader.sampler.send_job_ended_notfication()
+
     elapsed_time = time.perf_counter() - train_start_time
-
     fabric.print(f"Training completed in {elapsed_time:.2f} seconds")
-
-
 
 @hydra.main(version_base=None, config_path="./conf", config_name="config")
 def run(config: DictConfig):
