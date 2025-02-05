@@ -36,7 +36,7 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
     if config.workload.model_architecture == 'vit_s_16':
         model = timm.create_model('vit_base_patch16_224', pretrained=False)
     elif config.workload.model_architecture == 'vit_s_32':
-        model = timm.create_model('vit_small_patch32_224', pretrained=False)
+        model = timm.create_model('deit_base_patch16_224', pretrained=False)
     else:
         model = get_model(name=config.workload.model_architecture, weights=None, num_classes=config.workload.num_classes)
     optimizer = optim.Adam(model.parameters(), lr=config.workload.learning_rate)
