@@ -82,7 +82,8 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
                                                 cache_address=config.dataloader.cache_address,
                                                 cache_transformations=True,
                                                 use_compression=config.dataloader.use_compression,
-                                                use_local_folder=config.dataloader.use_local_folder,)
+                                                use_local_folder=config.dataloader.use_local_folder,
+                                                ssl=config.dataloader.ssl_enabled)
             
             train_sampler = CoorDLSampler(
                             dataset=train_dataset,

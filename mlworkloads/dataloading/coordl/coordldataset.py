@@ -48,7 +48,8 @@ class CoorDLMappedDataset(Dataset):
                 simulate_time_for_cache_hit=0,
                 cache_transformations=True,
                 use_compression=False,
-                use_local_folder=False):
+                use_local_folder=False,
+                ssl=True):
         
         self.s3_bucket = S3Url(s3_data_dir).bucket
         self.s3_prefix = S3Url(s3_data_dir).key
@@ -62,7 +63,7 @@ class CoorDLMappedDataset(Dataset):
         self._simlute_time_for_cache_hit = simulate_time_for_cache_hit
         self.cache_transformations = cache_transformations
         self.use_compression = use_compression
-        self.ssl = True
+        self.ssl = ssl
 
         if cache_address is not None:
             self.cache_host, self.cache_port = cache_address.split(":")
