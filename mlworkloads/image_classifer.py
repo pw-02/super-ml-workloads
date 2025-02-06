@@ -298,7 +298,7 @@ def train_loop(fabric:Fabric, job_id,
                 cache_hit_bacth = 1 if is_cache_hit == True else 0
             else:
                 cache_hit_samples = is_cache_hit
-                cache_hit_bacth = 1 if cache_hit_samples == is_cache_hit else 0
+                cache_hit_bacth = 1 if cache_hit_samples == batch[0].size(0) else 0
         
             if isinstance(train_dataloader.sampler, SUPERSampler) or isinstance(train_dataloader.sampler, CoorDLSampler):
                 train_dataloader.sampler.send_job_update_to_super(
