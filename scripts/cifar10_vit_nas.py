@@ -20,7 +20,7 @@ def get_python_command():
 # Define workload type and dataloader
 workload_type = "image_transformer"
 dataset = "cifar10"
-dataloader = "super" #super, coordl
+dataloader = "coordl" #super, coordl
 
 # Define workload configurations
 workload_configs = ["cifar10_vit_b_32", "cifar10_vit_small_patch32_224","cifar10_levit_128","cifar10_mixer_b32_224"]
