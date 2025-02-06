@@ -2,7 +2,7 @@ import os
 import subprocess
 import sys
 import time
-import datetime
+from datetime import datetime, timezone
 
 # Detect the correct Python version
 def get_python_command():
@@ -30,7 +30,7 @@ job_ids = [0, 1, 2, 3]
 learning_rates = [0.1, 0.01, 0.001, 0.0001]  # Add your learning rates here
 
 # Generate experiment ID and log directory
-current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+current_datetime = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 expid = f"multi_job_{current_datetime}"
 root_log_dir = "logs"
 log_dir = os.path.join(root_log_dir, workload_type, dataset, dataloader, expid)
@@ -45,7 +45,7 @@ with open(os.path.join(log_dir, "resource_monitor.log"), "w") as log_file:
 monitor_pid = monitor_process.pid
 
 # Track training start time
-training_started_datetime =  datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+training_started_datetime =  datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 print(f"Training started UTC Time: {training_started_datetime}")
 
 # Loop over jobs
