@@ -18,7 +18,8 @@ def get_python_command():
             sys.exit(1)
 
 # Define workload type and dataloader
-workload_type = "image_transfomer"
+workload_type = "image_transformer"
+dataset = "cifar10"
 dataloader = "super" #super, coordl
 
 # Define workload configurations
@@ -32,7 +33,7 @@ learning_rates = [0.1, 0.01, 0.001, 0.0001]  # Add your learning rates here
 current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 expid = f"multi_job_{current_datetime}"
 root_log_dir = "logs"
-log_dir = os.path.join(root_log_dir, workload_type, dataloader, expid)
+log_dir = os.path.join(root_log_dir, workload_type, dataset, dataloader, expid)
 os.makedirs(log_dir, exist_ok=True)  # Ensure the log directory exists
 
 # Start resource monitoring
