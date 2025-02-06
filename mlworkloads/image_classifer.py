@@ -20,6 +20,8 @@ from datetime import datetime, timezone
 from dataloading.coordl.coordldataset import CoorDLMappedDataset
 from dataloading.coordl.coordlsampler import CoorDLSampler
 import timm
+from dataloading.torchs3.s3_mapped_dataset import S3MappedDataset
+from dataloading.torchs3.batch_sampler import S3BatchSamplerWithID
 
 def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logger: CSVLogger):
     
@@ -91,6 +93,32 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
                             batch_size=config.workload.batch_size,
                             job_idx=config.job_id,
                             fabric=fabric,
+                            )
+            
+            train_dataloader = DataLoader(train_dataset, 
+                                          batch_size=None, 
+                                          sampler=train_sampler, 
+                                          num_workers=config.workload.num_pytorch_workers,
+                                          pin_memory=True)
+            train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
+
+    elif config.dataloader.name == 'baseline':
+        # PyTorch DataLoader
+        if config.workload.run_training:
+            train_dataset = S3MappedDataset(s3_data_dir=config.workload.s3_train_prefix,
+                                                transform=train_transform,
+                                                cache_address=config.dataloader.cache_address,
+                                                cache_transformations=True,
+                                                use_compression=config.dataloader.use_compression,
+                                                use_local_folder=config.dataloader.use_local_folder,
+                                                ssl=config.dataloader.ssl_enabled)
+            
+            train_sampler = S3BatchSamplerWithID(
+                            data_source=train_dataset,
+                            batch_size=config.workload.batch_size,
+                            drop_last=False,
+                            shuffle=True,
+                            seed=42
                             )
             
             train_dataloader = DataLoader(train_dataset, 
@@ -265,8 +293,12 @@ def train_loop(fabric:Fabric, job_id,
             avg_train_loss = total_train_loss / total_samples if not sim else 0
             global_step_count +=1
 
-            cache_hit_samples = batch[0].size(0) if is_cache_hit == True else 0
-            cache_hit_bacth = 1 if is_cache_hit == True else 0
+            if isinstance(train_dataloader.sampler, SUPERSampler) or isinstance(train_dataloader.sampler, CoorDLSampler):
+                cache_hit_samples = batch[0].size(0) if is_cache_hit == True else 0
+                cache_hit_bacth = 1 if is_cache_hit == True else 0
+            else:
+                cache_hit_samples = is_cache_hit
+                cache_hit_bacth = 1 if cache_hit_samples == is_cache_hit else 0
         
             if isinstance(train_dataloader.sampler, SUPERSampler) or isinstance(train_dataloader.sampler, CoorDLSampler):
                 train_dataloader.sampler.send_job_update_to_super(

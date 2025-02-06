@@ -1,4 +1,8 @@
-name: torchs3single
-cache_address: 54.184.32.64:6378  # 54.191.151.127:6378 #s-rdior4.serverless.usw2.cache.amazonaws.com:6379 #s-rdior4.serverless.usw2.cache.amazonaws.com:6379 #s-rdior4.serverless.usw2.cache.amazonaws.com:6379    #rs10.rdior4.ng.0001.usw2.cache.amazonaws.com:6379 #127.0.0.1:6379 # null #
+name: baseline
+cache_address: 127.0.0.1:6379  # 54.191.151.127:6378 #s-rdior4.serverless.usw2.cache.amazonaws.com:6379 #s-rdior4.serverless.usw2.cache.amazonaws.com:6379 #s-rdior4.serverless.usw2.cache.amazonaws.com:6379    #rs10.rdior4.ng.0001.usw2.cache.amazonaws.com:6379 #127.0.0.1:6379 # null #
+drop_last: False
 shuffle: True
-wss: null
+use_compression: True
+use_local_folder: True
+ssl_enabled: False
+wss: 0.2

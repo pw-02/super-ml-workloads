@@ -4,7 +4,7 @@ import hashlib
 import torch
 import random
 
-class BatchSamplerWithID(BatchSampler):
+class S3BatchSamplerWithID(BatchSampler):
     def __init__(self, data_source: Sized, batch_size: int, drop_last: bool, shuffle: bool = False, seed: Optional[int] = None):
         
         # Set random seed if provided
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     dataset_size = 100
 
     # Example usage of BatchSamplerWithID with shuffling
-    batch_sampler_with_id = BatchSamplerWithID(data_source=range(dataset_size), batch_size=10, drop_last=False, shuffle=True, seed=42)
+    batch_sampler_with_id = S3BatchSamplerWithID(data_source=range(dataset_size), batch_size=10, drop_last=False, shuffle=True, seed=42)
 
     # Iterate over batches and print batch IDs and indices
     for batch_id, batch_indices in batch_sampler_with_id:
