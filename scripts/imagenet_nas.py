@@ -19,8 +19,8 @@ def get_python_command():
 
 # Define workload type and dataloader
 workload_type = "image_classification"
-dataset = "cifar10"
-dataloader = "super" #super, coordl #baseline
+dataset = "imagenet"
+dataloader = "baseline" #super, coordl #baseline
 
 # Define workload configurations
 workload_configs = ["imagenet_resnet18", "imagenet_resnet50", "imagenet_shufflenet_v2_x1_0", "imagenet_vgg16"]

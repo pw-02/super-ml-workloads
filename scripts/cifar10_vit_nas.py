@@ -65,7 +65,7 @@ for process in job_pids:
     process.wait()
 
 # Track training end time
-training_ended_datetime =  datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+training_ended_datetime =  datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 print(f"Training started UTC Time: {training_started_datetime}")
 print(f"Training ended UTC Time: {training_ended_datetime}")
 
