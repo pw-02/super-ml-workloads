@@ -2,7 +2,7 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime
+import datetime
 
 # Detect the correct Python version
 def get_python_command():
@@ -18,9 +18,9 @@ def get_python_command():
             sys.exit(1)
 
 # Define workload type and dataloader
-workload_type = "image_transformer"
+workload_type = "image_transformer" 
 dataset = "cifar10"
-dataloader = "super" #super, coordl
+dataloader = "super" #super, coordl #baseline
 
 # Define workload configurations
 workload_configs = ["cifar10_vit_b_32", "cifar10_vit_small_patch32_224","cifar10_levit_128","cifar10_mixer_b32_224"]
@@ -45,7 +45,7 @@ with open(os.path.join(log_dir, "resource_monitor.log"), "w") as log_file:
 monitor_pid = monitor_process.pid
 
 # Track training start time
-training_started_datetime = datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S")
+training_started_datetime =  datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 print(f"Training started UTC Time: {training_started_datetime}")
 
 # Loop over jobs
@@ -65,7 +65,7 @@ for process in job_pids:
     process.wait()
 
 # Track training end time
-training_ended_datetime = datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S")
+training_ended_datetime =  datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 print(f"Training started UTC Time: {training_started_datetime}")
 print(f"Training ended UTC Time: {training_ended_datetime}")
 

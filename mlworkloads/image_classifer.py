@@ -333,7 +333,7 @@ def train_loop(fabric:Fabric, job_id,
                             "Cache_Memory (Mb)": cache_memory,
                             "Train Loss (Avg)": avg_train_loss, #calculates the average training loss across all batches.
                             "Train Accuracy (Avg)": avg_train_acc, #calculates the average training accuracy across all batches.
-                            "Timestamp (UTC)": datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')  # Adds UTC timestamp
+                            "Timestamp (UTC)": datetime.now(timezone.utc)  # Adds UTC timestamp
                             })
             train_logger.log_metrics(metrics,step=global_step_count)
             
