@@ -5,8 +5,8 @@ import redis
 #                                                      port=6379,
 #                                                      ssl=True)
 
-cache_client =redis.StrictRedis = redis.StrictRedis(host="127.0.0.1",
-                                                     port=6379)
+cache_client =redis.StrictRedis = redis.StrictRedis(host="localhost",
+                                                     port=6378)
 
 def put_in_cache(batch_id):
      try:

@@ -39,7 +39,6 @@ plt.xticks(fontsize=12, weight='normal')  # Adjust the font size as needed
 # plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=3)
 # plt.legend()
 
-# plt.show()
+plt.show()
 
 
-plt.savefig('figures/cpu_utilization/resnet18_cpu.png')
