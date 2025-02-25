@@ -20,9 +20,10 @@ from datetime import datetime, timezone
 import timm
 from dataloading.torchs3.s3_mapped_dataset import S3MappedDataset
 from dataloading.torchs3.batch_sampler import S3BatchSamplerWithID
-from dataloading.tensorsocket.tensor_socket_dataset import TensorSockerDataset
+from dataloading.tensorsocket.tensorsocket_dataset import TensorSockerDataset
 from dataloading.tensorsocket.producer import TensorProducer
 from dataloading.tensorsocket.consumer import TensorConsumer
+from dataloading.tensorsocket.tensorsocket_sampler import TensorSocketSampler
 
 def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logger: CSVLogger):
     if config.simulation_mode:
@@ -83,15 +84,24 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
         # PyTorch DataLoader
         if config.dataloader.mode == 'producer':
             train_dataset = TensorSockerDataset(s3_data_dir=config.workload.s3_train_prefix,
-                                                transform=train_transform)
+                                                transform=train_transform,
+                                                cache_address=config.dataloader.cache_address,
+                                                cache_transformations=True,
+                                                use_compression=config.dataloader.use_compression,
+                                                use_local_folder=config.dataloader.use_local_folder,
+                                                ssl=config.dataloader.ssl_enabled
+                                                )
             
+            tensor_socket_sampler = TensorSocketSampler(data_source=train_dataset,
+                                                        batch_size=config.workload.batch_size)
             train_dataloader = DataLoader(train_dataset,
-                                          sampler=RandomSampler(train_dataset),
-                                          batch_size=config.workload.batch_size,
+                                          sampler=tensor_socket_sampler,
+                                          batch_size=None,
                                           num_workers=config.workload.num_pytorch_workers,
                                           pin_memory=True)
             
             train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=False)
+
             tensorsocket_procuder = TensorProducer(
                 data_loader=train_dataloader,
                 port=config.dataloader.producer_port,
@@ -259,7 +269,6 @@ def train_loop(fabric:Fabric, job_id,
         for i, _ in enumerate(tensorsocker_procuder):
             #dont do anything as the producer will send the data to gpu of the consumers
             time.sleep(0.001)
-            pass
     else:
         to_enmerate = tensorsocket_consumer if tensorsocket_consumer is not None else train_dataloader
         for batch_idx, (batch, data_load_time, transformation_time, is_cache_hit, cached_on_miss) in enumerate(to_enmerate):
@@ -270,6 +279,7 @@ def train_loop(fabric:Fabric, job_id,
             # Unpack batch
             if isinstance(to_enmerate, TensorConsumer):
                 inputs, labels = batch
+                batch_id = batch_idx
             else:
                 inputs, labels, batch_id = batch
             
@@ -309,8 +319,8 @@ def train_loop(fabric:Fabric, job_id,
 
             cache_hit_samples = batch[0].size(0) if is_cache_hit == True else 0
             cache_hit_bacth = 1 if is_cache_hit == True else 0
-        
-            if not isinstance(train_dataloader.sampler, SUPERSampler):
+
+            if not isinstance(train_dataloader, TensorConsumer):
                 train_dataloader.sampler.send_job_update_to_super(
                     batch_id,
                     data_load_time,
@@ -321,7 +331,7 @@ def train_loop(fabric:Fabric, job_id,
             metrics= OrderedDict({
                             "Batch Id": batch_id,
                             "Elapsed Time (s)": time.perf_counter() - train_start_time,
-                            "Num Torch Workers": train_dataloader.num_workers,
+                            # "Num Torch Workers": train_dataloader.num_workers,
                             "Device": fabric.global_rank,
                             "Epoch Index": current_epoch,
                             "Batch Index": batch_idx+1,

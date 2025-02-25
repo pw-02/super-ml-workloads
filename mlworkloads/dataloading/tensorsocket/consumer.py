@@ -177,6 +177,7 @@ class TensorConsumer:
         """
         while True:
             start_loading_time = time.perf_counter()
+            is_cache_hit = True
 
             #check if buffer is empty
             if self.buffer.empty():

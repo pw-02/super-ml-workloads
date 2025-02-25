@@ -1,18 +1,24 @@
-import boto3
+
+# No 'default_generator' in torch/__init__.pyi
+from typing import TypeVar, List, Tuple, Dict
+from datetime import datetime
+import random
+import PIL.Image as Image
+import numpy as np
 import io
-import json
-from PIL import Image
-import torch
-from torch.utils.data import Dataset
-from torchvision import transforms
-from typing import List, Dict, Tuple
-import functools
-import time
+import numpy as np
+import PIL
 from urllib.parse import urlparse
-import redis
-import botocore.config
+import boto3
+import functools
+from torch.utils.data import Dataset
+import json
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import botocore.config
 import os
+import redis
+import torch
 from io import BytesIO
 
 class S3Url(object):
@@ -35,11 +41,10 @@ class S3Url(object):
         return self._parsed.geturl()
 
 
-class S3MappedDataset(Dataset):
-    def __init__(self, 
-                 s3_data_dir: str,
-                 transform=None,  
-                 cache_address= None,
+class TensorSockerDataset(Dataset):
+    def __init__(self, s3_data_dir: str, 
+                 transform=None,
+                 cache_address=None,  
                  simulate_mode=False, 
                  simulate_time_for_cache_miss=0,
                  simulate_time_for_cache_hit=0,
@@ -47,7 +52,7 @@ class S3MappedDataset(Dataset):
                  use_compression=False,
                  use_local_folder=False,
                  ssl=True):
-
+        
         self.s3_bucket = S3Url(s3_data_dir).bucket
         self.s3_prefix = S3Url(s3_data_dir).key
         self.s3_data_dir = s3_data_dir
@@ -61,6 +66,7 @@ class S3MappedDataset(Dataset):
         self.cache_transformations = cache_transformations
         self.use_compression = use_compression
         self.ssl = ssl
+        self.cache_client = None
 
         if cache_address is not None:
             self.cache_host, self.cache_port = cache_address.split(":")
@@ -68,10 +74,8 @@ class S3MappedDataset(Dataset):
             self.use_cache = True
         else:
             self.use_cache = False
-
-        self.cache_client = None
     
-
+    
     def __getstate__(self):
 
         state = self.__dict__.copy()
@@ -84,21 +88,20 @@ class S3MappedDataset(Dataset):
             self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port, ssl=True)
         else:
             self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
-    
-    
 
-
+    
     def check_s3_client(self):
         if self.s3_client is None:
             self.s3_client = boto3.client('s3', config=botocore.config.Config(
                 max_pool_connections=100))
-    
+            
+
     @functools.cached_property
     def _classed_items(self) -> List[Tuple[str, int]]:
         return [(blob, class_index)
             for class_index, blob_class in enumerate(self.samples)
             for blob in self.samples[blob_class]]
-
+    
     def _get_sample_list_from_s3(self, use_index_file=True, images_only=True) -> Dict[str, List[str]]:
         s3_client = boto3.client('s3')
 
@@ -149,51 +152,27 @@ class S3MappedDataset(Dataset):
     def __len__(self) -> int:
         return sum(len(class_items) for class_items in self.samples.values())
     
+
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, float, float]:
         batch_id, batch_indices = idx
         # batch_indices = self._classed_items[idx][0]  # Simplified for demonstration
         start_loading_time = time.perf_counter()
-        data_samples, labels, cache_hit_count = self.fetch_batch_data(batch_indices)
+        samples, labels, cache_hit_count = self.fetch_batch_data(batch_indices)
         start_transformation_time  = time.perf_counter()
 
         start_transformation_time = time.perf_counter()
         if self.transform is not None:
-            for i in range(len(data_samples)):
-                data_samples[i] = self.transform(data_samples[i])        
+            for i in range(len(samples)):
+                samples[i] = self.transform(samples[i])        
         transformation_time =  time.perf_counter() - start_transformation_time
         # Convert to tensors
-        data_samples= torch.stack(data_samples)
+        samples= torch.stack(samples)
         labels = torch.tensor(labels)
-        data_loading_time  = time.perf_counter() - start_loading_time - transformation_time
-        
-        return (data_samples,labels,batch_id), data_loading_time, transformation_time, cache_hit_count, self.use_cache
-    
-    def _initialize_cache_client(self):
-        """Initialize Redis cache client if not already connected."""
-        if self.cache_client is None:
-            # self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
-            if self.ssl:
-                self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port, ssl=True)
-            else:
-                self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
+        data_fetch_time  = time.perf_counter() - start_loading_time - transformation_time
+        return samples, labels
 
-    def fetch_item_from_cache(self, idx: int):
-          self._initialize_cache_client()
-          byte_image = self.cache_client.get(idx)
-          if byte_image is None:
-                return None
-          byteImgIO = io.BytesIO(byte_image)
-          data = Image.open(byteImgIO)
-          return data
-    
-    def put_item_in_cache(self, idx: int, data):
-        self._initialize_cache_client()
-        # Serialize the image using BytesIO
-        img_byte_arr = BytesIO()
-        data.save(img_byte_arr, format='PNG')  # Save as PNG to the byte array
-        img_byte_arr.seek(0)  # Reset pointer to the start of the byte array
-        self.cache_client.set(idx, img_byte_arr.read())
-    
+        # return samples, labels,batch_id,data_fetch_time,transformation_time
+
     def fetch_batch_data(self, batch_indices: List[str]):
         data_samples, labels = [], []
         cache_hits = 0
@@ -226,6 +205,33 @@ class S3MappedDataset(Dataset):
                     labels.append(label)
             return data_samples, labels, cache_hits
         
+
+    def _initialize_cache_client(self):
+        """Initialize Redis cache client if not already connected."""
+        if self.cache_client is None:
+            # self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
+            if self.ssl:
+                self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port, ssl=True)
+            else:
+                self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
+
+    def fetch_item_from_cache(self, idx: int):
+          self._initialize_cache_client()
+          byte_image = self.cache_client.get(idx)
+          if byte_image is None:
+                return None
+          byteImgIO = io.BytesIO(byte_image)
+          data = Image.open(byteImgIO)
+          return data
+    
+    def put_item_in_cache(self, idx: int, data):
+        self._initialize_cache_client()
+        # Serialize the image using BytesIO
+        img_byte_arr = BytesIO()
+        data.save(img_byte_arr, format='PNG')  # Save as PNG to the byte array
+        img_byte_arr.seek(0)  # Reset pointer to the start of the byte array
+        self.cache_client.set(idx, img_byte_arr.read())
+
     def get_data_sample(self,idx) -> tuple:  
         data_path, label = self._classed_items[idx]
         cache_hit = False
@@ -239,15 +245,58 @@ class S3MappedDataset(Dataset):
                 self.put_item_in_cache(idx, data)
         return data.convert("RGB"), label, cache_hit
 
+    def fetch_image_from_s3(self, data_path):
+        if self.s3_client is None:
+            self.s3_client = boto3.client('s3')
+        obj = self.s3_client.get_object(Bucket=self.s3_bucket, Key=data_path)
+        img_data = obj['Body'].read()
+        image = Image.open(io.BytesIO(img_data)) #.convert('RGB')
+        return image
+    
+    def _get_sample_list_from_s3(self, use_index_file=True, images_only=True) -> Dict[str, List[str]]:
+        s3_client = boto3.client('s3')
 
-if __name__ == "__main__":
-    # Example usage
-    transform = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
-    dataset = S3MappedDataset(s3_bucket="sdl-cifar10", s3_prefix="train/", transform=transform)
-    img, label = dataset[0]
-    print(img.shape)
+        index_file_key = f"{self.s3_prefix}_paired_index.json"
+        paired_samples = {}
+
+        if use_index_file:
+            try:
+                index_object = s3_client.get_object(Bucket=self.s3_bucket, Key=index_file_key)
+                file_content = index_object['Body'].read().decode('utf-8')
+                paired_samples = json.loads(file_content)
+                return paired_samples
+            except Exception as e:
+                print(f"Error reading index file '{index_file_key}': {e}")
+
+        paginator = s3_client.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=self.s3_bucket, Prefix=self.s3_prefix):
+            for blob in page.get('Contents', []):
+                blob_path = blob.get('Key')
+                
+                if blob_path.endswith("/"):
+                    continue  # Skip folders
+                
+                stripped_path = blob_path[len(self.s3_prefix):].lstrip("/")
+                if stripped_path == blob_path:
+                    continue  # No matching prefix, skip
+
+                if images_only and not blob_path.lower().endswith(('.jpg', '.jpeg', '.png')):
+                    continue  # Skip non-image files
+                
+                if 'index.json' in blob_path:
+                    continue  # Skip index file
+
+                blob_class = stripped_path.split("/")[0]
+                if blob_class not in paired_samples:
+                    paired_samples[blob_class] = []
+                paired_samples[blob_class].append(blob_path)
+
+        if use_index_file and paired_samples:
+            s3_client.put_object(
+                Bucket=self.s3_bucket,
+                Key=index_file_key,
+                Body=json.dumps(paired_samples, indent=4).encode('utf-8')
+            )
+
+        return paired_samples
+       
