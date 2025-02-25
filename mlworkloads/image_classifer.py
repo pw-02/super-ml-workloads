@@ -4,7 +4,7 @@ print(sys.path)
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import transforms
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, RandomSampler
 import hydra
 from omegaconf import DictConfig
 from lightning.fabric import Fabric, seed_everything
@@ -17,14 +17,14 @@ import os
 from collections import OrderedDict
 import numpy as np
 from datetime import datetime, timezone
-from dataloading.coordl.coordldataset import CoorDLMappedDataset
-from dataloading.coordl.coordlsampler import CoorDLSampler
 import timm
 from dataloading.torchs3.s3_mapped_dataset import S3MappedDataset
 from dataloading.torchs3.batch_sampler import S3BatchSamplerWithID
+from dataloading.tensorsocket.tensor_socket_dataset import TensorSockerDataset
+from dataloading.tensorsocket.producer import TensorProducer
+from dataloading.tensorsocket.consumer import TensorConsumer
 
 def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logger: CSVLogger):
-    
     if config.simulation_mode:
         config.accelerator = 'cpu'
         
@@ -52,6 +52,8 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
 
     train_dataloader = None
     val_dataloader = None
+    tensorsocket_procuder:TensorProducer = None
+    tensorsoket_consumer:TensorConsumer = None
 
     if config.dataloader.name == 'super':
         if config.workload.run_training:
@@ -76,31 +78,34 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
                                           pin_memory=True)
             train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
 
-    elif config.dataloader.name == 'coordl':
+            
+    elif config.dataloader.name == 'tensorsocket':
         # PyTorch DataLoader
-        if config.workload.run_training:
-            train_dataset = CoorDLMappedDataset(s3_data_dir=config.workload.s3_train_prefix,
-                                                transform=train_transform,
-                                                cache_address=config.dataloader.cache_address,
-                                                cache_transformations=True,
-                                                use_compression=config.dataloader.use_compression,
-                                                use_local_folder=config.dataloader.use_local_folder,
-                                                ssl=config.dataloader.ssl_enabled)
+        if config.dataloader.mode == 'producer':
+            train_dataset = TensorSockerDataset(s3_data_dir=config.workload.s3_train_prefix,
+                                                transform=train_transform)
             
-            train_sampler = CoorDLSampler(
-                            dataset=train_dataset,
-                            grpc_server_address=config.dataloader.grpc_server_address,
-                            batch_size=config.workload.batch_size,
-                            job_idx=config.job_id,
-                            fabric=fabric,
-                            )
-            
-            train_dataloader = DataLoader(train_dataset, 
-                                          batch_size=None, 
-                                          sampler=train_sampler, 
+            train_dataloader = DataLoader(train_dataset,
+                                          sampler=RandomSampler(train_dataset),
+                                          batch_size=config.workload.batch_size,
                                           num_workers=config.workload.num_pytorch_workers,
                                           pin_memory=True)
-            train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
+            
+            train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=False)
+            tensorsocket_procuder = TensorProducer(
+                data_loader=train_dataloader,
+                port=config.dataloader.producer_port,
+                ack_port=config.dataloader.producer_ackport,
+                producer_batch_size=config.workload.batch_size,
+                consumer_max_buffer_size=config.dataloader.consumer_maxbuffersize)
+            
+        elif config.dataloader.mode == 'consumer':
+            tensorsoket_consumer = TensorConsumer(
+                port=config.dataloader.consumer_port,
+                ack_port=config.dataloader.consumer_ackport,
+                batch_size=config.workload.batch_size,
+            )
+
 
     elif config.dataloader.name == 'baseline':
         # PyTorch DataLoader
@@ -136,12 +141,15 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
     current_epoch=0
     should_stop = False
     train_start_time = time.perf_counter()
+    if tensorsoket_consumer is not None:
+        train_dataloader = tensorsoket_consumer
 
     if config.workload.limit_train_batches is None:
         config.workload.limit_train_batches = len(train_dataloader)
         
     while not should_stop:
         current_epoch += 1
+        
         global_train_step_count = train_loop(
             fabric=fabric,
             job_id=config.job_id,
@@ -155,15 +163,13 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
             max_steps=config.workload.max_steps,
             limit_train_batches=config.workload.limit_train_batches,
             criterion=nn.CrossEntropyLoss(reduction = 'none'), # if isinstance(train_dataloader.sampler, ShadeSampler) else nn.CrossEntropyLoss(),
+            tensorsocker_procuder=tensorsocket_procuder,
+            tensorsocket_consumer=tensorsoket_consumer,
             sim=config.simulation_mode,
             sim_time=config.workload.gpu_time)
     
         if val_dataloader is not None and current_epoch % config.workload.validation_frequency == 0:
-            global_val_step_count=  validate_loop(fabric, 
-                                                  config.job_id,
-                                                  val_logger,
-                                                  model, 
-                                                  val_dataloader,
+            global_val_step_count=  validate_loop(fabric, config.job_id,val_logger,model, val_dataloader,
                                                   train_start_time, 
                                                   current_epoch, 
                                                   global_val_step_count, 
@@ -180,8 +186,9 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
 
     if isinstance(train_dataloader.sampler, SUPERSampler):
         train_dataloader.sampler.send_job_ended_notfication()
-    if isinstance(train_dataloader.sampler, CoorDLSampler):
-        train_dataloader.sampler.send_job_ended_notfication()
+    
+    if config.dataloader.name == 'tensorsocket' and config.dataloader.mode == 'producer':
+        tensorsocket_procuder.join() #shutdown the producer
 
     elapsed_time = time.perf_counter() - train_start_time
     fabric.print(f"Training completed in {elapsed_time:.2f} seconds")
@@ -238,7 +245,8 @@ def train_loop(fabric:Fabric, job_id,
                max_steps = None, 
                limit_train_batches = np.inf, 
                criterion=nn.CrossEntropyLoss(),
-               batch_wts = None,
+               tensorsocker_procuder:TensorProducer=None,
+               tensorsocket_consumer:TensorConsumer=None,
                sim=False,
                sim_time=0):
     
@@ -246,26 +254,33 @@ def train_loop(fabric:Fabric, job_id,
     total_samples = 0
     total_train_loss = 0.0
     correct_preds = 0
-    
     end = time.perf_counter()
-    for batch_idx, (batch, data_load_time, transformation_time, is_cache_hit, cached_on_miss) in enumerate(train_dataloader):
-            
+    if tensorsocker_procuder is not None:
+        for i, _ in enumerate(tensorsocker_procuder):
+            #dont do anything as the producer will send the data to gpu of the consumers
+            time.sleep(0.001)
+            pass
+    else:
+        to_enmerate = tensorsocket_consumer if tensorsocket_consumer is not None else train_dataloader
+        for batch_idx, (batch, data_load_time, transformation_time, is_cache_hit, cached_on_miss) in enumerate(to_enmerate):
             wait_for_data_time = time.perf_counter() - end
             # end epoch if stopping training completely or max batches for this epoch reached
             if limit_train_batches is not None and batch_idx >= limit_train_batches:
                 break
             # Unpack batch
-            inputs, labels, batch_id = batch
-         
+            if isinstance(to_enmerate, TensorConsumer):
+                inputs, labels = batch
+            else:
+                inputs, labels, batch_id = batch
+            
             if fabric.device.type == 'cuda':
-                    torch.cuda.synchronize() # Ensure accurate timing
-
+                torch.cuda.synchronize()
+            
             # Forward pass: Compute model output and loss
             gpu_processing_started = time.perf_counter()
             if sim:
                 time.sleep(sim_time)
             else:
-
                 outputs  = model(inputs)
                 item_loss = criterion(outputs, labels)
                 loss = item_loss.mean()
@@ -278,13 +293,12 @@ def train_loop(fabric:Fabric, job_id,
                 # Accumulate metrics directly on GPU to avoid synchronization
                 correct_preds += (outputs.argmax(dim=1) == labels).sum().item()  # No .item(), stays on GPU
                 total_train_loss += loss.item() * inputs.size(0)  # Convert loss to CPU for accumulation
-                
+                    
                 # if fabric.device.type == 'cuda':
                 #     torch.cuda.synchronize()
 
-             # Track time taken for GPU processing
+            # Track time taken for GPU processing
             gpu_processing_time = time.perf_counter() - gpu_processing_started
-            
             # Metrics calculation
             total_samples += inputs.size(0)
             avg_train_loss = total_train_loss / total_samples if not sim else 0
@@ -293,27 +307,17 @@ def train_loop(fabric:Fabric, job_id,
             avg_train_loss = total_train_loss / total_samples if not sim else 0
             global_step_count +=1
 
-            if isinstance(train_dataloader.sampler, SUPERSampler) or isinstance(train_dataloader.sampler, CoorDLSampler):
-                cache_hit_samples = batch[0].size(0) if is_cache_hit == True else 0
-                cache_hit_bacth = 1 if is_cache_hit == True else 0
-            else:
-                cache_hit_samples = is_cache_hit
-                cache_hit_bacth = 1 if cache_hit_samples == batch[0].size(0) else 0
+            cache_hit_samples = batch[0].size(0) if is_cache_hit == True else 0
+            cache_hit_bacth = 1 if is_cache_hit == True else 0
         
-            if isinstance(train_dataloader.sampler, SUPERSampler) or isinstance(train_dataloader.sampler, CoorDLSampler):
+            if not isinstance(train_dataloader.sampler, SUPERSampler):
                 train_dataloader.sampler.send_job_update_to_super(
                     batch_id,
                     data_load_time,
                     is_cache_hit,
                     gpu_processing_time,
                     cached_on_miss)
-            if isinstance(train_dataloader.dataset, CoorDLMappedDataset):
-                cache_size = train_dataloader.dataset.get_cache_size()
-                cache_memory = train_dataloader.dataset.get_cache_memory()
-            else:
-                cache_size = 0
-                cache_memory = 0
-
+          
             metrics= OrderedDict({
                             "Batch Id": batch_id,
                             "Elapsed Time (s)": time.perf_counter() - train_start_time,
@@ -329,8 +333,8 @@ def train_loop(fabric:Fabric, job_id,
                             "Transformation Time (s)": transformation_time,
                             "Cache_Hit (Batch)": cache_hit_bacth,
                             "Cache_Hits (Samples)": cache_hit_samples,
-                            "Cache_Size": cache_size,
-                            "Cache_Memory (Mb)": cache_memory,
+                            "Cache_Size": 0,
+                            "Cache_Memory (Mb)": 0,
                             "Train Loss (Avg)": avg_train_loss, #calculates the average training loss across all batches.
                             "Train Accuracy (Avg)": avg_train_acc, #calculates the average training accuracy across all batches.
                             "Timestamp (UTC)": datetime.now(timezone.utc)  # Adds UTC timestamp
@@ -358,7 +362,7 @@ def train_loop(fabric:Fabric, job_id,
                 break
 
             end = time.perf_counter()
-        
+            
     return  global_step_count
 
 

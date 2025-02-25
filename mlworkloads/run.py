@@ -42,23 +42,30 @@ def main(config: DictConfig):
 
     # print(OmegaConf.to_yaml(config, resolve=True))
 
-    log_dir = f"{config.log_dir}/{config.workload.name}/{config.job_id}".lower()
-    # log_dir = f"{config.log_dir}/{config.workload.name}/{config.dataloader.name}/{config.exp_id}/{config.job_id}".lower()
-    log_dir = os.path.normpath(log_dir)  # Normalize path for Windows
-    
-    train_logger = CSVLogger(root_dir=log_dir, name="train", prefix='', flush_logs_every_n_steps=config.log_interval)
-    val_logger = CSVLogger(root_dir=log_dir, name="val", prefix='', flush_logs_every_n_steps=config.log_interval)
-
-    if config.workload.name in image_worklaods:
-        train_image_classifer(config, train_logger,val_logger)
-
-    # elif config.workload.name  == 'lora_finetune_owt':
-    #     launch_finetune(config, train_logger, val_logger)
-    # elif config.workload.name  == 'albef_retrieval':
-    #     launch_finetune_retrieval(config, train_logger, val_logger)
+    if config.dataloader.name == 'tensorsocket' and config.dataloader.mode == 'producer':
+        if config.workload.name not in image_worklaods:
+            raise ValueError(f"Invalid workload: {config.workload}")
+        print('Starting TensorSocket producer...')
+        train_image_classifer(config, None, None)
+        return
     else:
-        raise ValueError(f"Invalid workload: {config.workload}")
-    save_hparams_to_yaml(os.path.join(log_dir, "hparms.yaml"), config)
+        log_dir = f"{config.log_dir}/{config.workload.name}/{config.job_id}".lower()
+        # log_dir = f"{config.log_dir}/{config.workload.name}/{config.dataloader.name}/{config.exp_id}/{config.job_id}".lower()
+        log_dir = os.path.normpath(log_dir)  # Normalize path for Windows
+        
+        train_logger = CSVLogger(root_dir=log_dir, name="train", prefix='', flush_logs_every_n_steps=config.log_interval)
+        val_logger = CSVLogger(root_dir=log_dir, name="val", prefix='', flush_logs_every_n_steps=config.log_interval)
+
+        if config.workload.name in image_worklaods:
+            train_image_classifer(config, train_logger,val_logger)
+
+        # elif config.workload.name  == 'lora_finetune_owt':
+        #     launch_finetune(config, train_logger, val_logger)
+        # elif config.workload.name  == 'albef_retrieval':
+        #     launch_finetune_retrieval(config, train_logger, val_logger)
+        else:
+            raise ValueError(f"Invalid workload: {config.workload}")
+        save_hparams_to_yaml(os.path.join(log_dir, "hparms.yaml"), config)
 
 
 if __name__ == "__main__":

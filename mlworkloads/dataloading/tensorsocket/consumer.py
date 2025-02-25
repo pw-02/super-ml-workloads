@@ -4,7 +4,7 @@ import threading
 import uuid
 from queue import Queue
 from typing import Tuple, Any, Iterator
-
+import time
 import zmq
 
 from .payload import TensorPayload
@@ -176,7 +176,13 @@ class TensorConsumer:
             StopIteration: At end of epoch
         """
         while True:
-            payload = self.buffer.get()  # This will block if buffer is empty
+            start_loading_time = time.perf_counter()
+
+            #check if buffer is empty
+            if self.buffer.empty():
+                is_cache_hit = False
+
+            payload = self.buffer.get()  # This will block if buffer is empty #cache miss
 
             if "stop_iteration" in payload:
                 self.batch_count = 0
@@ -199,4 +205,9 @@ class TensorConsumer:
                 )
                 self.batch_count += 1
                 # return batch_idx, batch
-                return batch
+                # return batch
+            # transformation_time = time.perf_counter() - start_loading_time
+            transformation_time = 0
+            data_loading_time  = time.perf_counter() - start_loading_time - transformation_time
+            return (batch), data_loading_time, transformation_time, is_cache_hit, False
+

@@ -1,0 +1,15 @@
+name: tensorsocket
+
+mode: producer #consumer
+#producer
+producer_port: 5556
+producer_ackport: 5557
+producer_heartports: [4444, 4445]
+consumer_maxbuffersize: 10
+
+#consumer
+consumer_port: 5556
+consumer_ackport: 5557
+# consumer_maxbuffersize: 10
+consumer_heartports: [4444, 4445]
+
