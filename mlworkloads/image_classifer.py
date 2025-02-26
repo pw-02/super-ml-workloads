@@ -85,11 +85,11 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
         if config.dataloader.mode == 'producer':
             train_dataset = TensorSockerDataset(s3_data_dir=config.workload.s3_train_prefix,
                                                 transform=train_transform,
-                                                cache_address=config.dataloader.cache_address,
-                                                cache_transformations=True,
-                                                use_compression=config.dataloader.use_compression,
-                                                use_local_folder=config.dataloader.use_local_folder,
-                                                ssl=config.dataloader.ssl_enabled
+                                                # cache_address=config.dataloader.cache_address,
+                                                # cache_transformations=True,
+                                                # use_compression=config.dataloader.use_compression,
+                                                # use_local_folder=config.dataloader.use_local_folder,
+                                                # ssl=config.dataloader.ssl_enabled
                                                 )
             
             tensor_socket_sampler = TensorSocketSampler(data_source=train_dataset,
@@ -105,9 +105,10 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
             tensorsocket_procuder = TensorProducer(
                 data_loader=train_dataloader,
                 port=config.dataloader.producer_port,
+                consumer_max_buffer_size=config.dataloader.consumer_maxbuffersize,
                 ack_port=config.dataloader.producer_ackport,
-                producer_batch_size=config.workload.batch_size,
-                consumer_max_buffer_size=config.dataloader.consumer_maxbuffersize)
+                producer_batch_size=config.dataloader.producer_batch_size,
+                )
             
         elif config.dataloader.mode == 'consumer':
             tensorsoket_consumer = TensorConsumer(
@@ -194,7 +195,7 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
         if config.workload.max_epochs is not None and current_epoch >= config.workload.max_epochs:
             should_stop = True
 
-    if isinstance(train_dataloader.sampler, SUPERSampler):
+    if not isinstance(train_dataloader, TensorConsumer):
         train_dataloader.sampler.send_job_ended_notfication()
     
     if config.dataloader.name == 'tensorsocket' and config.dataloader.mode == 'producer':

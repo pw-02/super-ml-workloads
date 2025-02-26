@@ -12,7 +12,7 @@ from .heartbeat import Heart
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
-    level=logging.DEBUG,
+    level=logging.WARNING,
     stream=sys.stdout,
 )
 

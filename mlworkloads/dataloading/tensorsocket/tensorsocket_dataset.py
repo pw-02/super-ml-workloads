@@ -77,17 +77,18 @@ class TensorSockerDataset(Dataset):
     
     
     def __getstate__(self):
-
-        state = self.__dict__.copy()
-        del state['cache_client']  # Remove the Redis connection before pickling
-        return state
+            state = self.__dict__.copy()
+            if self.use_cache:
+                del state['cache_client']  # Remove the Redis connection before pickling
+            return state
 
     def __setstate__(self, state):
-        self.__dict__.update(state)
-        if self.ssl:
-            self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port, ssl=True)
-        else:
-            self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
+            self.__dict__.update(state)
+            if self.use_cache:
+                if self.ssl:
+                    self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port, ssl=True)
+                else:
+                    self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
 
     
     def check_s3_client(self):

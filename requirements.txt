@@ -10,7 +10,7 @@ lightning
 zmq
 tornado
 lz4
-
+psutil
 # torchvision
 # transformers
 # hydra
