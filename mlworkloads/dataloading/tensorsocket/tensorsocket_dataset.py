@@ -180,7 +180,7 @@ class TensorSockerDataset(Dataset):
         labels = torch.tensor(labels)
 
         data_fetch_time  = time.perf_counter() - start_loading_time - transformation_time
-        self.record_metrics({'batch_id': batch_id, 'data_fetch_time': data_fetch_time, 'transformation_time': transformation_time, 'cache_hit_count': cache_hit_count, 'total_time': data_fetch_time + transformation_time})
+        self.record_metrics({'s3': self.s3_data_dir, 'batch_id': batch_id, 'data_fetch_time': data_fetch_time, 'transformation_time': transformation_time, 'cache_hit_count': cache_hit_count, 'total_time': data_fetch_time + transformation_time})
 
         return samples, labels
 
