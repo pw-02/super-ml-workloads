@@ -207,7 +207,17 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
 
 def get_transforms(workload_name):
     if 'imagenet' in workload_name or 'cifar10' in workload_name:
-        # Set up data transforms for ImageNet
+        # Set up data transforms for ImageNet on image classification workloads
+        # train_transform = transforms.Compose([
+        #     transforms.Resize(256), 
+        #     transforms.RandomResizedCrop(224),
+        #     transforms.RandomHorizontalFlip(),
+        #     transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # Randomly change brightness, contrast, saturation, and hue
+        #     transforms.ToTensor(),
+        #     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        # ])
+        
+        # Set up data transforms for ImageNet on transformer workloads
         train_transform = transforms.Compose([
             transforms.Resize(256), 
             transforms.RandomResizedCrop(224),
@@ -216,7 +226,6 @@ def get_transforms(workload_name):
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
-        
         val_transform = transforms.Compose([
             transforms.Resize(256),
             transforms.CenterCrop(224),
