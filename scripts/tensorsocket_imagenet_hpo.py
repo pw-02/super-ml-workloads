@@ -18,12 +18,12 @@ def get_python_command():
             sys.exit(1)
 
 # Define workload type and dataloader
-workload_type = "image_classification"
+workload_type = "image_classification_hpo"
 dataset = "imagenet"
 dataloader = "tensorsocket" #super, coordl #baseline, tensorsocket
-
+model = "imagenet_resnet18"
 # Define workload configurations
-workload_configs = ["imagenet_resnet18", "imagenet_resnet18", "imagenet_resnet18", "imagenet_resnet18"]  # Add your workloads here
+workload_configs = [model,model,model,model]  # Add your workloads here
 
 # Define GPU indices and learning rates
 job_ids = [0, 1, 2, 3]
@@ -35,7 +35,7 @@ consumer_ackports= [5557, 5559, 5561, 5563]
 current_datetime = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 expid = f"multi_job_{current_datetime}"
 root_log_dir = "logs"
-log_dir = os.path.join(root_log_dir, workload_type, dataset, dataloader, expid)
+log_dir = os.path.join(root_log_dir, workload_type, dataset, model, dataloader, expid)
 os.makedirs(log_dir, exist_ok=True)  # Ensure the log directory exists
 
 # Start resource monitoring
