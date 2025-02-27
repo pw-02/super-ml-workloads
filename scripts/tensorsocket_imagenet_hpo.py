@@ -66,7 +66,8 @@ for i, workload in enumerate(workload_configs):
     gpu_device = 0
     print(f"Starting job on GPU {i} with workload {workload} and exp_id {expid}_{i}")
     # run_cmd = f"set CUDA_VISIBLE_DEVICES={gpu_device} && {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir}"
-    run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir} dataloader.consumer_port={consumer_ports[i]} dataloader.consumer_ackport={consumer_ackports[i]}"
+    # run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir} dataloader.consumer_port={consumer_ports[i]} dataloader.consumer_ackport={consumer_ackports[i]}"
+    run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir}"
 
     #run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir}"
     #run_cmd = f"{python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={jobid} dataloader={dataloader} log_dir={log_dir}"
