@@ -100,7 +100,7 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
                                           num_workers=config.workload.num_pytorch_workers,
                                           pin_memory=True)
             
-            train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
+            train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=False)
 
             tensorsocket_procuder = TensorProducer(
                 data_loader=train_dataloader,
@@ -289,7 +289,7 @@ def train_loop(fabric:Fabric, job_id,
             if fabric.device.type == 'cuda':
                 torch.cuda.synchronize()
             
-            print(inputs)
+            # print(inputs)
 
             # Forward pass: Compute model output and loss
             gpu_processing_started = time.perf_counter()
