@@ -23,7 +23,7 @@ dataset = "imagenet"
 dataloader = "tensorsocket" #super, coordl #baseline, tensorsocket
 model = "imagenet_shufflenet_v2_x1_0"
 # Define workload configurations
-workload_configs = [model,model,model,model]  # Add your workloads here
+workload_configs = ['hpo','hpo','hpo','hpo']  # Add your workloads here
 
 # Define GPU indices and learning rates
 job_ids = [0, 1, 2, 3]
