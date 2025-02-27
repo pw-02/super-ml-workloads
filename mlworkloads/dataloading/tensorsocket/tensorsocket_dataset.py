@@ -20,6 +20,7 @@ import os
 import redis
 import torch
 from io import BytesIO
+import csv
 
 class S3Url(object):
     def __init__(self, url):
@@ -153,6 +154,14 @@ class TensorSockerDataset(Dataset):
     def __len__(self) -> int:
         return sum(len(class_items) for class_items in self.samples.values())
     
+    def record_metrics(self, line):
+        file_name = 'tensordataset.csv'
+        file_exists = os.path.isfile(file_name)
+        with open(file_name, mode='a', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=line.keys())
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(line)
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, float, float]:
         batch_id, batch_indices = idx
@@ -169,7 +178,10 @@ class TensorSockerDataset(Dataset):
         # Convert to tensors
         samples= torch.stack(samples)
         labels = torch.tensor(labels)
+
         data_fetch_time  = time.perf_counter() - start_loading_time - transformation_time
+        self.record_metrics({'batch_id': batch_id, 'data_fetch_time': data_fetch_time, 'transformation_time': transformation_time, 'cache_hit_count': cache_hit_count, 'total_time': data_fetch_time + transformation_time})
+
         return samples, labels
 
         # return samples, labels,batch_id,data_fetch_time,transformation_time
