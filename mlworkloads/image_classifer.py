@@ -287,8 +287,8 @@ def train_loop(fabric:Fabric, job_id,
             if fabric.device.type == 'cuda':
                 torch.cuda.synchronize()
             
-            print(inputs.size())
-            
+            print(inputs)
+
             # Forward pass: Compute model output and loss
             gpu_processing_started = time.perf_counter()
             if sim:
