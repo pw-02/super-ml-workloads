@@ -43,8 +43,8 @@ def main(config: DictConfig):
     # print(OmegaConf.to_yaml(config, resolve=True))
 
     if config.dataloader.name == 'tensorsocket' and config.dataloader.mode == 'producer':
-        if config.workload.name not in image_worklaods:
-            raise ValueError(f"Invalid workload: {config.workload}")
+        # if config.workload.name not in image_worklaods:
+        #     raise ValueError(f"Invalid workload: {config.workload}")
         print('Starting TensorSocket producer...')
         train_image_classifer(config, None, None)
         return
@@ -56,15 +56,15 @@ def main(config: DictConfig):
         train_logger = CSVLogger(root_dir=log_dir, name="train", prefix='', flush_logs_every_n_steps=config.log_interval)
         val_logger = CSVLogger(root_dir=log_dir, name="val", prefix='', flush_logs_every_n_steps=config.log_interval)
 
-        if config.workload.name in image_worklaods:
-            train_image_classifer(config, train_logger,val_logger)
+        # if config.workload.name in image_worklaods:
+        train_image_classifer(config, train_logger,val_logger)
 
         # elif config.workload.name  == 'lora_finetune_owt':
         #     launch_finetune(config, train_logger, val_logger)
         # elif config.workload.name  == 'albef_retrieval':
         #     launch_finetune_retrieval(config, train_logger, val_logger)
-        else:
-            raise ValueError(f"Invalid workload: {config.workload}")
+        # else:
+        #     raise ValueError(f"Invalid workload: {config.workload}")
         save_hparams_to_yaml(os.path.join(log_dir, "hparms.yaml"), config)
 
 
