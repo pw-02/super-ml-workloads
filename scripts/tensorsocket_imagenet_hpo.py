@@ -36,6 +36,8 @@ current_datetime = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 expid = f"multi_job_{current_datetime}"
 root_log_dir = "logs"
 log_dir = os.path.join(root_log_dir, workload_type, dataset, model, dataloader, expid)
+# log_dir = os.path.join(root_log_dir, workload_type, dataset, dataloader, expid)
+
 os.makedirs(log_dir, exist_ok=True)  # Ensure the log directory exists
 
 # Start resource monitoring
