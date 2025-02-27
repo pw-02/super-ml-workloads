@@ -100,7 +100,7 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
                                           num_workers=config.workload.num_pytorch_workers,
                                           pin_memory=True)
             
-            train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=False)
+            train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
 
             tensorsocket_procuder = TensorProducer(
                 data_loader=train_dataloader,
@@ -268,6 +268,8 @@ def train_loop(fabric:Fabric, job_id,
     end = time.perf_counter()
     if tensorsocker_procuder is not None:
         for i, _ in enumerate(tensorsocker_procuder):
+            #move data to all gpus (4)
+
             #dont do anything as the producer will send the data to gpu of the consumers
             time.sleep(0.001)
     else:
