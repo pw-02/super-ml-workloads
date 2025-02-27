@@ -21,7 +21,7 @@ def get_python_command():
 workload_type = "image_classification_hpo"
 dataset = "imagenet"
 dataloader = "tensorsocket" #super, coordl #baseline, tensorsocket
-model = "imagenet_resnet18"
+model = "imagenet_shufflenet_v2_x1_0"
 # Define workload configurations
 workload_configs = [model,model,model,model]  # Add your workloads here
 
