@@ -28,6 +28,8 @@ workload_configs = ["imagenet_resnet18", "imagenet_resnet18", "imagenet_resnet18
 # Define GPU indices and learning rates
 job_ids = [0, 1, 2, 3]
 learning_rates = [0.1, 0.01, 0.001, 0.0001]  # Add your learning rates here
+consumer_ports= [5556, 5558, 5560, 5562]
+consumer_ackports= [5557, 5559, 5561, 5563]
 
 # Generate experiment ID and log directory
 current_datetime = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
@@ -64,7 +66,7 @@ for i, workload in enumerate(workload_configs):
     gpu_device = 0
     print(f"Starting job on GPU {i} with workload {workload} and exp_id {expid}_{i}")
     # run_cmd = f"set CUDA_VISIBLE_DEVICES={gpu_device} && {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir}"
-    run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir}"
+    run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir} dataloader.consumer_port={consumer_ports[i]} dataloader.consumer_ackport={consumer_ackports[i]}"
 
     #run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir}"
     #run_cmd = f"{python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={jobid} dataloader={dataloader} log_dir={log_dir}"
