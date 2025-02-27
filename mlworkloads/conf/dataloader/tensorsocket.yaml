@@ -5,7 +5,7 @@ producer_port: 5556
 producer_ackport: 5557
 producer_heartports: [4444, 4445]
 consumer_maxbuffersize: 15
-producer_batch_size: 2
+producer_batch_size: 8
 
 #consumer
 consumer_port: 5556
