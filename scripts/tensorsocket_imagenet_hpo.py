@@ -21,7 +21,6 @@ def get_python_command():
 workload_type = "image_classification_hpo"
 dataset = "imagenet"
 dataloader = "tensorsocket" #super, coordl #baseline, tensorsocket
-model = "imagenet_shufflenet_v2_x1_0"
 # Define workload configurations
 workload_configs = ['hpo','hpo','hpo','hpo']  # Add your workloads here
 
@@ -87,7 +86,10 @@ print(f"Training started UTC Time: {training_started_datetime}")
 print(f"Training ended UTC Time: {training_ended_datetime}")
 
 # # Stop resource monitor
-print("Stopping Resource Monitor...")
-monitor_process.terminate()
-producer_process.terminate()
+print("Stopping Resource Monitor and Producer...")
+monitor_process.kill()
+producer_process.kill()
+
+# monitor_process.terminate()
+# producer_process.terminate()
 print("Experiment completed.")
