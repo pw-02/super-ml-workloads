@@ -29,7 +29,7 @@ job_speed = job_speeds_list[run_id]
 # Define workload type and dataloader
 workload_type = "scalability_varying_speeds"
 dataset = f"imagenet_{batches_per_sec[run_id]}_batch_per_s"
-dataloader = "super" #super, "tensorsocket"
+dataloader = "tensorsocket" #super, "tensorsocket"
 
 # Define workload configurations
 workload_configs = ["imagenet_resnet18"]
