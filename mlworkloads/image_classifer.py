@@ -297,6 +297,9 @@ def train_loop(fabric:Fabric, job_id,
             
             if fabric.device.type == 'cuda':
                 torch.cuda.synchronize()
+                #remove batch from GPU
+                inputs = inputs.cpu()
+                labels = labels.cpu()
             
             # print(inputs)
 
