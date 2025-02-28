@@ -23,7 +23,7 @@ batches_per_sec = [4,8,12,16,20,24,28,32]
 #divide 1 by each element in the list to get the job speeds
 job_speeds_list = [1/x for x in batches_per_sec]
 #0,1,2,3,4,5,6,7
-run_id = 0
+run_id = 7
 job_speed = job_speeds_list[run_id]
 
 # Define workload type and dataloader
