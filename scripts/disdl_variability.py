@@ -64,7 +64,7 @@ dataset = f"imagenet_{range}"
 dataloader = "super" #super, coordl #baseline
 
 # Define workload configurations
-workload_configs = ["imagenet_resnet18", "imagenet_resnet50", "imagenet_resnet18", "imagenet_resnet18"]
+workload_configs = ["imagenet_resnet18", "imagenet_resnet18", "imagenet_resnet18", "imagenet_resnet18"]
 
 # Define GPU indices and learning rates
 job_ids = [0, 1, 2, 3]
