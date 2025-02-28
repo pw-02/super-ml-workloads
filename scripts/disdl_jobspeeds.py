@@ -67,7 +67,7 @@ if dataloader == "super":
         workload = workload_configs[i]
         lr = learning_rates[i]
         print(f"Starting job on GPU {i} with job speed {job_speed} and exp_id {expid}_{i}")
-        run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir} workload.num_pytorch_workers=8 workload.gpu_time={job_speed} simulation_mode=True"
+        run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir} workload.num_pytorch_workers=24 workload.gpu_time={job_speed} simulation_mode=True"
         #run_cmd = f"{python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={jobid} dataloader={dataloader} log_dir={log_dir}"
         process = subprocess.Popen(run_cmd, shell=True)
         job_pids.append(process)
