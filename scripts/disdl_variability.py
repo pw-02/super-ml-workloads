@@ -20,16 +20,35 @@ def get_python_command():
 
 #job speeds to tested
 job_speeds_list = [
-    [1.01, 0.99, 1.00, 1.02],       # Very Low Variability (Range ≈ 0.03)
-    [1.05, 0.97, 1.02, 0.98],       # Low Variability (Range ≈ 0.08)
-    [0.90, 1.00, 1.10, 1.00],       # Mild Variability (Range ≈ 0.20)
-    [0.80, 0.90, 1.20, 1.10],       # Moderate Variability (Range ≈ 0.40)
-    [0.70, 0.85, 1.30, 1.15],       # Medium-High Variability (Range ≈ 0.60)
-    [0.60, 0.80, 1.40, 1.20],       # High Variability (Range ≈ 0.80)
-    [0.50, 0.70, 1.60, 1.30],       # Very High Variability (Range ≈ 1.10)
-    [0.40, 0.65, 1.70, 1.45],       # Extreme Variability (Range ≈ 1.30)
-    [0.35, 0.60, 1.80, 1.50],       # Ultra-Extreme Variability (Range ≈ 1.45)
-    [0.30, 0.55, 2.00, 1.60]        # Maximum Variability (Range ≈ 1.70)
+    # Very Low Variability (CV ≈ 0.05)
+    [1.01, 0.99, 1.00, 1.02],  
+    
+    # Low Variability (CV ≈ 0.1)
+    [1.05, 0.97, 1.02, 0.98],  
+    
+    # Mild Variability (CV ≈ 0.2)
+    [0.9, 1.0, 1.1, 1.0],  
+    
+    # Moderate Variability (CV ≈ 0.35)
+    [0.8, 0.9, 1.2, 1.1],  
+    
+    # Medium-High Variability (CV ≈ 0.5)
+    [0.6, 0.8, 1.4, 1.2],  
+    
+    # High Variability (CV ≈ 0.7)
+    [0.5, 0.7, 1.5, 1.2],  
+    
+    # Very High Variability (CV ≈ 1.0)
+    [0.3, 0.6, 2.0, 1.5],  
+    
+    # Extreme Variability (CV ≈ 1.3)
+    [0.2, 0.5, 2.5, 2.0],  
+    
+    # Ultra-Extreme Variability (CV ≈ 1.7)
+    [0.1, 0.4, 2.8, 2.2],  
+    
+    # Maximum Variability (CV > 2.0)
+    [0.05, 0.3, 3.5, 2.5]  
 ]
 
 run_id = 0
