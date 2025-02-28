@@ -51,7 +51,7 @@ job_speeds_list = [
     [0.05, 0.3, 3.5, 2.5]  
 ]
 2,4,6,8
-run_id = 2
+run_id = 4
 
 job_speeds = job_speeds_list[run_id]
 # range = max(job_speeds) - min(job_speeds)
@@ -61,7 +61,7 @@ range = str('0.05').replace(".", "_")
 # Define workload type and dataloader
 workload_type = "scalability_varying_speeds"
 dataset = f"imagenet_{range}"
-dataloader = "super" #super, coordl #baseline
+dataloader = "super" #super, "tensorsocket"
 
 # Define workload configurations
 workload_configs = ["imagenet_resnet18", "imagenet_resnet18", "imagenet_resnet18", "imagenet_resnet18"]
@@ -87,12 +87,10 @@ monitor_cmd = f"{python_cmd} mlworkloads/resource_monitor.py start --interval 1 
 with open(os.path.join(log_dir, "resource_monitor.log"), "w") as log_file:
     monitor_process = subprocess.Popen(monitor_cmd, shell=True, stdout=log_file, stderr=log_file)
 monitor_pid = monitor_process.pid
-
-# Track training start time
-training_started_datetime =  datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
-print(f"Training started UTC Time: {training_started_datetime}")
-
 if dataloader == "super":
+    # Track training start time
+    training_started_datetime =  datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+    print(f"Training started UTC Time: {training_started_datetime}")
 
     # Loop over jobs
     job_pids = []
@@ -120,19 +118,27 @@ if dataloader == "super":
     print("Stopping Resource Monitor...")
     monitor_process.kill()
     print("Experiment completed.")
-else:
+elif dataloader == "tensorsocket":
+    # print("Starting TensorSocket producer...")
+    producer_cmd = f"{python_cmd} mlworkloads/run.py workload={workload_configs[0]} dataloader={dataloader} dataloader.mode=producer workload.num_pytorch_workers=8"
+    producer_process = subprocess.Popen(producer_cmd, shell=True)
+    producer_pid = producer_process.pid
+
+    time.sleep(5)  # Adjust as necessary
+    # Track training start time
+    training_started_datetime =  datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+    print(f"Training started UTC Time: {training_started_datetime}")
+
     job_pids = []
     # Loop over jobs
     for i, workload in enumerate(workload_configs):
         workload = workload_configs[i]
         lr = learning_rates[i]
-        gpu_device = 0
+        job_speed = job_speeds[i]
+
         print(f"Starting job on GPU {i} with workload {workload} and exp_id {expid}_{i}")
         # run_cmd = f"set CUDA_VISIBLE_DEVICES={gpu_device} && {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir}"
-        run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir}"
-
-        #run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir}"
-        #run_cmd = f"{python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={jobid} dataloader={dataloader} log_dir={log_dir}"
+        run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir} workload.num_pytorch_workers=8 workload.gpu_time={job_speed} simulation_mode=True"
         process = subprocess.Popen(run_cmd, shell=True)
         job_pids.append(process)
         time.sleep(2)  # Adjust as necessary
