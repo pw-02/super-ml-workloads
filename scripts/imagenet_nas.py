@@ -71,6 +71,6 @@ print(f"Training ended UTC Time: {training_ended_datetime}")
 
 # Stop resource monitor
 print("Stopping Resource Monitor...")
-monitor_process.terminate()
+monitor_process.kill()
 
 print("Experiment completed.")
