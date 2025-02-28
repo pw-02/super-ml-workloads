@@ -23,7 +23,7 @@ batches_per_sec = [4,8,12,16,20,24,28,32]
 #divide 1 by each element in the list to get the job speeds
 job_speeds_list = [1/x for x in batches_per_sec]
 #0,1,2,3,4,5,6,7
-run_id = 6
+run_id = 5
 job_speed = job_speeds_list[run_id]
 
 # Define workload type and dataloader
@@ -67,7 +67,7 @@ if dataloader == "super":
         workload = workload_configs[i]
         lr = learning_rates[i]
         print(f"Starting job on GPU {i} with job speed {job_speed} and exp_id {expid}_{i}")
-        run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir} workload.num_pytorch_workers=24 workload.gpu_time={job_speed} simulation_mode=True"
+        run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir} workload.num_pytorch_workers=8 workload.gpu_time={job_speed} simulation_mode=True"
         #run_cmd = f"{python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={jobid} dataloader={dataloader} log_dir={log_dir}"
         process = subprocess.Popen(run_cmd, shell=True)
         job_pids.append(process)
