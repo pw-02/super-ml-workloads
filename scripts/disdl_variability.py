@@ -19,16 +19,30 @@ def get_python_command():
 
 
 #job speeds to tested
+job_speeds_list = [
+    [1.01, 0.99, 1.00, 1.02],       # Very Low Variability (Range ≈ 0.03)
+    [1.05, 0.97, 1.02, 0.98],       # Low Variability (Range ≈ 0.08)
+    [0.90, 1.00, 1.10, 1.00],       # Mild Variability (Range ≈ 0.20)
+    [0.80, 0.90, 1.20, 1.10],       # Moderate Variability (Range ≈ 0.40)
+    [0.70, 0.85, 1.30, 1.15],       # Medium-High Variability (Range ≈ 0.60)
+    [0.60, 0.80, 1.40, 1.20],       # High Variability (Range ≈ 0.80)
+    [0.50, 0.70, 1.60, 1.30],       # Very High Variability (Range ≈ 1.10)
+    [0.40, 0.65, 1.70, 1.45],       # Extreme Variability (Range ≈ 1.30)
+    [0.35, 0.60, 1.80, 1.50],       # Ultra-Extreme Variability (Range ≈ 1.45)
+    [0.30, 0.55, 2.00, 1.60]        # Maximum Variability (Range ≈ 1.70)
+]
 
-      
+run_id = 0
+
+job_speeds = job_speeds_list[run_id]
 
 # Define workload type and dataloader
-workload_type = "image_classification"
+workload_type = "scalability_varying_speeds"
 dataset = "imagenet"
 dataloader = "super" #super, coordl #baseline
 
 # Define workload configurations
-workload_configs = ["imagenet_resnet18", "imagenet_resnet50", "imagenet_shufflenet_v2_x1_0", "imagenet_vgg16"]
+workload_configs = ["imagenet_resnet18", "imagenet_resnet50", "imagenet_resnet18", "imagenet_resnet18"]
 
 # Define GPU indices and learning rates
 job_ids = [0, 1, 2, 3]
@@ -58,8 +72,9 @@ job_pids = []
 for i, workload in enumerate(workload_configs):
     workload = workload_configs[i]
     lr = learning_rates[i]
-    print(f"Starting job on GPU {i} with workload {workload} and exp_id {expid}_{i}")
-    run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir} workload.num_pytorch_workers=2"
+    job_speed = job_speeds[i]
+    print(f"Starting job on GPU {i} with job speed {job_speed} and exp_id {expid}_{i}")
+    run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir} workload.num_pytorch_workers=2 workload.gpu_time={job_speed} simulation_mode=True"
     #run_cmd = f"{python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={jobid} dataloader={dataloader} log_dir={log_dir}"
     process = subprocess.Popen(run_cmd, shell=True)
     job_pids.append(process)
