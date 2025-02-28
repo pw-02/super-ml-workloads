@@ -18,7 +18,9 @@ def get_python_command():
             sys.exit(1)
 
 
-#job speeds to te            
+#job speeds to tested
+
+      
 
 # Define workload type and dataloader
 workload_type = "image_classification"
