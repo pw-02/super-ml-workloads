@@ -19,66 +19,33 @@ def get_python_command():
 
 
 #job speeds to tested
-job_speeds_list = [
-    # Very Low Variability (CV ≈ 0.05)
-    [1.01, 0.99, 1.00, 1.02],  
-    
-    # Low Variability (CV ≈ 0.1)
-    [1.05, 0.97, 1.02, 0.98],  
-    
-    # Mild Variability (CV ≈ 0.2)
-    [0.9, 1.0, 1.1, 1.0],  
-    
-    # Moderate Variability (CV ≈ 0.35)
-    [0.8, 0.9, 1.2, 1.1],  
-    
-    # Medium-High Variability (CV ≈ 0.5)
-    [0.6, 0.8, 1.4, 1.2],  
-    
-    # High Variability (CV ≈ 0.7)
-    [0.5, 0.7, 1.5, 1.2],  
-    
-    # Very High Variability (CV ≈ 1.0)
-    [0.3, 0.6, 2.0, 1.5],  
-    
-    # Extreme Variability (CV ≈ 1.3)
-    [0.2, 0.5, 2.5, 2.0],  
-    
-    # Ultra-Extreme Variability (CV ≈ 1.7)
-    [0.1, 0.4, 2.8, 2.2],  
-    
-    # Maximum Variability (CV > 2.0)
-    [0.05, 0.3, 3.5, 2.5]  
-]
-0,2,4,6,8
-run_id = 6
+batches_per_sec = [4,8,12,16,20,24,28,32]
+#divide 1 by each element in the list to get the job speeds
+job_speeds_list = [1/x for x in batches_per_sec]
 
-job_speeds = job_speeds_list[run_id]
-# range = max(job_speeds) - min(job_speeds)
-#replace periods with underscores for the range
-range = str('0.05').replace(".", "_")
+run_id = 40
+job_speed = job_speeds_list[run_id]
 
 # Define workload type and dataloader
 workload_type = "scalability_varying_speeds"
-dataset = f"imagenet_{range}"
+dataset = f"imagenet_{batches_per_sec[run_id]}_batches_per_s"
 dataloader = "super" #super, "tensorsocket"
 
 # Define workload configurations
-workload_configs = ["imagenet_resnet18", "imagenet_resnet18", "imagenet_resnet18", "imagenet_resnet18"]
+workload_configs = ["imagenet_resnet18"]
 
 # Define GPU indices and learning rates
-job_ids = [0, 1, 2, 3]
-learning_rates = [0.1, 0.01, 0.001, 0.0001]  # Add your learning rates here
+job_ids = [0]
+learning_rates = [0.1]  # Add your learning rates here
 
 # Generate experiment ID and log directory
 current_datetime = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
-expid = f"multi_job_{current_datetime}"
+expid = f"single_job_{current_datetime}"
 root_log_dir = "logs"
 
 log_dir = os.path.join(root_log_dir, workload_type, dataset, dataloader, expid)
 
 os.makedirs(log_dir, exist_ok=True)  # Ensure the log directory exists
-
 
 # Start resource monitoring
 print("Starting Resource Monitor...")
@@ -86,7 +53,9 @@ python_cmd = get_python_command()
 monitor_cmd = f"{python_cmd} mlworkloads/resource_monitor.py start --interval 1 --flush_interval 10 --file_path {log_dir}/resource_usage_metrics.json"
 with open(os.path.join(log_dir, "resource_monitor.log"), "w") as log_file:
     monitor_process = subprocess.Popen(monitor_cmd, shell=True, stdout=log_file, stderr=log_file)
+
 monitor_pid = monitor_process.pid
+
 if dataloader == "super":
     # Track training start time
     training_started_datetime =  datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
@@ -97,7 +66,6 @@ if dataloader == "super":
     for i, workload in enumerate(workload_configs):
         workload = workload_configs[i]
         lr = learning_rates[i]
-        job_speed = job_speeds[i]
         print(f"Starting job on GPU {i} with job speed {job_speed} and exp_id {expid}_{i}")
         run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir} workload.num_pytorch_workers=2 workload.gpu_time={job_speed} simulation_mode=True"
         #run_cmd = f"{python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={jobid} dataloader={dataloader} log_dir={log_dir}"
@@ -134,7 +102,6 @@ elif dataloader == "tensorsocket":
     for i, workload in enumerate(workload_configs):
         workload = workload_configs[i]
         lr = learning_rates[i]
-        job_speed = job_speeds[i]
 
         print(f"Starting job on GPU {i} with job speed {job_speed} and exp_id {expid}_{i}")
         # run_cmd = f"set CUDA_VISIBLE_DEVICES={gpu_device} && {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir}"
