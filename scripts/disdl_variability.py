@@ -35,10 +35,13 @@ job_speeds_list = [
 run_id = 0
 
 job_speeds = job_speeds_list[run_id]
+range = max(job_speeds) - min(job_speeds)
+#replace periods with underscores for the range
+range = str(range).replace(".", "_")
 
 # Define workload type and dataloader
 workload_type = "scalability_varying_speeds"
-dataset = "imagenet"
+dataset = f"imagenet_{range}"
 dataloader = "super" #super, coordl #baseline
 
 # Define workload configurations
@@ -52,7 +55,9 @@ learning_rates = [0.1, 0.01, 0.001, 0.0001]  # Add your learning rates here
 current_datetime = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 expid = f"multi_job_{current_datetime}"
 root_log_dir = "logs"
+
 log_dir = os.path.join(root_log_dir, workload_type, dataset, dataloader, expid)
+
 os.makedirs(log_dir, exist_ok=True)  # Ensure the log directory exists
 
 # Start resource monitoring
