@@ -50,7 +50,7 @@ job_speeds_list = [
     # Maximum Variability (CV > 2.0)
     [0.05, 0.3, 3.5, 2.5]  
 ]
-
+2,4,6,8
 run_id = 0
 
 job_speeds = job_speeds_list[run_id]
@@ -79,6 +79,7 @@ log_dir = os.path.join(root_log_dir, workload_type, dataset, dataloader, expid)
 
 os.makedirs(log_dir, exist_ok=True)  # Ensure the log directory exists
 
+
 # Start resource monitoring
 print("Starting Resource Monitor...")
 python_cmd = get_python_command()
@@ -91,30 +92,64 @@ monitor_pid = monitor_process.pid
 training_started_datetime =  datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 print(f"Training started UTC Time: {training_started_datetime}")
 
-# Loop over jobs
-job_pids = []
-for i, workload in enumerate(workload_configs):
-    workload = workload_configs[i]
-    lr = learning_rates[i]
-    job_speed = job_speeds[i]
-    print(f"Starting job on GPU {i} with job speed {job_speed} and exp_id {expid}_{i}")
-    run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir} workload.num_pytorch_workers=2 workload.gpu_time={job_speed} simulation_mode=True"
-    #run_cmd = f"{python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={jobid} dataloader={dataloader} log_dir={log_dir}"
-    process = subprocess.Popen(run_cmd, shell=True)
-    job_pids.append(process)
-    time.sleep(2)  # Adjust as necessary
+if dataloader == "super":
 
-# Wait for all jobs to complete
-for process in job_pids:
-    process.wait()
+    # Loop over jobs
+    job_pids = []
+    for i, workload in enumerate(workload_configs):
+        workload = workload_configs[i]
+        lr = learning_rates[i]
+        job_speed = job_speeds[i]
+        print(f"Starting job on GPU {i} with job speed {job_speed} and exp_id {expid}_{i}")
+        run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir} workload.num_pytorch_workers=2 workload.gpu_time={job_speed} simulation_mode=True"
+        #run_cmd = f"{python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={jobid} dataloader={dataloader} log_dir={log_dir}"
+        process = subprocess.Popen(run_cmd, shell=True)
+        job_pids.append(process)
+        time.sleep(2)  # Adjust as necessary
 
-# Track training end time
-training_ended_datetime =  datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
-print(f"Training started UTC Time: {training_started_datetime}")
-print(f"Training ended UTC Time: {training_ended_datetime}")
+    # Wait for all jobs to complete
+    for process in job_pids:
+        process.wait()
 
-# Stop resource monitor
-print("Stopping Resource Monitor...")
-monitor_process.kill()
+    # Track training end time
+    training_ended_datetime =  datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+    print(f"Training started UTC Time: {training_started_datetime}")
+    print(f"Training ended UTC Time: {training_ended_datetime}")
 
-print("Experiment completed.")
+    # Stop resource monitor
+    print("Stopping Resource Monitor...")
+    monitor_process.kill()
+    print("Experiment completed.")
+else:
+    job_pids = []
+    # Loop over jobs
+    for i, workload in enumerate(workload_configs):
+        workload = workload_configs[i]
+        lr = learning_rates[i]
+        gpu_device = 0
+        print(f"Starting job on GPU {i} with workload {workload} and exp_id {expid}_{i}")
+        # run_cmd = f"set CUDA_VISIBLE_DEVICES={gpu_device} && {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir}"
+        run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir}"
+
+        #run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir}"
+        #run_cmd = f"{python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={jobid} dataloader={dataloader} log_dir={log_dir}"
+        process = subprocess.Popen(run_cmd, shell=True)
+        job_pids.append(process)
+        time.sleep(2)  # Adjust as necessary
+
+    # Wait for all jobs to complete
+    for process in job_pids:
+        process.wait()
+
+    # # Track training end time
+    training_ended_datetime =  datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+    print(f"Training started UTC Time: {training_started_datetime}")
+    print(f"Training ended UTC Time: {training_ended_datetime}")
+
+    # # Stop resource monitor
+    print("Stopping Resource Monitor...")
+    monitor_process.terminate()
+    producer_process.terminate()
+    print("Experiment completed.")
+
+
