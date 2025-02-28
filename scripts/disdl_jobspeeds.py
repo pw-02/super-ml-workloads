@@ -121,8 +121,8 @@ elif dataloader == "tensorsocket":
 
     # # Stop resource monitor
     print("Stopping Resource Monitor...")
-    monitor_process.terminate()
-    producer_process.terminate()
+    monitor_process.kill()
+    producer_process.kill()
     print("Experiment completed.")
 
 
