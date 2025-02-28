@@ -1,5 +1,5 @@
 #dataloading configuration
-name: imagenet_mobilenet_v3_large
+name: imagenet_regnet_y_400mf
 
 #imagenet_regnet_y_400mf
 
@@ -10,7 +10,7 @@ num_pytorch_workers: 8
 max_dataset_size: null #5 #gb
 
 #model configuration
-model_architecture: mobilenet_v3_large
+model_architecture: regnet_y_400mf
 learning_rate: 6e-4
 weight_decay: 1e-1
 precision: 32 # 16, 32, 64
