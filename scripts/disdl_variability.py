@@ -54,9 +54,9 @@ job_speeds_list = [
 run_id = 0
 
 job_speeds = job_speeds_list[run_id]
-range = max(job_speeds) - min(job_speeds)
+# range = max(job_speeds) - min(job_speeds)
 #replace periods with underscores for the range
-range = str(range).replace(".", "_")
+range = str('0.05').replace(".", "_")
 
 # Define workload type and dataloader
 workload_type = "scalability_varying_speeds"
