@@ -88,7 +88,7 @@ if dataloader == "super":
     print("Experiment completed.")
 elif dataloader == "tensorsocket":
     # print("Starting TensorSocket producer...")
-    producer_cmd = f"{python_cmd} mlworkloads/run.py workload={workload_configs[0]} dataloader={dataloader} dataloader.mode=producer workload.num_pytorch_workers=8"
+    producer_cmd = f"{python_cmd} mlworkloads/run.py workload={workload_configs[0]} dataloader={dataloader} dataloader.mode=producer workload.num_pytorch_workers=16"
     producer_process = subprocess.Popen(producer_cmd, shell=True)
     producer_pid = producer_process.pid
 
