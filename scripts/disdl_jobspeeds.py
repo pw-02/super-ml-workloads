@@ -22,13 +22,13 @@ def get_python_command():
 batches_per_sec = [4,8,12,16,20,24,28,32]
 #divide 1 by each element in the list to get the job speeds
 job_speeds_list = [1/x for x in batches_per_sec]
-
-run_id = 40
+#0,1,2,3,4,5,6,7
+run_id = 0
 job_speed = job_speeds_list[run_id]
 
 # Define workload type and dataloader
 workload_type = "scalability_varying_speeds"
-dataset = f"imagenet_{batches_per_sec[run_id]}_batches_per_s"
+dataset = f"imagenet_{batches_per_sec[run_id]}_batch_per_s"
 dataloader = "super" #super, "tensorsocket"
 
 # Define workload configurations
