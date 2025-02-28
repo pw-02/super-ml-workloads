@@ -18,12 +18,12 @@ def get_python_command():
             sys.exit(1)
 
 # Define workload type and dataloader
-workload_type = "image_classification"
+workload_type = "image_transfomer"
 dataset = "imagenet"
-dataloader = "baseline" #super, coordl #baseline
+dataloader = "super" #super, coordl #baseline
 
 # Define workload configurations
-workload_configs = ["imagenet_resnet18", "imagenet_resnet50", "imagenet_shufflenet_v2_x1_0", "imagenet_vgg16"]
+workload_configs = ["imagenet_vit_b_32", "imagenet_vit_small_patch32_224","imagenet_levit_128","imagenet_mixer_b32_224"]
 
 # Define GPU indices and learning rates
 job_ids = [0, 1, 2, 3]
@@ -54,7 +54,7 @@ for i, workload in enumerate(workload_configs):
     workload = workload_configs[i]
     lr = learning_rates[i]
     print(f"Starting job on GPU {i} with workload {workload} and exp_id {expid}_{i}")
-    run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir}"
+    run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir} workload.num_pytorch_workers=2"
     #run_cmd = f"{python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={jobid} dataloader={dataloader} log_dir={log_dir}"
     process = subprocess.Popen(run_cmd, shell=True)
     job_pids.append(process)
@@ -65,12 +65,12 @@ for process in job_pids:
     process.wait()
 
 # Track training end time
-training_ended_datetime =  datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+training_ended_datetime =  datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 print(f"Training started UTC Time: {training_started_datetime}")
 print(f"Training ended UTC Time: {training_ended_datetime}")
 
 # Stop resource monitor
 print("Stopping Resource Monitor...")
-monitor_process.terminate()
+monitor_process.kill()
 
 print("Experiment completed.")

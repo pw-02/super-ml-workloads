@@ -18,13 +18,11 @@ def get_python_command():
             sys.exit(1)
 
 # Define workload type and dataloader
-workload_type = "image_transformer" 
-dataset = "cifar10"
-dataloader = "baseline" #super, coordl #baseline
-
+workload_type = "image_classification"
+dataset = "imagenet"
+dataloader = "super" #super, coordl #baseline, tensorsocket
 # Define workload configurations
-workload_configs = ["cifar10_vit_b_32", "cifar10_vit_small_patch32_224","cifar10_levit_128","cifar10_mixer_b32_224"]
-
+workload_configs = ['hpo','hpo','hpo','hpo']  # Add your workloads here
 # Define GPU indices and learning rates
 job_ids = [0, 1, 2, 3]
 learning_rates = [0.1, 0.01, 0.001, 0.0001]  # Add your learning rates here
@@ -54,7 +52,7 @@ for i, workload in enumerate(workload_configs):
     workload = workload_configs[i]
     lr = learning_rates[i]
     print(f"Starting job on GPU {i} with workload {workload} and exp_id {expid}_{i}")
-    run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir}"
+    run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir} workload.num_pytorch_workers=2"
     #run_cmd = f"{python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={jobid} dataloader={dataloader} log_dir={log_dir}"
     process = subprocess.Popen(run_cmd, shell=True)
     job_pids.append(process)
@@ -71,6 +69,6 @@ print(f"Training ended UTC Time: {training_ended_datetime}")
 
 # Stop resource monitor
 print("Stopping Resource Monitor...")
-monitor_process.terminate()
+monitor_process.kill()
 
 print("Experiment completed.")

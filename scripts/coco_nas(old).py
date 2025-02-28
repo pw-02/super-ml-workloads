@@ -2,7 +2,7 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Detect the correct Python version
 def get_python_command():
@@ -18,21 +18,22 @@ def get_python_command():
             sys.exit(1)
 
 # Define workload type and dataloader
-workload_type = "image_transfomer"
-dataloader = "coordl"
+workload_type = "image_classification"
+dataset = "imagenet"
+dataloader = "baseline" #super, coordl #baseline
 
 # Define workload configurations
-workload_configs = ["imagenet_vit_b_32", "imagenet_vit_small_patch32_224","imagenet_levit_128","imagenet_mixer_b32_224"]
+workload_configs = ["imagenet_resnet18", "imagenet_resnet50", "imagenet_shufflenet_v2_x1_0", "imagenet_vgg16"]
 
 # Define GPU indices and learning rates
 job_ids = [0, 1, 2, 3]
 learning_rates = [0.1, 0.01, 0.001, 0.0001]  # Add your learning rates here
 
 # Generate experiment ID and log directory
-current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+current_datetime = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 expid = f"multi_job_{current_datetime}"
 root_log_dir = "logs"
-log_dir = os.path.join(root_log_dir, workload_type, dataloader, expid)
+log_dir = os.path.join(root_log_dir, workload_type, dataset, dataloader, expid)
 os.makedirs(log_dir, exist_ok=True)  # Ensure the log directory exists
 
 # Start resource monitoring
@@ -44,7 +45,7 @@ with open(os.path.join(log_dir, "resource_monitor.log"), "w") as log_file:
 monitor_pid = monitor_process.pid
 
 # Track training start time
-training_started_datetime = datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S")
+training_started_datetime =  datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 print(f"Training started UTC Time: {training_started_datetime}")
 
 # Loop over jobs
@@ -64,7 +65,7 @@ for process in job_pids:
     process.wait()
 
 # Track training end time
-training_ended_datetime = datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S")
+training_ended_datetime =  datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 print(f"Training started UTC Time: {training_started_datetime}")
 print(f"Training ended UTC Time: {training_ended_datetime}")
 
