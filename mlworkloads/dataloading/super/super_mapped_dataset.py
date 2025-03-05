@@ -167,7 +167,7 @@ class SUPERMappedDataset(Dataset):
         # If data is fetched from cache and it's in the correct format
         if next_minibatch  is not None and (isinstance(next_minibatch , bytes) or isinstance(next_minibatch , str)):
             start_transformation_time   = time.perf_counter()
-            data_samples, labels = self._bytes_to_torch_batch(next_minibatch)
+            batch_data, batch_labels = self._bytes_to_torch_batch(next_minibatch)
             transformation_time  =  time.perf_counter() - start_transformation_time 
             cache_hit = True
         else:
