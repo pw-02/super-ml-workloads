@@ -211,18 +211,6 @@ class SUPERMappedDataset(Dataset):
             else:
                 self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
 
-    # def _torch_batch_to_bytes(self, data_samples: torch.Tensor, labels: torch.Tensor) -> str:
-    #     with BytesIO() as buffer:
-    #         torch.save((data_samples, labels), buffer)
-    #         bytes_minibatch = buffer.getvalue()
-    #         # print(f"Serialized minibatch size: {sys.getsizeof(bytes_minibatch)} bytes")
-    #         if self.use_compression:
-    #             bytes_minibatch = lz4.frame.compress(bytes_minibatch,  compression_level=0)
-    #         # bytes_minibatch = zlib.compress(bytes_minibatch,level=0)
-
-    #         # print(f"Compressed minibatch size: {sys.getsizeof(bytes_minibatch)} bytes)")
-    #         #bytes_minibatch = self.compressor.compress(bytes_minibatch)
-    #     return bytes_minibatch
 
     def _torch_batch_to_bytes(self, minibatch):
         with BytesIO() as buffer:
@@ -232,9 +220,7 @@ class SUPERMappedDataset(Dataset):
             if self.use_compression:
                 bytes_minibatch = lz4.frame.compress(bytes_minibatch,  compression_level=0)
             # bytes_minibatch = zlib.compress(bytes_minibatch,level=0)
-
             # print(f"Compressed minibatch size: {sys.getsizeof(bytes_minibatch)} bytes)")
-            #bytes_minibatch = self.compressor.compress(bytes_minibatch)
         return bytes_minibatch
     
     def _bytes_to_torch_batch(self, bytes_minibatch) -> tuple:
@@ -245,7 +231,6 @@ class SUPERMappedDataset(Dataset):
         # compressed_batch = zlib.decompress(bytes_minibatch)
         # print(f"Decompression time: {time.perf_counter() - time_start}")
         # time_start = time.perf_counter()
-        # bytes_minibatch = self.decompressor.decompress(bytes_minibatch)
         with BytesIO(bytes_minibatch) as buffer:
             data_samples, labels = torch.load(buffer)
         # print(f"Deserialization time: {time.perf_counter() - time_start}")
