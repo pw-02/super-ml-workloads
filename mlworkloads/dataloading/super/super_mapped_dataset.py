@@ -183,15 +183,16 @@ class SUPERMappedDataset(Dataset):
             cache_hit = False
             
             # Convert to tensors
-            data_samples= torch.stack(data_samples)
-            labels = torch.tensor(labels)
+            batch_data= torch.stack(data_samples)
+            batch_labels = torch.tensor(labels)
             
             # Cache the data if enabled
             # if self.use_cache and not is_cached: 
             if self.use_cache: 
                 try:
                     self._initialize_cache_client()
-                    batch_as_bytes = self._torch_batch_to_bytes(data_samples, labels)
+                    minibatch = torch.stack(batch_data), torch.tensor(batch_labels)
+                    batch_as_bytes = self._torch_batch_to_bytes(minibatch)
                     cached_after_fetch = self.cache_minibatch_with_retries(batch_id, batch_as_bytes)
                 except Exception as e:
                     print(f"Error saving to cache: {e}, batch_id: {batch_id}")
@@ -199,7 +200,7 @@ class SUPERMappedDataset(Dataset):
         # Calculate data loading time excluding transformation time
         data_loading_time  = time.perf_counter() - start_loading_time - transformation_time
         
-        return (data_samples,labels,batch_id), data_loading_time, transformation_time, cache_hit, cached_after_fetch
+        return (batch_data,batch_labels,batch_id), data_loading_time, transformation_time, cache_hit, cached_after_fetch
     
     def _initialize_cache_client(self):
         """Initialize Redis cache client if not already connected."""
@@ -210,9 +211,22 @@ class SUPERMappedDataset(Dataset):
             else:
                 self.cache_client = redis.StrictRedis(host=self.cache_host, port=self.cache_port)
 
-    def _torch_batch_to_bytes(self, data_samples: torch.Tensor, labels: torch.Tensor) -> str:
+    # def _torch_batch_to_bytes(self, data_samples: torch.Tensor, labels: torch.Tensor) -> str:
+    #     with BytesIO() as buffer:
+    #         torch.save((data_samples, labels), buffer)
+    #         bytes_minibatch = buffer.getvalue()
+    #         # print(f"Serialized minibatch size: {sys.getsizeof(bytes_minibatch)} bytes")
+    #         if self.use_compression:
+    #             bytes_minibatch = lz4.frame.compress(bytes_minibatch,  compression_level=0)
+    #         # bytes_minibatch = zlib.compress(bytes_minibatch,level=0)
+
+    #         # print(f"Compressed minibatch size: {sys.getsizeof(bytes_minibatch)} bytes)")
+    #         #bytes_minibatch = self.compressor.compress(bytes_minibatch)
+    #     return bytes_minibatch
+
+    def _torch_batch_to_bytes(self, minibatch):
         with BytesIO() as buffer:
-            torch.save((data_samples, labels), buffer)
+            torch.save(minibatch, buffer)
             bytes_minibatch = buffer.getvalue()
             # print(f"Serialized minibatch size: {sys.getsizeof(bytes_minibatch)} bytes")
             if self.use_compression:
