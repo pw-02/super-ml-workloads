@@ -17,38 +17,30 @@ def get_python_command():
             print("Error: Python is not installed.", file=sys.stderr)
             sys.exit(1)
 
+#Coefficient of Variation (CV) = Standard Deviation / Mean
 
 #job speeds to tested
 job_speeds_list = [
     # Very Low Variability (CV ≈ 0.05)
-    [1.01, 0.99, 1.00, 1.02],  
-    
+    [1.01, 0.99, 1.00, 1.02],
     # Low Variability (CV ≈ 0.1)
     [1.05, 0.97, 1.02, 0.98],  
-    
     # Mild Variability (CV ≈ 0.2)
     [0.9, 1.0, 1.1, 1.0],  
-    
     # Moderate Variability (CV ≈ 0.35)
     [0.8, 0.9, 1.2, 1.1],  
-    
     # Medium-High Variability (CV ≈ 0.5)
     [0.6, 0.8, 1.4, 1.2],  
-    
     # High Variability (CV ≈ 0.7)
     [0.5, 0.7, 1.5, 1.2],  
-    
     # Very High Variability (CV ≈ 1.0)
     [0.3, 0.6, 2.0, 1.5],  
-    
     # Extreme Variability (CV ≈ 1.3)
     [0.2, 0.5, 2.5, 2.0],  
-    
     # Ultra-Extreme Variability (CV ≈ 1.7)
     [0.1, 0.4, 2.8, 2.2],  
-    
     # Maximum Variability (CV > 2.0)
-    [0.05, 0.3, 3.5, 2.5]  
+    [0.05, 0.3, 3.5, 2.5]
 ]
 0,2,4,6,8
 run_id = 8
