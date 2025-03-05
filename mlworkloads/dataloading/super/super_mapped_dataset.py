@@ -240,6 +240,7 @@ class SUPERMappedDataset(Dataset):
     def _bytes_to_torch_batch(self, bytes_minibatch) -> tuple:
         # time_start = time.perf_counter()
         if self.use_compression:
+            print("Decompressing minibatch")
             bytes_minibatch = lz4.frame.decompress(bytes_minibatch)
         # compressed_batch = zlib.decompress(bytes_minibatch)
         # print(f"Decompression time: {time.perf_counter() - time_start}")
