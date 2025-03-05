@@ -54,7 +54,7 @@ for i, workload in enumerate(workload_configs):
     workload = workload_configs[i]
     lr = learning_rates[i]
     print(f"Starting job on GPU {i} with workload {workload} and exp_id {expid}_{i}")
-    run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir} workload.num_pytorch_workers=8"
+    run_cmd = f"CUDA_VISIBLE_DEVICES={i} {python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={i} dataloader={dataloader} log_dir={log_dir} workload.num_pytorch_workers=2"
     #run_cmd = f"{python_cmd} mlworkloads/run.py workload={workload} exp_id={expid} job_id={jobid} dataloader={dataloader} log_dir={log_dir}"
     process = subprocess.Popen(run_cmd, shell=True)
     job_pids.append(process)
