@@ -191,7 +191,7 @@ class SUPERMappedDataset(Dataset):
             if self.use_cache: 
                 try:
                     self._initialize_cache_client()
-                    minibatch = torch.stack(batch_data), torch.tensor(batch_labels)
+                    minibatch = batch_data, batch_labels
                     batch_as_bytes = self._torch_batch_to_bytes(minibatch)
                     cached_after_fetch = self.cache_minibatch_with_retries(batch_id, batch_as_bytes)
                 except Exception as e:
