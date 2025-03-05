@@ -76,6 +76,7 @@ def train_image_classifer(config: DictConfig,  train_logger: CSVLogger, val_logg
                                           batch_size=None,
                                           sampler=train_sampler, 
                                           num_workers=config.workload.num_pytorch_workers,
+                                          prefetch_factor=8,
                                           pin_memory=True)
             train_dataloader = fabric.setup_dataloaders(train_dataloader, move_to_device=True)
 
