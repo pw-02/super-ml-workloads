@@ -3,6 +3,6 @@ grpc_server_address: 10.0.25.0:50051   #10.0.17.5:50051 #10.0.17.5:50051 # 10.0.
 cache_address: 10.0.25.0:6378 #redos-rdior4.serverless.usw2.cache.amazonaws.com:6379 #10.0.21.36:6378 #127.0.0.1:6379 #10.0.17.5:6378  # 10.0.17.5:6378  #10.0.17.5:6378 #null # 10.0.17.5:6378  #10.0.17.31:6378 # null # 54.245.179.233:6378 #null
 drop_last: False
 shuffle: True
-use_compression: False
+use_compression: True
 use_local_folder: False
 ssl_enabled: False
