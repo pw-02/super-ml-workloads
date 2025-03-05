@@ -450,6 +450,7 @@ def validate_loop(fabric,job_id, val_logger:CSVLogger, model, dataloader, val_st
             f" Job {job_id} | Epoch {metrics['Epoch Index']}({metrics['Batch Index']}/{min(len(dataloader), limit_val_batches)}) |"
             f" iter time: {metrics['Total Iteration Time (s)']:.2f} |"
             f" dataload time: {metrics['Data Fetch Time (s)']:.2f} |"
+            f" transform time: {metrics['Transformation Time (s)']:.2f} |"
             f" gpu time: {metrics['Data Fetch Time (s)']:.2f} |"
             f" elapsed time: {metrics['Elapsed Time (s)']:.2f} |"
             f" val loss: {metrics['Avg Validation Loss']:.3f} |"
